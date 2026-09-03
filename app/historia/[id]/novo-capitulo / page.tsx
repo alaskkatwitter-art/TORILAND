@@ -201,4 +201,4 @@ export default function NovoCapituloPage() {
       </div>
     </main>
   );
-              }
+}
