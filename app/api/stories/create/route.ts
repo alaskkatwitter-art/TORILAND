@@ -7,10 +7,24 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY!
 );
 
+function createSlug(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export async function POST(request: Request) {
   let uploadedCoverPath = '';
 
   try {
+    // =====================================================
+    // AUTENTICAÇÃO
+    // =====================================================
+
     const cookieHeader = request.headers.get('cookie') || '';
 
     const sessionCookie = cookieHeader
@@ -56,16 +70,26 @@ export async function POST(request: Request) {
       new Date(session.expires_at).getTime() <= Date.now()
     ) {
       return NextResponse.json(
-        { error: 'Sua sessão expirou. Entre novamente.' },
+        {
+          error:
+            'Sua sessão expirou. Entre novamente.',
+        },
         { status: 401 }
       );
     }
+
+    // =====================================================
+    // FORMULÁRIO
+    // =====================================================
 
     const formData = await request.formData();
 
     const titleValue = formData.get('title');
     const descriptionValue = formData.get('description');
     const statusValue = formData.get('status');
+    const genreValue = formData.get('genre');
+    const ratingValue = formData.get('rating');
+    const tagsValue = formData.get('tags');
     const coverValue = formData.get('cover');
 
     const title =
@@ -83,10 +107,30 @@ export async function POST(request: Request) {
         ? statusValue.trim()
         : 'Em andamento';
 
+    const genre =
+      typeof genreValue === 'string'
+        ? genreValue.trim()
+        : '';
+
+    const rating =
+      typeof ratingValue === 'string'
+        ? ratingValue.trim()
+        : '';
+
+    const tagsText =
+      typeof tagsValue === 'string'
+        ? tagsValue.trim()
+        : '';
+
+    // =====================================================
+    // VALIDAÇÕES
+    // =====================================================
+
     if (!title) {
       return NextResponse.json(
         {
-          error: 'O título da história é obrigatório.',
+          error:
+            'O título da história é obrigatório.',
         },
         { status: 400 }
       );
@@ -126,9 +170,36 @@ export async function POST(request: Request) {
       );
     }
 
+    const allowedRatings = [
+      '',
+      'Livre',
+      '10',
+      '12',
+      '14',
+      '16',
+      '18',
+    ];
+
+    if (!allowedRatings.includes(rating)) {
+      return NextResponse.json(
+        {
+          error:
+            'Classificação de história inválida.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // =====================================================
+    // UPLOAD DA CAPA
+    // =====================================================
+
     let coverUrl: string | null = null;
 
-    if (coverValue instanceof File && coverValue.size > 0) {
+    if (
+      coverValue instanceof File &&
+      coverValue.size > 0
+    ) {
       const allowedTypes = [
         'image/jpeg',
         'image/png',
@@ -200,6 +271,10 @@ export async function POST(request: Request) {
       coverUrl = publicUrlData.publicUrl;
     }
 
+    // =====================================================
+    // CRIAR HISTÓRIA
+    // =====================================================
+
     const { data: story, error: storyError } =
       await supabase
         .from('stories')
@@ -232,14 +307,155 @@ export async function POST(request: Request) {
       );
     }
 
+    // =====================================================
+    // PROCESSAR TAGS
+    // =====================================================
+
+    const tagNames = tagsText
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+    // Evita tags repetidas no mesmo formulário
+    const uniqueTagNames = Array.from(
+      new Map(
+        tagNames.map((tag) => [
+          createSlug(tag),
+          tag,
+        ])
+      ).values()
+    );
+
+    // O gênero também entra como tag.
+    if (genre) {
+      const genreSlug = createSlug(genre);
+
+      const alreadyExists = uniqueTagNames.some(
+        (tag) => createSlug(tag) === genreSlug
+      );
+
+      if (!alreadyExists) {
+        uniqueTagNames.push(genre);
+      }
+    }
+
+    // Limite de segurança
+    const limitedTags =
+      uniqueTagNames.slice(0, 30);
+
+    if (limitedTags.length > 0) {
+      // ---------------------------------------------------
+      // Buscar categorias
+      // ---------------------------------------------------
+
+      const { data: genreCategory } =
+        await supabase
+          .from('tag_categories')
+          .select('id')
+          .eq('slug', 'genre')
+          .maybeSingle();
+
+      const { data: freeformCategory } =
+        await supabase
+          .from('tag_categories')
+          .select('id')
+          .eq('slug', 'freeform')
+          .maybeSingle();
+
+      // ---------------------------------------------------
+      // Criar / reutilizar tags
+      // ---------------------------------------------------
+
+      const tagIds: string[] = [];
+
+      for (const tagName of limitedTags) {
+        const tagSlug = createSlug(tagName);
+
+        if (!tagSlug) {
+          continue;
+        }
+
+        const isGenre =
+          genre &&
+          createSlug(genre) === tagSlug;
+
+        const categoryId = isGenre
+          ? genreCategory?.id || null
+          : freeformCategory?.id || null;
+
+        // Primeiro tenta encontrar a tag existente
+        const { data: existingTag } =
+          await supabase
+            .from('tags')
+            .select('id')
+            .eq('slug', tagSlug)
+            .maybeSingle();
+
+        if (existingTag) {
+          tagIds.push(existingTag.id);
+          continue;
+        }
+
+        // Se não existir, cria
+        const { data: newTag, error: tagError } =
+          await supabase
+            .from('tags')
+            .insert({
+              name: tagName,
+              slug: tagSlug,
+              category_id: categoryId,
+              created_by: session.user_id,
+            })
+            .select('id')
+            .single();
+
+        if (!tagError && newTag) {
+          tagIds.push(newTag.id);
+        }
+      }
+
+      // ---------------------------------------------------
+      // Relacionar tags com a história
+      // ---------------------------------------------------
+
+      if (tagIds.length > 0) {
+        const storyTags = tagIds.map((tagId) => ({
+          story_id: story.id,
+          tag_id: tagId,
+        }));
+
+        const { error: storyTagsError } =
+          await supabase
+            .from('story_tags')
+            .insert(storyTags);
+
+        if (storyTagsError) {
+          console.error(
+            'Erro ao relacionar tags:',
+            storyTagsError
+          );
+        }
+      }
+    }
+
+    // =====================================================
+    // RESPOSTA
+    // =====================================================
+
     return NextResponse.json(
       {
-        message: 'História criada com sucesso.',
+        message:
+          'História criada com sucesso.',
         story,
       },
       { status: 201 }
     );
-  } catch {
+  } catch (error) {
+    console.error(
+      'Erro ao criar história:',
+      error
+    );
+
     if (uploadedCoverPath) {
       await supabase.storage
         .from('story-covers')
