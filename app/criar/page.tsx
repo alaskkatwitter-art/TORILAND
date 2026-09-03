@@ -18,6 +18,9 @@ export default function CriarHistoriaPage() {
     null
   );
 
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+
   function handleCoverChange(
     event: React.ChangeEvent<HTMLInputElement>
   ) {
@@ -32,27 +35,64 @@ export default function CriarHistoriaPage() {
     ];
 
     if (!allowedTypes.includes(file.type)) {
-      alert('Use uma imagem JPG, PNG ou WEBP.');
+      setError('Use uma imagem JPG, PNG ou WEBP.');
       return;
     }
 
     if (file.size > 8 * 1024 * 1024) {
-      alert('A capa pode ter no máximo 8 MB.');
+      setError('A capa pode ter no máximo 8 MB.');
       return;
     }
+
+    setError('');
 
     const previewUrl = URL.createObjectURL(file);
     setCoverPreview(previewUrl);
   }
 
-  function handleSubmit(
+  async function handleSubmit(
     event: React.FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
 
-    alert(
-      'A página está pronta. Na próxima etapa vamos conectar este formulário ao Supabase.'
-    );
+    if (!title.trim()) {
+      setError('Digite um título para sua história.');
+      return;
+    }
+
+    setCreating(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/stories/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error ||
+            'Não foi possível criar a história.'
+        );
+        return;
+      }
+
+      router.push('/perfil');
+      router.refresh();
+    } catch {
+      setError(
+        'Não foi possível criar a história. Tente novamente.'
+      );
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
@@ -94,6 +134,12 @@ export default function CriarHistoriaPage() {
             adicionar capítulos depois.
           </p>
         </div>
+
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">
+            {error}
+          </div>
+        )}
 
         <form
           onSubmit={handleSubmit}
@@ -369,16 +415,20 @@ export default function CriarHistoriaPage() {
             <button
               type="button"
               onClick={() => router.push('/perfil')}
-              className="rounded-full border border-white/10 px-7 py-3.5 text-sm font-semibold text-white/50 transition hover:border-white/20 hover:text-white"
+              disabled={creating}
+              className="rounded-full border border-white/10 px-7 py-3.5 text-sm font-semibold text-white/50 transition hover:border-white/20 hover:text-white disabled:opacity-40"
             >
               Cancelar
             </button>
 
             <button
               type="submit"
-              className="rounded-full bg-[#ff78b9] px-8 py-3.5 text-sm font-bold text-[#180d15] transition hover:brightness-110"
+              disabled={creating}
+              className="rounded-full bg-[#ff78b9] px-8 py-3.5 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50"
             >
-              Criar história
+              {creating
+                ? 'Criando história...'
+                : 'Criar história'}
             </button>
           </div>
         </form>
@@ -409,4 +459,4 @@ function CloudLogo() {
       />
     </svg>
   );
-                    }
+}
