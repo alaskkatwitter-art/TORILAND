@@ -66,9 +66,26 @@ export async function POST(request: Request) {
         ? body.title.trim()
         : '';
 
+    const description =
+      typeof body.description === 'string'
+        ? body.description.trim()
+        : '';
+
+    const status =
+      typeof body.status === 'string'
+        ? body.status.trim()
+        : 'Em andamento';
+
+    const coverUrl =
+      typeof body.cover_url === 'string'
+        ? body.cover_url.trim()
+        : '';
+
     if (!title) {
       return NextResponse.json(
-        { error: 'O título da história é obrigatório.' },
+        {
+          error: 'O título da história é obrigatório.',
+        },
         { status: 400 }
       );
     }
@@ -83,14 +100,43 @@ export async function POST(request: Request) {
       );
     }
 
+    if (description.length > 2000) {
+      return NextResponse.json(
+        {
+          error:
+            'A sinopse pode ter no máximo 2000 caracteres.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const allowedStatuses = [
+      'Em andamento',
+      'Concluída',
+    ];
+
+    if (!allowedStatuses.includes(status)) {
+      return NextResponse.json(
+        {
+          error: 'Status de história inválido.',
+        },
+        { status: 400 }
+      );
+    }
+
     const { data: story, error: storyError } =
       await supabase
         .from('stories')
         .insert({
           author: session.user_id,
           title,
+          description: description || null,
+          status,
+          cover_url: coverUrl || null,
         })
-        .select('id, author, title')
+        .select(
+          'id, author, title, description, cover_url, status, created_at, updated_at'
+        )
         .single();
 
     if (storyError || !story) {
