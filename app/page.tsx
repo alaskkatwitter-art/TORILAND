@@ -1,224 +1,350 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Heart,
-  MessageCircle,
-  BookOpen,
-  Home,
-  User,
-  Search,
-  Moon,
-  Sun,
-  Send,
-  Bookmark,
-  BarChart3,
-  Share2,
-  ChevronRight,
-  Plus,
-  Check,
-} from 'lucide-react';
 
 type Story = {
+  id: number;
   title: string;
   author: string;
   description: string;
-  progress: number;
-  comments: number;
-  likes: number;
-  chapters: number;
 };
 
 const stories: Story[] = [
   {
-    title: 'The Dragon and the Rose',
-    author: 'alaskkatwitter',
-    description:
-      'Entre dragões, segredos e uma promessa antiga, dois destinos se encontram.',
-    progress: 68,
-    comments: 342,
-    likes: 1240,
-    chapters: 18,
+    id: 1,
+    title: 'Entre Dragões e Estrelas',
+    author: 'Valarr',
+    description: 'Uma história de amor, magia e dragões.',
   },
   {
-    title: 'Ashes of Winter',
-    author: 'rhaenyra',
-    description:
-      'Um reino dividido. Uma princesa sem medo. E uma guerra que ninguém consegue evitar.',
-    progress: 34,
-    comments: 189,
-    likes: 876,
-    chapters: 12,
+    id: 2,
+    title: 'O Último Reino',
+    author: 'Jolie',
+    description: 'Quando dois destinos se encontram.',
   },
   {
-    title: 'A Crown of Starlight',
-    author: 'daeron',
-    description:
-      'Algumas histórias começam muito antes de seus protagonistas nascerem.',
-    progress: 12,
-    comments: 91,
-    likes: 534,
-    chapters: 9,
+    id: 3,
+    title: 'Asas de Fogo',
+    author: 'Daeron',
+    description: 'Um segredo antigo está prestes a despertar.',
   },
 ];
 
-const feedPosts = [
-  {
-    author: 'alaskkatwitter',
-    time: '2h',
-    text: 'Finalmente terminei o capítulo 18! 🥹',
-    likes: 82,
-    comments: 21,
-  },
-  {
-    author: 'rhaenyra',
-    time: '5h',
-    text: 'Qual personagem vocês acham que vai trair a protagonista?',
-    likes: 114,
-    comments: 47,
-  },
-];
-
-export default function HomePage() {
-  const [activeTab, setActiveTab] = useState('home');
-  const [darkMode, setDarkMode] = useState(true);
+export default function Home() {
+  const [tab, setTab] = useState('home');
   const [liked, setLiked] = useState<number[]>([]);
-  const [followed, setFollowed] = useState(false);
+  const [following, setFollowing] = useState(false);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
-  const [commentOpen, setCommentOpen] = useState(false);
-  const [commentText, setCommentText] = useState('');
-  const [shared, setShared] = useState(false);
-  const [theme, setTheme] = useState('#ff6fba');
+  const [dark, setDark] = useState(true);
 
-  const toggleLike = (index: number) => {
+  function toggleLike(id: number) {
     setLiked((current) =>
-      current.includes(index)
-        ? current.filter((item) => item !== index)
-        : [...current, index]
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id]
     );
-  };
-
-  const openStory = (story: Story) => {
-    setSelectedStory(story);
-    setActiveTab('reading');
-  };
-
-  const pageClass = darkMode
-    ? 'min-h-screen bg-[#120b16] text-[#fff4fb]'
-    : 'min-h-screen bg-[#fff7fc] text-[#271523]';
+  }
 
   return (
-    <main className={pageClass}>
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#120b16]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setActiveTab('home')}
-            className="flex items-center gap-3"
-          >
-            <div
-              className="flex h-11 w-11 items-center justify-center rounded-full"
-              style={{ backgroundColor: theme }}
-            >
-              <span className="text-xl font-black text-white">🐉</span>
-            </div>
-
-            <span className="text-2xl font-black tracking-tight">
-              Toriland
-            </span>
-          </button>
-
-          <nav className="hidden items-center gap-2 md:flex">
-            {[
-              ['home', 'Início', Home],
-              ['feed', 'Feed', MessageCircle],
-              ['stories', 'Histórias', BookOpen],
-              ['profile', 'Perfil', User],
-            ].map(([id, label, Icon]) => (
-              <button
-                key={id as string}
-                onClick={() => setActiveTab(id as string)}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  activeTab === id
-                    ? 'bg-white/10'
-                    : 'text-white/60 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <Icon size={17} />
-                {label as string}
-              </button>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-2">
+    <main className={dark ? 'dark' : ''}>
+      <div className="min-h-screen bg-[#120b16] text-white">
+        <header className="sticky top-0 z-20 border-b border-pink-300/10 bg-[#120b16]/95 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
             <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="rounded-xl p-2 text-white/70 hover:bg-white/10"
+              onClick={() => setTab('home')}
+              className="text-2xl font-black text-pink-400"
             >
-              {darkMode ? <Sun size={19} /> : <Moon size={19} />}
+              Toriland
             </button>
 
             <button
-              onClick={() => setActiveTab('profile')}
-              className="h-10 w-10 overflow-hidden rounded-full border-2"
-              style={{ borderColor: theme }}
+              onClick={() => setDark(!dark)}
+              className="rounded-xl border border-white/10 px-3 py-2 text-sm"
             >
-              <div
-                className="flex h-full w-full items-center justify-center text-sm font-black"
-                style={{ backgroundColor: `${theme}55` }}
-              >
-                A
-              </div>
+              {dark ? '☀️' : '🌙'}
             </button>
           </div>
-        </div>
-      </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        {activeTab === 'home' && (
-          <>
-            <section className="mb-10">
-              <div className="grid gap-8 rounded-3xl border border-pink-300/10 bg-gradient-to-br from-[#29142d] to-[#160d1b] p-7 md:grid-cols-[1.4fr_.6fr] md:p-10">
-                <div>
-                  <p
-                    className="mb-3 text-sm font-bold uppercase tracking-[.25em]"
-                    style={{ color: theme }}
-                  >
-                    seu cantinho de histórias
+          <nav className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 pb-3">
+            <NavButton
+              active={tab === 'home'}
+              onClick={() => setTab('home')}
+            >
+              🏠 Início
+            </NavButton>
+
+            <NavButton
+              active={tab === 'feed'}
+              onClick={() => setTab('feed')}
+            >
+              ✨ Feed
+            </NavButton>
+
+            <NavButton
+              active={tab === 'stories'}
+              onClick={() => setTab('stories')}
+            >
+              📚 Histórias
+            </NavButton>
+
+            <NavButton
+              active={tab === 'profile'}
+              onClick={() => setTab('profile')}
+            >
+              👤 Perfil
+            </NavButton>
+          </nav>
+        </header>
+
+        <section className="mx-auto max-w-6xl px-4 py-8">
+          {tab === 'home' && (
+            <>
+              <div className="rounded-3xl border border-pink-300/10 bg-[#1b101f] p-6">
+                <p className="mb-2 text-sm font-semibold text-pink-300">
+                  SEU CANTINHO DE HISTÓRIAS
+                </p>
+
+                <h1 className="text-4xl font-black">
+                  Bem-vinda ao Toriland ✨
+                </h1>
+
+                <p className="mt-3 max-w-2xl text-white/60">
+                  Um lugar para descobrir histórias, acompanhar autores,
+                  comentar e mergulhar em novos universos.
+                </p>
+
+                <button
+                  onClick={() => setTab('stories')}
+                  className="mt-6 rounded-2xl bg-pink-500 px-5 py-3 font-bold"
+                >
+                  Explorar histórias
+                </button>
+              </div>
+
+              <h2 className="mt-10 text-2xl font-bold">
+                Histórias em destaque
+              </h2>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-3">
+                {stories.map((story) => (
+                  <StoryCard
+                    key={story.id}
+                    story={story}
+                    liked={liked.includes(story.id)}
+                    onLike={() => toggleLike(story.id)}
+                    onOpen={() => setSelectedStory(story)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
+          {tab === 'feed' && (
+            <div>
+              <h1 className="text-3xl font-black">Seu Feed ✨</h1>
+
+              <div className="mt-6 space-y-4">
+                <article className="rounded-3xl border border-white/10 bg-[#1b101f] p-5">
+                  <p className="font-bold">Valarr publicou um novo capítulo.</p>
+                  <p className="mt-2 text-white/50">
+                    Entre Dragões e Estrelas — Capítulo 12
                   </p>
 
-                  <h1 className="max-w-2xl text-4xl font-black leading-tight md:text-6xl">
-                    Leia. Escreva.
-                    <br />
-                    <span style={{ color: theme }}>Compartilhe.</span>
-                  </h1>
+                  <button className="mt-4 rounded-xl bg-pink-500 px-4 py-2 font-semibold">
+                    Ler capítulo
+                  </button>
+                </article>
 
-                  <p className="mt-5 max-w-xl text-base leading-7 text-white/60">
-                    Uma comunidade feita para quem vive dentro das histórias.
-                    Salve seu progresso, converse sobre seus trechos favoritos
-                    e descubra novas fanfics.
+                <article className="rounded-3xl border border-white/10 bg-[#1b101f] p-5">
+                  <p className="font-bold">Jolie começou uma nova história.</p>
+                  <p className="mt-2 text-white/50">
+                    O Último Reino
                   </p>
+                </article>
+              </div>
+            </div>
+          )}
 
-                  <div className="mt-7 flex flex-wrap gap-3">
-                    <button
-                      onClick={() => setActiveTab('stories')}
-                      className="rounded-2xl px-5 py-3 font-bold text-black"
-                      style={{ backgroundColor: theme }}
-                    >
-                      Explorar histórias
-                    </button>
+          {tab === 'stories' && (
+            <div>
+              <h1 className="text-3xl font-black">Todas as histórias 📚</h1>
 
-                    <button
-                      onClick={() => setActiveTab('feed')}
-                      className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold"
-                    >
-                      Ver comunidade
-                    </button>
-                  </div>
+              <div className="mt-6 space-y-4">
+                {stories.map((story) => (
+                  <StoryCard
+                    key={story.id}
+                    story={story}
+                    liked={liked.includes(story.id)}
+                    onLike={() => toggleLike(story.id)}
+                    onOpen={() => setSelectedStory(story)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {tab === 'profile' && (
+            <div className="mx-auto max-w-xl">
+              <div className="rounded-3xl border border-white/10 bg-[#1b101f] p-8 text-center">
+                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-pink-500 text-4xl">
+                  🐉
                 </div>
 
-                <div className="hidden items-center justify-center md:flex">
-                  <div
-                    className="flex h-56 w-56 items-center justify-center rounded-full border"
-                    style={{
-                      borderColor: `${theme}55`,
-background: `radial-gradient(circle, ${theme}22, transparent 70%)`,
+                <h1 className="mt-4 text-2xl font-black">
+                  Seu perfil
+                </h1>
+
+                <p className="mt-2 text-white/50">
+                  Leitora e futura autora do Toriland.
+                </p>
+
+                <button
+                  onClick={() => setFollowing(!following)}
+                  className="mt-6 rounded-xl bg-pink-500 px-6 py-3 font-bold"
+                >
+                  {following ? 'Seguindo ✓' : 'Seguir'}
+                </button>
+
+                <div className="mt-8 grid grid-cols-3 gap-3">
+                  <Stat number="0" label="Histórias" />
+                  <Stat number={String(liked.length)} label="Curtidas" />
+                  <Stat number="0" label="Seguidores" />
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {selectedStory && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+            <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#1b101f] p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm text-pink-300">
+                    História
+                  </p>
+
+                  <h2 className="mt-1 text-2xl font-black">
+                    {selectedStory.title}
+                  </h2>
+                </div>
+
+                <button
+                  onClick={() => setSelectedStory(null)}
+                  className="rounded-xl border border-white/10 px-3 py-2"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="mt-5 text-white/60">
+                {selectedStory.description}
+              </p>
+
+              <p className="mt-4 text-sm text-white/40">
+                Por {selectedStory.author}
+              </p>
+
+              <button
+                onClick={() => setSelectedStory(null)}
+                className="mt-6 w-full rounded-xl bg-pink-500 py-3 font-bold"
+              >
+                Começar a ler
+              </button>
+            </div>
+          </div>
+        )}
+
+        <footer className="border-t border-white/10 px-4 py-8 text-center text-sm text-white/30">
+          Toriland © 2026 — histórias para quem ama histórias.
+        </footer>
+      </div>
+    </main>
+  );
+}
+
+function NavButton({
+  children,
+  active,
+  onClick,
+}: {
+  children: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold ${
+        active
+          ? 'bg-pink-500 text-white'
+          : 'bg-white/5 text-white/60'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function StoryCard({
+  story,
+  liked,
+  onLike,
+  onOpen,
+}: {
+  story: Story;
+  liked: boolean;
+  onLike: () => void;
+  onOpen: () => void;
+}) {
+  return (
+    <article className="rounded-3xl border border-white/10 bg-[#1b101f] p-5">
+      <div className="flex h-40 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500/40 to-purple-900/40 text-6xl">
+        📖
+      </div>
+
+      <h3 className="mt-4 text-xl font-black">
+        {story.title}
+      </h3>
+
+      <p className="mt-1 text-sm text-pink-300">
+        por {story.author}
+      </p>
+
+      <p className="mt-3 text-sm text-white/50">
+        {story.description}
+      </p>
+
+      <div className="mt-5 flex gap-2">
+        <button
+          onClick={onOpen}
+          className="flex-1 rounded-xl bg-pink-500 py-2 font-bold"
+        >
+          Ler
+        </button>
+
+        <button
+          onClick={onLike}
+          className="rounded-xl border border-white/10 px-4"
+        >
+          {liked ? '❤️' : '🤍'}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function Stat({
+  number,
+  label,
+}: {
+  number: string;
+  label: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-white/5 p-4">
+      <strong className="block text-xl">{number}</strong>
+      <span className="text-xs text-white/40">{label}</span>
+    </div>
+  );
+}
