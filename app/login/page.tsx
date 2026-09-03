@@ -55,12 +55,38 @@ export default function LoginPage() {
     }
   }
 
-  function handleLogin(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleLogin(event: React.FormEvent) {
+  event.preventDefault();
 
-    setError(
-      'O login será conectado na próxima etapa.'
-    );
+  setError('');
+  setLoading(true);
+
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username,
+        password,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setError(data.error || 'Username ou senha incorretos.');
+      return;
+    }
+
+    router.push('/');
+    router.refresh();
+  } catch {
+    setError('Não foi possível conectar ao Toriland.');
+  } finally {
+    setLoading(false);
+  }
   }
 
   if (recoveryKey) {
