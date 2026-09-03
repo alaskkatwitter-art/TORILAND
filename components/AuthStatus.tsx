@@ -18,6 +18,7 @@ export default function AuthStatus() {
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     async function loadUser() {
@@ -48,6 +49,22 @@ export default function AuthStatus() {
     loadUser();
   }, []);
 
+  async function handleLogout() {
+    setLoggingOut(true);
+
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+
+      setUser(null);
+      router.push('/');
+      router.refresh();
+    } catch {
+      setLoggingOut(false);
+    }
+  }
+
   if (loading) {
     return null;
   }
@@ -64,17 +81,27 @@ export default function AuthStatus() {
   }
 
   return (
-    <button
-      onClick={() => router.push('/perfil')}
-      className="flex items-center gap-3 rounded-full border border-white/10 bg-[#191219] px-4 py-2 transition hover:border-[#ff78b9]/40"
-    >
-      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff78b9] text-xs font-black text-[#180d15]">
-        {user.username.charAt(0).toUpperCase()}
-      </div>
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => router.push('/perfil')}
+        className="flex items-center gap-3 rounded-full border border-white/10 bg-[#191219] px-4 py-2 transition hover:border-[#ff78b9]/40"
+      >
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff78b9] text-xs font-black text-[#180d15]">
+          {user.username.charAt(0).toUpperCase()}
+        </div>
 
-      <span className="max-w-[120px] truncate text-sm font-semibold text-white">
-        @{user.username}
-      </span>
-    </button>
+        <span className="max-w-[120px] truncate text-sm font-semibold text-white">
+          @{user.username}
+        </span>
+      </button>
+
+      <button
+        onClick={handleLogout}
+        disabled={loggingOut}
+        className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white/50 transition hover:border-[#ff78b9]/40 hover:text-[#ff78b9] disabled:opacity-50"
+      >
+        {loggingOut ? 'Saindo...' : 'Sair'}
+      </button>
+    </div>
   );
 }
