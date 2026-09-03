@@ -3,247 +3,253 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-const notifications = [
-  {
-    type: 'like',
-    title: 'Lia curtiu sua história',
-    description: 'Entre Dois Mundos',
-    time: 'há 5 minutos',
-    category: 'Histórias',
-    unread: true,
-  },
-  {
-    type: 'comment',
-    title: 'Noah comentou na sua história',
-    description: '"Esse capítulo acabou comigo. Preciso do próximo!"',
-    time: 'há 18 minutos',
-    category: 'Histórias',
-    unread: true,
-  },
-  {
-    type: 'follow',
-    title: 'Maya começou a seguir você',
-    description: '@mayawrites',
-    time: 'há 1 hora',
-    category: 'Social',
-    unread: true,
-  },
-  {
-    type: 'update',
-    title: 'Uma história que você acompanha foi atualizada',
-    description: 'As Cinzas do Reino · Capítulo 9',
-    time: 'há 3 horas',
-    category: 'Histórias',
-    unread: false,
-  },
-  {
-    type: 'like',
-    title: 'Alex curtiu seu capítulo',
-    description: 'Depois da Meia-Noite · Capítulo 7',
-    time: 'ontem',
-    category: 'Histórias',
-    unread: false,
-  },
-  {
-    type: 'follow',
-    title: 'Clara começou a seguir você',
-    description: '@clarawrites',
-    time: 'ontem',
-    category: 'Social',
-    unread: false,
-  },
-];
+export default function LoginPage() {
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
 
-export default function NotificationsPage() {
-  const [filter, setFilter] = useState('Todas');
-  const [items, setItems] = useState(notifications);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-  const filtered =
-    filter === 'Todas'
-      ? items
-      : items.filter((item) => item.category === filter);
+  const isSignup = mode === 'signup';
 
-  function markAllAsRead() {
-    setItems((current) =>
-      current.map((item) => ({
-        ...item,
-        unread: false,
-      }))
-    );
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
   }
 
   return (
-    <main className="min-h-screen bg-[#100b12] text-white">
-      <header className="border-b border-white/10 bg-[#100b12]">
-        <div className="mx-auto flex max-w-7xl flex-col items-center px-5 pt-5">
-          <Link href="/" className="flex flex-col items-center">
-            <CloudLogo />
+    <main className="flex min-h-screen bg-[#100b12] text-white">
+      <div className="flex min-h-screen w-full flex-col lg:flex-row">
 
-            <span className="mt-1 text-2xl font-bold tracking-[0.18em] text-[#ff78b9]">
-              TORILAND
-            </span>
-          </Link>
+        <section className="relative hidden overflow-hidden lg:flex lg:w-1/2">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#ff78b9]/20 via-[#191219] to-[#100b12]" />
 
-          <nav className="mt-6 flex w-full items-center justify-center gap-1 overflow-x-auto border-t border-white/5 py-3">
-            <NavLink href="/">Início</NavLink>
+          <div className="absolute -left-20 top-20 h-72 w-72 rounded-full bg-[#ff78b9]/10 blur-3xl" />
 
-            <NavLink href="/explorar">Explorar</NavLink>
+          <div className="absolute bottom-10 right-10 h-96 w-96 rounded-full bg-[#ff78b9]/5 blur-3xl" />
 
-            <NavLink href="/escrever">Escrever</NavLink>
+          <div className="relative z-10 flex w-full flex-col justify-between p-12 xl:p-20">
 
-            <NavLink href="/notificacoes" active>
-              Notificações
-            </NavLink>
+            <Link href="/" className="w-fit">
+              <CloudLogo />
 
-            <NavLink href="/perfil">Perfil</NavLink>
-          </nav>
-        </div>
-      </header>
+              <span className="mt-1 block text-2xl font-bold tracking-[0.18em] text-[#ff78b9]">
+                TORILAND
+              </span>
+            </Link>
 
-      <section className="mx-auto max-w-4xl px-5 py-12">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#ff78b9]">
-              Sua atividade
-            </p>
+            <div className="max-w-lg">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#ff78b9]">
+                Seu lugar para histórias
+              </p>
 
-            <h1 className="mt-2 text-4xl font-black md:text-5xl">
-              Notificações
-            </h1>
+              <h1 className="mt-5 text-5xl font-black leading-tight xl:text-6xl">
+                Onde histórias
+                <br />
+                encontram leitores.
+              </h1>
 
-            <p className="mt-4 text-sm leading-6 text-white/40">
-              Acompanhe tudo o que acontece com suas histórias e seu perfil.
-            </p>
-          </div>
-
-          <button
-            onClick={markAllAsRead}
-            className="w-fit rounded-full border border-white/10 px-5 py-2.5 text-xs font-semibold text-white/50 hover:border-[#ff78b9]/30 hover:text-[#ff78b9]"
-          >
-            Marcar todas como lidas
-          </button>
-        </div>
-
-        <div className="mt-10 flex gap-2 overflow-x-auto border-b border-white/10 pb-3">
-          {['Todas', 'Histórias', 'Social'].map((item) => (
-            <button
-              key={item}
-              onClick={() => setFilter(item)}
-              className={`whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition ${
-                filter === item
-                  ? 'bg-[#ff78b9] text-[#180d15]'
-                  : 'text-white/40 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-[#191219]">
-          {filtered.length > 0 ? (
-            filtered.map((notification, index) => (
-              <Notification
-                key={`${notification.title}-${index}`}
-                {...notification}
-              />
-            ))
-          ) : (
-            <div className="px-6 py-20 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#ff78b9]/10 text-2xl font-light text-[#ff78b9]">
-                —
-              </div>
-
-              <h2 className="mt-5 text-xl font-bold">
-                Nada por aqui
-              </h2>
-
-              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/30">
-                Quando houver novas atividades, elas aparecerão aqui.
+              <p className="mt-6 max-w-md text-base leading-8 text-white/40">
+                Descubra novos mundos, acompanhe seus autores favoritos e
+                transforme suas próprias ideias em histórias.
               </p>
             </div>
-          )}
-        </div>
-      </section>
 
-      <footer className="border-t border-white/10 bg-[#0b080d]">
-        <div className="mx-auto max-w-7xl px-5 py-8 text-center text-sm text-white/30">
-          TORILAND — Um lar para histórias.
-        </div>
-      </footer>
+            <p className="text-xs text-white/20">
+              TORILAND — Um lar para histórias.
+            </p>
+          </div>
+        </section>
+
+        <section className="flex min-h-screen flex-1 items-center justify-center px-5 py-10">
+          <div className="w-full max-w-md">
+
+            <div className="mb-10 text-center lg:hidden">
+              <Link href="/" className="inline-flex flex-col items-center">
+                <CloudLogo />
+
+                <span className="mt-1 text-2xl font-bold tracking-[0.18em] text-[#ff78b9]">
+                  TORILAND
+                </span>
+              </Link>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-[#191219] p-6 shadow-2xl shadow-black/20 sm:p-8">
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#ff78b9]">
+                  {isSignup ? 'Bem-vindo' : 'Que bom ver você'}
+                </p>
+
+                <h2 className="mt-3 text-3xl font-black">
+                  {isSignup ? 'Crie sua conta.' : 'Entre no Toriland.'}
+                </h2>
+
+                <p className="mt-3 text-sm leading-6 text-white/35">
+                  {isSignup
+                    ? 'Crie seu espaço no Toriland usando apenas um nome de usuário e uma senha.'
+                    : 'Entre para continuar suas histórias e acompanhar seus autores.'}
+                </p>
+              </div>
+
+              <div className="mt-8 grid grid-cols-2 rounded-2xl bg-[#100b12] p-1">
+
+                <button
+                  type="button"
+                  onClick={() => setMode('login')}
+                  className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    mode === 'login'
+                      ? 'bg-[#ff78b9] text-[#180d15]'
+                      : 'text-white/35 hover:text-white'
+                  }`}
+                >
+                  Entrar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMode('signup')}
+                  className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    mode === 'signup'
+                      ? 'bg-[#ff78b9] text-[#180d15]'
+                      : 'text-white/35 hover:text-white'
+                  }`}
+                >
+                  Criar conta
+                </button>
+
+              </div>
+
+              <form onSubmit={handleSubmit} className="mt-8">
+
+                <div className="mb-5">
+                  <label className="text-sm font-semibold text-white/70">
+                    Nome de usuário
+                  </label>
+
+                  <div className="mt-2 flex items-center rounded-2xl border border-white/10 bg-[#100b12] px-4 focus-within:border-[#ff78b9]/50">
+
+                    <span className="text-white/25">
+                      @
+                    </span>
+
+                    <input
+                      value={username}
+                      onChange={(event) =>
+                        setUsername(event.target.value)
+                      }
+                      placeholder="seuusuario"
+                      autoComplete="username"
+                      className="w-full bg-transparent px-2 py-3.5 text-sm outline-none placeholder:text-white/20"
+                    />
+
+                  </div>
+
+                  {isSignup && (
+                    <p className="mt-2 text-xs text-white/25">
+                      Escolha um nome único. Ele será usado para encontrar seu perfil.
+                    </p>
+                  )}
+                </div>
+
+                <div className="mb-5">
+
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-semibold text-white/70">
+                      Senha
+                    </label>
+
+                    {!isSignup && (
+                      <span className="text-xs text-white/20">
+                        Sem recuperação por e-mail
+                      </span>
+                    )}
+                  </div>
+
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(event) =>
+                      setPassword(event.target.value)
+                    }
+                    placeholder="Sua senha"
+                    autoComplete={isSignup ? 'new-password' : 'current-password'}
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm outline-none placeholder:text-white/20 focus:border-[#ff78b9]/50"
+                  />
+
+                </div>
+
+                {isSignup && (
+                  <div className="mb-5">
+
+                    <label className="text-sm font-semibold text-white/70">
+                      Confirmar senha
+                    </label>
+
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(event) =>
+                        setConfirmPassword(event.target.value)
+                      }
+                      placeholder="Digite a senha novamente"
+                      autoComplete="new-password"
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm outline-none placeholder:text-white/20 focus:border-[#ff78b9]/50"
+                    />
+
+                  </div>
+                )}
+
+                {isSignup && (
+                  <div className="rounded-2xl border border-[#ff78b9]/10 bg-[#ff78b9]/5 p-4">
+                    <p className="text-xs leading-5 text-white/40">
+                      O Toriland não precisa do seu nome real, e-mail ou
+                      telefone para criar uma conta.
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="mt-6 w-full rounded-full bg-[#ff78b9] px-6 py-3.5 text-sm font-bold text-[#180d15] transition hover:brightness-110"
+                >
+                  {isSignup ? 'Criar minha conta' : 'Entrar'}
+                </button>
+
+              </form>
+
+              <div className="mt-7 text-center">
+
+                <p className="text-sm text-white/30">
+                  {isSignup
+                    ? 'Já tem uma conta?'
+                    : 'Ainda não tem uma conta?'}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMode(isSignup ? 'login' : 'signup')
+                  }
+                  className="mt-2 text-sm font-semibold text-[#ff78b9] hover:underline"
+                >
+                  {isSignup
+                    ? 'Entrar no Toriland'
+                    : 'Criar uma conta'}
+                </button>
+
+              </div>
+
+            </div>
+
+            <p className="mt-6 text-center text-xs leading-5 text-white/20">
+              Sua conta do Toriland não precisa de informações pessoais.
+            </p>
+
+          </div>
+        </section>
+
+      </div>
     </main>
-  );
-}
-
-function Notification({
-  type,
-  title,
-  description,
-  time,
-  unread,
-}: {
-  type: string;
-  title: string;
-  description: string;
-  time: string;
-  unread: boolean;
-}) {
-  return (
-    <div
-      className={`flex gap-4 border-b border-white/5 px-5 py-5 last:border-b-0 ${
-        unread ? 'bg-[#ff78b9]/[0.025]' : ''
-      }`}
-    >
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#ff78b9]/10 text-sm font-bold text-[#ff78b9]">
-        {type === 'like' && 'L'}
-        {type === 'comment' && 'C'}
-        {type === 'follow' && 'S'}
-        {type === 'update' && 'N'}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm font-semibold text-white/85">
-            {title}
-          </p>
-
-          <span className="text-xs text-white/25">
-            {time}
-          </span>
-        </div>
-
-        <p className="mt-1 text-sm leading-6 text-white/40">
-          {description}
-        </p>
-      </div>
-
-      {unread && (
-        <div className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[#ff78b9]" />
-      )}
-    </div>
-  );
-}
-
-function NavLink({
-  href,
-  children,
-  active = false,
-}: {
-  href: string;
-  children: React.ReactNode;
-  active?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium ${
-        active
-          ? 'bg-[#ff78b9] text-[#180d15]'
-          : 'text-white/60 hover:bg-white/5 hover:text-white'
-      }`}
-    >
-      {children}
-    </Link>
   );
 }
 
