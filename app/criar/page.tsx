@@ -3,22 +3,23 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function CriarHistoriaPage() {
+export default function CriarPage() {
   const router = useRouter();
+
   const coverInputRef = useRef<HTMLInputElement | null>(null);
 
   const [title, setTitle] = useState('');
-  const [synopsis, setSynopsis] = useState('');
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState('Em andamento');
+
+  const [cover, setCover] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState('');
+
   const [genre, setGenre] = useState('');
   const [rating, setRating] = useState('');
-  const [status, setStatus] = useState('Em andamento');
   const [tags, setTags] = useState('');
 
-  const [coverPreview, setCoverPreview] = useState<string | null>(
-    null
-  );
-
-  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   function handleCoverChange(
@@ -35,7 +36,7 @@ export default function CriarHistoriaPage() {
     ];
 
     if (!allowedTypes.includes(file.type)) {
-      setError('Use uma imagem JPG, PNG ou WEBP.');
+      setError('Use uma capa em JPG, PNG ou WEBP.');
       return;
     }
 
@@ -45,6 +46,7 @@ export default function CriarHistoriaPage() {
     }
 
     setError('');
+    setCover(file);
 
     const previewUrl = URL.createObjectURL(file);
     setCoverPreview(previewUrl);
@@ -55,24 +57,33 @@ export default function CriarHistoriaPage() {
   ) {
     event.preventDefault();
 
+    setError('');
+
     if (!title.trim()) {
       setError('Digite um título para sua história.');
       return;
     }
 
-    setCreating(true);
-    setError('');
+    setSaving(true);
 
     try {
-      const response = await fetch('/api/stories/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: title.trim(),
-        }),
-      });
+      const formData = new FormData();
+
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('status', status);
+
+      if (cover) {
+        formData.append('cover', cover);
+      }
+
+      const response = await fetch(
+        '/api/stories/create',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const data = await response.json();
 
@@ -91,7 +102,7 @@ export default function CriarHistoriaPage() {
         'Não foi possível criar a história. Tente novamente.'
       );
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   }
 
@@ -114,7 +125,7 @@ export default function CriarHistoriaPage() {
             onClick={() => router.push('/perfil')}
             className="rounded-full border border-white/10 px-5 py-2 text-sm font-semibold text-white/60 transition hover:border-[#ff78b9]/40 hover:text-white"
           >
-            Voltar ao perfil
+            Cancelar
           </button>
         </div>
       </header>
@@ -126,35 +137,41 @@ export default function CriarHistoriaPage() {
           </p>
 
           <h1 className="mt-2 text-4xl font-black">
-            Crie sua história
+            Conte sua história.
           </h1>
 
           <p className="mt-3 max-w-2xl text-sm leading-6 text-white/40">
-            Apresente sua história aos leitores. Você poderá
-            adicionar capítulos depois.
+            Crie a página da sua história agora. Depois você poderá
+            adicionar os capítulos.
           </p>
         </div>
-
-        {error && (
-          <div className="mb-6 rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">
-            {error}
-          </div>
-        )}
 
         <form
           onSubmit={handleSubmit}
           className="space-y-6"
         >
           <section className="rounded-3xl border border-white/10 bg-[#191219] p-6 md:p-8">
-            <h2 className="text-xl font-black">
-              Informações principais
-            </h2>
+            <div className="mb-6">
+              <h2 className="text-xl font-black">
+                Informações principais
+              </h2>
 
-            <div className="mt-6 space-y-5">
+              <p className="mt-1 text-sm text-white/35">
+                Essas informações aparecerão na página da história.
+              </p>
+            </div>
+
+            <div className="space-y-5">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-white/80">
-                  Título
-                </label>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold text-white/80">
+                    Título
+                  </label>
+
+                  <span className="text-xs text-white/30">
+                    {title.length}/100
+                  </span>
+                </div>
 
                 <input
                   type="text"
@@ -163,169 +180,145 @@ export default function CriarHistoriaPage() {
                     setTitle(event.target.value)
                   }
                   maxLength={100}
-                  required
                   placeholder="Nome da sua história"
-                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
+                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
                 />
+              </div>
 
-                <p className="mt-2 text-right text-xs text-white/25">
-                  {title.length}/100
-                </p>
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold text-white/80">
+                    Sinopse
+                  </label>
+
+                  <span className="text-xs text-white/30">
+                    {description.length}/2000
+                  </span>
+                </div>
+
+                <textarea
+                  value={description}
+                  onChange={(event) =>
+                    setDescription(event.target.value)
+                  }
+                  maxLength={2000}
+                  rows={7}
+                  placeholder="Sobre o que é sua história?"
+                  className="w-full resize-none rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
+                />
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-semibold text-white/80">
-                  Sinopse
+                  Status
                 </label>
 
-                <textarea
-                  value={synopsis}
+                <select
+                  value={status}
                   onChange={(event) =>
-                    setSynopsis(event.target.value)
+                    setStatus(event.target.value)
                   }
-                  maxLength={2000}
-                  required
-                  rows={7}
-                  placeholder="Sobre o que é sua história?"
-                  className="w-full resize-none rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm leading-6 text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
-                />
+                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm text-white outline-none transition focus:border-[#ff78b9]/60"
+                >
+                  <option value="Em andamento">
+                    Em andamento
+                  </option>
 
-                <p className="mt-2 text-right text-xs text-white/25">
-                  {synopsis.length}/2000
-                </p>
+                  <option value="Concluída">
+                    Concluída
+                  </option>
+                </select>
               </div>
             </div>
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-[#191219] p-6 md:p-8">
-            <h2 className="text-xl font-black">
-              Capa
-            </h2>
+            <div className="mb-6">
+              <h2 className="text-xl font-black">
+                Capa
+              </h2>
 
-            <p className="mt-1 text-sm text-white/35">
-              Escolha uma imagem para representar sua história.
-            </p>
+              <p className="mt-1 text-sm text-white/35">
+                JPG, PNG ou WEBP. Máximo de 8 MB.
+              </p>
+            </div>
 
-            <div className="mt-6 flex flex-col gap-6 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => coverInputRef.current?.click()}
-                className="group relative h-64 w-44 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-[#100b12] transition hover:border-[#ff78b9]/50"
-              >
-                {coverPreview ? (
+            <button
+              type="button"
+              onClick={() => coverInputRef.current?.click()}
+              className="group relative h-72 w-full overflow-hidden rounded-3xl border border-dashed border-white/15 bg-[#100b12] transition hover:border-[#ff78b9]/50"
+            >
+              {coverPreview ? (
+                <>
                   <img
                     src={coverPreview}
                     alt="Prévia da capa"
                     className="h-full w-full object-cover"
                   />
-                ) : (
-                  <div className="flex h-full flex-col items-center justify-center px-5 text-center">
-                    <span className="text-sm font-bold text-white/50">
-                      Adicionar capa
-                    </span>
 
-                    <span className="mt-2 text-xs leading-5 text-white/25">
-                      JPG, PNG ou WEBP
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition group-hover:opacity-100">
+                    <span className="rounded-full bg-[#191219] px-5 py-2.5 text-sm font-bold">
+                      Alterar capa
                     </span>
                   </div>
-                )}
+                </>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center px-5 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#ff78b9]/10 text-3xl text-[#ff78b9]">
+                    +
+                  </div>
 
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition group-hover:opacity-100">
-                  <span className="rounded-full bg-black/70 px-4 py-2 text-xs font-bold">
-                    Alterar capa
-                  </span>
+                  <p className="mt-4 text-sm font-bold text-white/70">
+                    Adicionar capa
+                  </p>
+
+                  <p className="mt-1 text-xs text-white/30">
+                    Toque aqui para escolher uma imagem
+                  </p>
                 </div>
-              </button>
+              )}
+            </button>
 
-              <input
-                ref={coverInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handleCoverChange}
-                className="hidden"
-              />
-
-              <div className="max-w-sm">
-                <p className="text-sm leading-6 text-white/40">
-                  Recomendamos uma imagem vertical para que a capa
-                  fique bonita nas páginas da história e no feed.
-                </p>
-
-                <p className="mt-3 text-xs leading-5 text-white/25">
-                  Tamanho máximo: 8 MB.
-                </p>
-              </div>
-            </div>
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleCoverChange}
+              className="hidden"
+            />
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-[#191219] p-6 md:p-8">
-            <h2 className="text-xl font-black">
-              Classificação e categoria
-            </h2>
+            <div className="mb-6">
+              <h2 className="text-xl font-black">
+                Organização
+              </h2>
 
-            <div className="mt-6 grid gap-5 md:grid-cols-2">
+              <p className="mt-1 text-sm text-white/35">
+                Essas opções serão conectadas ao banco em uma próxima etapa.
+              </p>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm font-semibold text-white/80">
                   Gênero
                 </label>
 
-                <select
+                <input
+                  type="text"
                   value={genre}
                   onChange={(event) =>
                     setGenre(event.target.value)
                   }
-                  required
-                  className="w-full appearance-none rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm text-white outline-none transition focus:border-[#ff78b9]/60"
-                >
-                  <option value="" disabled>
-                    Selecione um gênero
-                  </option>
-
-                  <option value="Romance">
-                    Romance
-                  </option>
-
-                  <option value="Fantasia">
-                    Fantasia
-                  </option>
-
-                  <option value="Ação">
-                    Ação
-                  </option>
-
-                  <option value="Aventura">
-                    Aventura
-                  </option>
-
-                  <option value="Drama">
-                    Drama
-                  </option>
-
-                  <option value="Terror">
-                    Terror
-                  </option>
-
-                  <option value="Mistério">
-                    Mistério
-                  </option>
-
-                  <option value="Ficção científica">
-                    Ficção científica
-                  </option>
-
-                  <option value="Comédia">
-                    Comédia
-                  </option>
-
-                  <option value="Outro">
-                    Outro
-                  </option>
-                </select>
+                  placeholder="Ex.: Romance, Fantasia"
+                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
+                />
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-semibold text-white/80">
-                  Classificação indicativa
+                  Classificação
                 </label>
 
                 <select
@@ -333,11 +326,10 @@ export default function CriarHistoriaPage() {
                   onChange={(event) =>
                     setRating(event.target.value)
                   }
-                  required
-                  className="w-full appearance-none rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm text-white outline-none transition focus:border-[#ff78b9]/60"
+                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm text-white outline-none transition focus:border-[#ff78b9]/60"
                 >
-                  <option value="" disabled>
-                    Selecione uma classificação
+                  <option value="">
+                    Selecionar
                   </option>
 
                   <option value="Livre">
@@ -365,72 +357,40 @@ export default function CriarHistoriaPage() {
                   </option>
                 </select>
               </div>
-            </div>
 
-            <div className="mt-5">
-              <label className="mb-2 block text-sm font-semibold text-white/80">
-                Status
-              </label>
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm font-semibold text-white/80">
+                  Tags
+                </label>
 
-              <select
-                value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value)
-                }
-                className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm text-white outline-none transition focus:border-[#ff78b9]/60"
-              >
-                <option value="Em andamento">
-                  Em andamento
-                </option>
-
-                <option value="Concluída">
-                  Concluída
-                </option>
-              </select>
+                <input
+                  type="text"
+                  value={tags}
+                  onChange={(event) =>
+                    setTags(event.target.value)
+                  }
+                  placeholder="Ex.: slow burn, enemies to lovers, drama"
+                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
+                />
+              </div>
             </div>
           </section>
 
-          <section className="rounded-3xl border border-white/10 bg-[#191219] p-6 md:p-8">
-            <h2 className="text-xl font-black">
-              Tags
-            </h2>
+          {error && (
+            <div className="rounded-2xl border border-red-400/20 bg-red-400/5 px-5 py-4 text-sm text-red-300">
+              {error}
+            </div>
+          )}
 
-            <p className="mt-1 text-sm text-white/35">
-              Separe as tags por vírgulas.
-            </p>
-
-            <input
-              type="text"
-              value={tags}
-              onChange={(event) =>
-                setTags(event.target.value)
-              }
-              maxLength={300}
-              placeholder="slow burn, enemies to lovers, fantasia..."
-              className="mt-5 w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
-            />
-          </section>
-
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => router.push('/perfil')}
-              disabled={creating}
-              className="rounded-full border border-white/10 px-7 py-3.5 text-sm font-semibold text-white/50 transition hover:border-white/20 hover:text-white disabled:opacity-40"
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="submit"
-              disabled={creating}
-              className="rounded-full bg-[#ff78b9] px-8 py-3.5 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50"
-            >
-              {creating
-                ? 'Criando história...'
-                : 'Criar história'}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full rounded-full bg-[#ff78b9] px-6 py-4 text-sm font-black text-[#180d15] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50"
+          >
+            {saving
+              ? 'Criando história...'
+              : 'Criar história'}
+          </button>
         </form>
       </div>
     </main>
