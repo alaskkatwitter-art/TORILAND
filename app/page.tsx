@@ -221,5 +221,4 @@ export default function HomePage() {
                     className="flex h-56 w-56 items-center justify-center rounded-full border"
                     style={{
                       borderColor: `${theme}55`,
-                      background: `radial-gradient(circle, ${theme}
-background: `radial-gradient(circle, ${theme}
+background: `radial-gradient(circle, ${theme}22, transparent 70%)`,
