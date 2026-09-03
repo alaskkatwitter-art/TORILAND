@@ -15,7 +15,9 @@ type User = {
 
 export default function PerfilPage() {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +28,7 @@ export default function PerfilPage() {
   const [saving, setSaving] = useState(false);
 
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -124,7 +127,7 @@ export default function PerfilPage() {
     setError('');
     setSuccess('');
 
-    fileInputRef.current?.click();
+    avatarInputRef.current?.click();
   }
 
   async function handleAvatarChange(
@@ -178,8 +181,74 @@ export default function PerfilPage() {
     } finally {
       setUploadingAvatar(false);
 
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
+      }
+    }
+  }
+
+  function openCoverPicker() {
+    if (uploadingCover) return;
+
+    setError('');
+    setSuccess('');
+
+    coverInputRef.current?.click();
+  }
+
+  async function handleCoverChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    setUploadingCover(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/profile/cover', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error ||
+            'Não foi possível atualizar sua capa.'
+        );
+        return;
+      }
+
+      setUser((currentUser) =>
+        currentUser
+          ? {
+              ...currentUser,
+              cover_url: data.cover_url,
+            }
+          : currentUser
+      );
+
+      setSuccess('Capa atualizada com sucesso.');
+
+      setTimeout(() => {
+        setSuccess('');
+      }, 2000);
+    } catch {
+      setError(
+        'Não foi possível enviar a capa. Tente novamente.'
+      );
+    } finally {
+      setUploadingCover(false);
+
+      if (coverInputRef.current) {
+        coverInputRef.current.value = '';
       }
     }
   }
@@ -226,9 +295,38 @@ export default function PerfilPage() {
 
       <div className="mx-auto max-w-5xl px-5 py-8">
         <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#191219]">
-          <div className="relative h-48 bg-gradient-to-r from-[#3b1b30] via-[#572544] to-[#241322]">
-            <div className="absolute inset-0 bg-[#ff78b9]/5" />
-          </div>
+          <button
+            type="button"
+            onClick={openCoverPicker}
+            disabled={uploadingCover}
+            className="group relative block h-48 w-full overflow-hidden bg-gradient-to-r from-[#3b1b30] via-[#572544] to-[#241322]"
+          >
+            {user.cover_url && (
+              <img
+                src={user.cover_url}
+                alt="Capa do perfil"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
+
+            <div className="absolute inset-0 bg-black/10 transition group-hover:bg-black/40" />
+
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="rounded-full bg-black/60 px-5 py-2.5 text-sm font-bold text-white opacity-0 transition group-hover:opacity-100">
+                {uploadingCover
+                  ? 'Enviando...'
+                  : 'Alterar capa'}
+              </span>
+            </div>
+          </button>
+
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleCoverChange}
+            className="hidden"
+          />
 
           <div className="relative px-6 pb-8 md:px-10">
             <div className="-mt-14 flex flex-col items-start gap-5 md:flex-row md:items-end">
@@ -256,7 +354,7 @@ export default function PerfilPage() {
               </button>
 
               <input
-                ref={fileInputRef}
+                ref={avatarInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 onChange={handleAvatarChange}
