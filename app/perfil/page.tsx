@@ -20,7 +20,7 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true);
 
   const [editing, setEditing] = useState(false);
-  const [displayName, setDisplayName] = useState('');
+  const [editDisplayName, setEditDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
