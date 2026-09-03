@@ -216,19 +216,20 @@ export async function POST(request: Request) {
         .single();
 
     if (storyError || !story) {
-      if (uploadedCoverPath) {
-        await supabase.storage
-          .from('story-covers')
-          .remove([uploadedCoverPath]);
-      }
+  if (uploadedCoverPath) {
+    await supabase.storage
+      .from('story-covers')
+      .remove([uploadedCoverPath]);
+  }
 
-      return NextResponse.json(
-        {
-          error:
-            'Não foi possível criar a história.',
-        },
-        { status: 500 }
-      );
+  return NextResponse.json(
+    {
+      error:
+        storyError?.message ||
+        'Não foi possível criar a história.',
+    },
+    { status: 500 }
+  );
     }
 
     return NextResponse.json(
