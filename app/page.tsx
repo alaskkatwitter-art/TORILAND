@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import AuthStatus from '@/components/AuthStatus';
-
+import AuthStatus from '../components/AuthStatus';
 type Story = {
   title: string;
   author: string;
