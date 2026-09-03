@@ -1,6 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 type Chapter = {
@@ -41,6 +46,12 @@ type Comment = {
   } | null;
 };
 
+type CommentGroup = {
+  comments: Comment[];
+  start: number;
+  end: number;
+};
+
 export default function CapituloPage() {
   const params = useParams();
   const router = useRouter();
@@ -48,6 +59,7 @@ export default function CapituloPage() {
   const id = params.id as string;
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const articleRef = useRef<HTMLElement | null>(null);
 
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [previousChapter, setPreviousChapter] =
@@ -78,6 +90,10 @@ export default function CapituloPage() {
   const [activeCommentGroup, setActiveCommentGroup] = useState<Comment[]>(
     []
   );
+
+  const [markerPositions, setMarkerPositions] = useState<
+    { key: string; top: number }[]
+  >([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -331,7 +347,7 @@ export default function CapituloPage() {
     }
   }
 
-  function getCommentGroups() {
+  function getCommentGroups(): CommentGroup[] {
     const groups = new Map<string, Comment[]>();
 
     comments.forEach((comment) => {
@@ -349,17 +365,7 @@ export default function CapituloPage() {
       groups.set(key, [...current, comment]);
     });
 
-    return Array.from(groups.values());
-  }
-
-  function renderChapterText() {
-    if (!chapter?.body) {
-      return null;
-    }
-
-    const text = chapter.body;
-
-    const commentGroups = getCommentGroups()
+    return Array.from(groups.values())
       .map((group) => {
         const first = group[0];
 
@@ -379,15 +385,71 @@ export default function CapituloPage() {
         };
       })
       .filter(
-        (
-          group
-        ): group is {
-          comments: Comment[];
-          start: number;
-          end: number;
-        } => group !== null
+        (group): group is CommentGroup =>
+          group !== null
       )
       .sort((a, b) => a.start - b.start);
+  }
+
+  useLayoutEffect(() => {
+    if (!articleRef.current || !chapter?.body) {
+      setMarkerPositions([]);
+      return;
+    }
+
+    const updatePositions = () => {
+      const article = articleRef.current;
+
+      if (!article) {
+        return;
+      }
+
+      const groups = getCommentGroups();
+
+      const positions = groups
+        .map((group) => {
+          const element = article.querySelector(
+            `[data-comment-start="${group.start}"]`
+          ) as HTMLElement | null;
+
+          if (!element) {
+            return null;
+          }
+
+          return {
+            key: `${group.start}-${group.end}`,
+            top: element.offsetTop,
+          };
+        })
+        .filter(
+          (
+            item
+          ): item is { key: string; top: number } =>
+            item !== null
+        );
+
+      setMarkerPositions(positions);
+    };
+
+    updatePositions();
+
+    window.addEventListener('resize', updatePositions);
+
+    return () => {
+      window.removeEventListener(
+        'resize',
+        updatePositions
+      );
+    };
+  }, [comments, chapter]);
+
+  function renderChapterText() {
+    if (!chapter?.body) {
+      return null;
+    }
+
+    const text = chapter.body;
+    const commentGroups = getCommentGroups();
 
     if (commentGroups.length === 0) {
       return text;
@@ -418,38 +480,10 @@ export default function CapituloPage() {
       pieces.push(
         <span
           key={`commented-${index}`}
-          className="relative inline rounded bg-white/[0.035] box-decoration-clone"
+          data-comment-start={group.start}
+          className="relative bg-white/[0.025] border-b border-white/10 box-decoration-clone"
         >
-          <span className="border-b border-white/20">
-            {selected}
-          </span>
-
-          <button
-            type="button"
-            aria-label="Ver comentários deste trecho"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              setActiveCommentGroup(group.comments);
-            }}
-            className="inline-flex align-middle ml-1.5 -translate-y-[1px] w-[18px] h-[18px] items-center justify-center rounded-full opacity-80 hover:opacity-100 transition"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="w-[15px] h-[15px]"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M7 18.5C4.79 17.52 3.25 15.3 3.25 12.75C3.25 9.02 6.27 6 10 6H14C17.73 6 20.75 9.02 20.75 12.75C20.75 16.48 17.73 19.5 14 19.5H10.5L7 21V18.5Z"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-gray-500"
-              />
-            </svg>
-          </button>
+          {selected}
         </span>
       );
 
@@ -495,6 +529,8 @@ export default function CapituloPage() {
       </main>
     );
   }
+
+  const commentGroups = getCommentGroups();
 
   const recentStickers = [...stickers]
     .sort((a, b) => {
@@ -547,13 +583,70 @@ export default function CapituloPage() {
         </header>
 
         {/* Texto */}
-        <article
-          onMouseUp={handleTextSelection}
-          onTouchEnd={handleTextSelection}
-          className="text-[18px] leading-8 text-gray-200 font-serif whitespace-pre-wrap select-text"
-        >
-          {renderChapterText()}
-        </article>
+        <div className="relative">
+
+          <article
+            ref={articleRef}
+            onMouseUp={handleTextSelection}
+            onTouchEnd={handleTextSelection}
+            className="text-[18px] leading-8 text-gray-200 font-serif whitespace-pre-wrap select-text pr-7 md:pr-8"
+          >
+            {renderChapterText()}
+          </article>
+
+          {/* Nuvens dos comentários */}
+          {commentGroups.length > 0 && (
+            <div
+              className="absolute top-0 right-0 w-6 h-full pointer-events-none"
+              aria-hidden="true"
+            >
+              {commentGroups.map((group) => {
+                const key = `${group.start}-${group.end}`;
+
+                const position = markerPositions.find(
+                  (item) => item.key === key
+                );
+
+                if (!position) {
+                  return null;
+                }
+
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-label="Ver comentários deste trecho"
+                    onClick={() =>
+                      setActiveCommentGroup(
+                        group.comments
+                      )
+                    }
+                    className="absolute right-0 pointer-events-auto flex items-center justify-center w-5 h-5 opacity-70 hover:opacity-100 active:opacity-100 transition"
+                    style={{
+                      top: `${position.top + 5}px`,
+                    }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-[17px] h-[17px]"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M7 18.5C4.79 17.52 3.25 15.3 3.25 12.75C3.25 9.02 6.27 6 10 6H14C17.73 6 20.75 9.02 20.75 12.75C20.75 16.48 17.73 19.5 14 19.5H10.5L7 21V18.5Z"
+                        stroke="#8a8a8a"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+        </div>
 
         {/* Caixa de comentário */}
         {showCommentBox && (
@@ -749,7 +842,7 @@ export default function CapituloPage() {
           </div>
         )}
 
-        {/* Janela dos comentários do trecho */}
+        {/* Comentários do trecho */}
         {activeCommentGroup.length > 0 && (
           <div
             className="fixed inset-0 z-50 bg-black/70 flex items-end md:items-center justify-center p-4"
@@ -833,11 +926,13 @@ export default function CapituloPage() {
 
                     {comment.user_stickers?.image_url && (
                       <div className="mt-3">
+
                         <img
                           src={comment.user_stickers.image_url}
                           alt="Figurinha"
                           className="max-w-full max-h-64 rounded-xl object-contain"
                         />
+
                       </div>
                     )}
 
