@@ -58,7 +58,7 @@ export default function PerfilPage() {
   function openEditor() {
     if (!user) return;
 
-    setDisplayName(user.display_name || '');
+    setEditDisplayName(user.display_name || '');
     setBio(user.bio || '');
     setError('');
     setSuccess('');
@@ -84,7 +84,7 @@ export default function PerfilPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          display_name: displayName,
+          display_name: editDisplayName,
           bio,
         }),
       });
@@ -281,15 +281,15 @@ export default function PerfilPage() {
                   </label>
 
                   <span className="text-xs text-white/30">
-                    {displayName.length}/50
+                    {editDisplayName.length}/50
                   </span>
                 </div>
 
                 <input
                   type="text"
-                  value={displayName}
+                  value={editDisplayName}
                   onChange={(event) =>
-                    setDisplayName(event.target.value)
+                    setEditDisplayName(event.target.value)
                   }
                   maxLength={50}
                   placeholder="Como você quer ser chamado?"
@@ -379,4 +379,4 @@ function CloudLogo() {
       />
     </svg>
   );
-              }
+}
