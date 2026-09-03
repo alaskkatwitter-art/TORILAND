@@ -204,32 +204,32 @@ export async function POST(request: Request) {
       await supabase
         .from('stories')
         .insert({
-          author: session.user_id,
+          author_id: session.user_id,
           title,
           description: description || null,
           cover_url: coverUrl,
           status,
         })
         .select(
-          'id, author, title, description, cover_url, status, created_at, updated_at'
+          'id, author_id, title, description, cover_url, status, created_at, updated_at'
         )
         .single();
 
     if (storyError || !story) {
-  if (uploadedCoverPath) {
-    await supabase.storage
-      .from('story-covers')
-      .remove([uploadedCoverPath]);
-  }
+      if (uploadedCoverPath) {
+        await supabase.storage
+          .from('story-covers')
+          .remove([uploadedCoverPath]);
+      }
 
-  return NextResponse.json(
-    {
-      error:
-        storyError?.message ||
-        'Não foi possível criar a história.',
-    },
-    { status: 500 }
-  );
+      return NextResponse.json(
+        {
+          error:
+            storyError?.message ||
+            'Não foi possível criar a história.',
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(
