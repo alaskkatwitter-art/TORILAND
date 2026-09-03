@@ -19,6 +19,13 @@ export default function PerfilPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [editing, setEditing] = useState(false);
+  const [displayName, setDisplayName] = useState('');
+  const [bio, setBio] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
   useEffect(() => {
     async function loadUser() {
       try {
@@ -47,6 +54,65 @@ export default function PerfilPage() {
 
     loadUser();
   }, [router]);
+
+  function openEditor() {
+    if (!user) return;
+
+    setDisplayName(user.display_name || '');
+    setBio(user.bio || '');
+    setError('');
+    setSuccess('');
+    setEditing(true);
+  }
+
+  function closeEditor() {
+    if (saving) return;
+
+    setEditing(false);
+    setError('');
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch('/api/profile/update', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          display_name: displayName,
+          bio,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error || 'Não foi possível salvar as alterações.'
+        );
+        return;
+      }
+
+      setUser(data.user);
+      setSuccess('Perfil atualizado com sucesso.');
+
+      setTimeout(() => {
+        setEditing(false);
+        setSuccess('');
+      }, 900);
+    } catch {
+      setError(
+        'Não foi possível salvar as alterações. Tente novamente.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -111,6 +177,7 @@ export default function PerfilPage() {
               </div>
 
               <button
+                onClick={openEditor}
                 className="md:ml-auto rounded-full bg-[#ff78b9] px-6 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110"
               >
                 Editar perfil
@@ -182,6 +249,110 @@ export default function PerfilPage() {
           </div>
         </section>
       </div>
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#191219] p-6 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-black">
+                  Editar perfil
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  Atualize as informações que aparecem no seu perfil.
+                </p>
+              </div>
+
+              <button
+                onClick={closeEditor}
+                disabled={saving}
+                className="text-2xl leading-none text-white/40 transition hover:text-white disabled:opacity-40"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold text-white/80">
+                    Nome de exibição
+                  </label>
+
+                  <span className="text-xs text-white/30">
+                    {displayName.length}/50
+                  </span>
+                </div>
+
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(event) =>
+                    setDisplayName(event.target.value)
+                  }
+                  maxLength={50}
+                  placeholder="Como você quer ser chamado?"
+                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold text-white/80">
+                    Bio
+                  </label>
+
+                  <span className="text-xs text-white/30">
+                    {bio.length}/500
+                  </span>
+                </div>
+
+                <textarea
+                  value={bio}
+                  onChange={(event) =>
+                    setBio(event.target.value)
+                  }
+                  maxLength={500}
+                  rows={5}
+                  placeholder="Conte um pouco sobre você..."
+                  className="w-full resize-none rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
+                />
+              </div>
+
+              {error && (
+                <div className="rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">
+                  {error}
+                </div>
+              )}
+
+              {success && (
+                <div className="rounded-2xl border border-green-400/20 bg-green-400/5 px-4 py-3 text-sm text-green-300">
+                  {success}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={closeEditor}
+                  disabled={saving}
+                  className="flex-1 rounded-full border border-white/10 px-5 py-3 text-sm font-semibold text-white/60 transition hover:border-white/20 hover:text-white disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 rounded-full bg-[#ff78b9] px-5 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-50"
+                >
+                  {saving ? 'Salvando...' : 'Salvar alterações'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -208,4 +379,4 @@ function CloudLogo() {
       />
     </svg>
   );
-}
+              }
