@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #120b16;
+  --panel: #1b101f;
+  --panel2: #24132a;
+  --pink: #ff6fba;
+  --pink2: #ff9bd0;
+  --text: #fff4fb;
+  --muted: #c8aebe;
+  --gold: #f7c969;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at 50% -10%, #3b173f 0, #120b16 42%);
+  color: var(--text);
+  font-family: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.glass {
+  background: rgba(27, 16, 31, 0.86);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 155, 208, 0.14);
+}
