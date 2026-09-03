@@ -22,7 +22,7 @@ export async function GET(
       );
     }
 
-    const { data: story, error } =
+    const { data: story, error: storyError } =
       await supabase
         .from('stories')
         .select(`
@@ -44,11 +44,10 @@ export async function GET(
         .eq('id', id)
         .maybeSingle();
 
-    if (error) {
+    if (storyError) {
       return NextResponse.json(
         {
-          error:
-            'Não foi possível carregar a história.',
+          error: 'Não foi possível carregar a história.',
         },
         { status: 500 }
       );
@@ -61,14 +60,40 @@ export async function GET(
       );
     }
 
+    const { data: chapters, error: chaptersError } =
+      await supabase
+        .from('chapters')
+        .select(`
+          id,
+          story_id,
+          chapter_number,
+          title,
+          published,
+          created_at
+        `)
+        .eq('story_id', id)
+        .eq('published', true)
+        .order('chapter_number', {
+          ascending: true,
+        });
+
+    if (chaptersError) {
+      return NextResponse.json(
+        {
+          error: 'Não foi possível carregar os capítulos.',
+        },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       story,
+      chapters: chapters || [],
     });
   } catch {
     return NextResponse.json(
       {
-        error:
-          'Não foi possível carregar a história.',
+        error: 'Não foi possível carregar a história.',
       },
       { status: 500 }
     );
