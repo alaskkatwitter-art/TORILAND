@@ -15,56 +15,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recoveryKey, setRecoveryKey] = useState('');
-  async function handleRecovery(event: React.FormEvent) {
-  event.preventDefault();
-
-  setError('');
-  setLoading(true);
-
-  const form = event.currentTarget;
-  const formData = new FormData(form);
-
-  const recoveryKey = formData.get('recoveryKey');
-  const newPassword = formData.get('newPassword');
-  const confirmNewPassword = formData.get('confirmNewPassword');
-
-  if (newPassword !== confirmNewPassword) {
-    setError('As senhas não coincidem.');
-    setLoading(false);
-    return;
-  }
-
-  try {
-    const response = await fetch('/api/auth/recover', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username,
-        recoveryKey,
-        newPassword,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      setError(
-        data.error || 'Não foi possível recuperar sua conta.'
-      );
-      return;
-    }
-
-    setMode('login');
-    setPassword('');
-    setConfirmPassword('');
-    setError('Senha alterada com sucesso. Agora você pode entrar.');
-  } catch {
-    setError('Não foi possível conectar ao Toriland.');
-  } finally {
-    setLoading(false);
-  }
 
   async function handleSignup(event: React.FormEvent) {
     event.preventDefault();
@@ -106,37 +56,91 @@ export default function LoginPage() {
   }
 
   async function handleLogin(event: React.FormEvent) {
-  event.preventDefault();
+    event.preventDefault();
 
-  setError('');
-  setLoading(true);
+    setError('');
+    setLoading(true);
 
-  try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username,
-        password,
-      }),
-    });
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          password,
+        }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      setError(data.error || 'Username ou senha incorretos.');
+      if (!response.ok) {
+        setError(data.error || 'Username ou senha incorretos.');
+        return;
+      }
+
+      router.push('/');
+      router.refresh();
+    } catch {
+      setError('Não foi possível conectar ao Toriland.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRecovery(event: React.FormEvent) {
+    event.preventDefault();
+
+    setError('');
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    const recoveryKeyValue = formData.get('recoveryKey');
+    const newPassword = formData.get('newPassword');
+    const confirmNewPassword = formData.get('confirmNewPassword');
+
+    if (newPassword !== confirmNewPassword) {
+      setError('As senhas não coincidem.');
       return;
     }
 
-    router.push('/');
-    router.refresh();
-  } catch {
-    setError('Não foi possível conectar ao Toriland.');
-  } finally {
-    setLoading(false);
-  }
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/recover', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          recoveryKey: recoveryKeyValue,
+          newPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error || 'Não foi possível recuperar sua conta.'
+        );
+        return;
+      }
+
+      setPassword('');
+      setConfirmPassword('');
+      setError(
+        'Senha alterada com sucesso. Agora você pode entrar.'
+      );
+      setMode('login');
+    } catch {
+      setError('Não foi possível conectar ao Toriland.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (recoveryKey) {
@@ -202,23 +206,27 @@ export default function LoginPage() {
             <h1 className="mt-8 text-2xl font-black">
               {mode === 'signup'
                 ? 'Crie sua conta'
-                : 'Bem-vindo de volta'}
+                : mode === 'login'
+                  ? 'Bem-vindo de volta'
+                  : 'Recupere sua conta'}
             </h1>
 
             <p className="mt-2 text-sm text-white/40">
               {mode === 'signup'
                 ? 'Entre no Toriland usando apenas um username e uma senha.'
-                : 'Entre na sua conta do Toriland.'}
+                : mode === 'login'
+                  ? 'Entre na sua conta do Toriland.'
+                  : 'Use sua chave de recuperação para criar uma nova senha.'}
             </p>
           </div>
 
-          <div className="mt-7 grid grid-cols-2 rounded-full bg-[#100b12] p-1">
+          <div className="mt-7 grid grid-cols-3 rounded-full bg-[#100b12] p-1">
             <button
               onClick={() => {
                 setMode('signup');
                 setError('');
               }}
-              className={`rounded-full py-2.5 text-sm font-semibold transition ${
+              className={`rounded-full py-2.5 text-xs font-semibold transition ${
                 mode === 'signup'
                   ? 'bg-[#ff78b9] text-[#180d15]'
                   : 'text-white/45'
@@ -232,7 +240,7 @@ export default function LoginPage() {
                 setMode('login');
                 setError('');
               }}
-              className={`rounded-full py-2.5 text-sm font-semibold transition ${
+              className={`rounded-full py-2.5 text-xs font-semibold transition ${
                 mode === 'login'
                   ? 'bg-[#ff78b9] text-[#180d15]'
                   : 'text-white/45'
@@ -240,13 +248,29 @@ export default function LoginPage() {
             >
               Entrar
             </button>
+
+            <button
+              onClick={() => {
+                setMode('recover');
+                setError('');
+              }}
+              className={`rounded-full py-2.5 text-xs font-semibold transition ${
+                mode === 'recover'
+                  ? 'bg-[#ff78b9] text-[#180d15]'
+                  : 'text-white/45'
+              }`}
+            >
+              Recuperar
+            </button>
           </div>
 
           <form
             onSubmit={
               mode === 'signup'
                 ? handleSignup
-                : handleLogin
+                : mode === 'login'
+                  ? handleLogin
+                  : handleRecovery
             }
             className="mt-7 space-y-5"
           >
@@ -274,34 +298,36 @@ export default function LoginPage() {
               )}
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm font-semibold">
-                Senha
-              </label>
+            {mode !== 'recover' && (
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Senha
+                </label>
 
-              <input
-                type="password"
-                value={password}
-                onChange={(event) =>
-                  setPassword(event.target.value)
-                }
-                placeholder="Sua senha"
-                autoComplete={
-                  mode === 'signup'
-                    ? 'new-password'
-                    : 'current-password'
-                }
-                minLength={8}
-                required
-                className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/50"
-              />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(event.target.value)
+                  }
+                  placeholder="Sua senha"
+                  autoComplete={
+                    mode === 'signup'
+                      ? 'new-password'
+                      : 'current-password'
+                  }
+                  minLength={8}
+                  required
+                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/50"
+                />
 
-              {mode === 'signup' && (
-                <p className="mt-2 text-xs text-white/30">
-                  A senha precisa ter pelo menos 8 caracteres.
-                </p>
-              )}
-            </div>
+                {mode === 'signup' && (
+                  <p className="mt-2 text-xs text-white/30">
+                    A senha precisa ter pelo menos 8 caracteres.
+                  </p>
+                )}
+              </div>
+            )}
 
             {mode === 'signup' && (
               <div>
@@ -323,6 +349,58 @@ export default function LoginPage() {
               </div>
             )}
 
+            {mode === 'recover' && (
+              <>
+                <div>
+                  <label className="mb-2 block text-sm font-semibold">
+                    Chave de recuperação
+                  </label>
+
+                  <input
+                    name="recoveryKey"
+                    type="text"
+                    placeholder="Cole sua chave de recuperação"
+                    required
+                    className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/50"
+                  />
+
+                  <p className="mt-2 text-xs leading-5 text-white/30">
+                    Use a chave que recebeu quando criou sua conta.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold">
+                    Nova senha
+                  </label>
+
+                  <input
+                    name="newPassword"
+                    type="password"
+                    placeholder="Sua nova senha"
+                    minLength={8}
+                    required
+                    className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/50"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold">
+                    Confirmar nova senha
+                  </label>
+
+                  <input
+                    name="confirmNewPassword"
+                    type="password"
+                    placeholder="Digite a nova senha novamente"
+                    minLength={8}
+                    required
+                    className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/50"
+                  />
+                </div>
+              </>
+            )}
+
             {error && (
               <div className="rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm leading-5 text-red-300">
                 {error}
@@ -338,7 +416,9 @@ export default function LoginPage() {
                 ? 'Aguarde...'
                 : mode === 'signup'
                   ? 'Criar minha conta'
-                  : 'Entrar'}
+                  : mode === 'login'
+                    ? 'Entrar'
+                    : 'Alterar minha senha'}
             </button>
           </form>
 
