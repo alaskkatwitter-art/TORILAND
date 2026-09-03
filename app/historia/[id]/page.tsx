@@ -1,244 +1,246 @@
 'use client';
 
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 
-export default function StoryPage() {
+type Author = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+};
+
+type Story = {
+  id: string;
+  author_id: string;
+  title: string;
+  description: string | null;
+  cover_url: string | null;
+  status: string | null;
+  created_at: string;
+  updated_at: string;
+  profiles: Author | null;
+};
+
+export default function HistoriaPage() {
+  const router = useRouter();
+  const params = useParams();
+
+  const id = params.id as string;
+
+  const [story, setStory] = useState<Story | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function loadStory() {
+      try {
+        const response = await fetch(
+          `/api/stories/${id}`,
+          {
+            cache: 'no-store',
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          setError(
+            data.error ||
+              'Não foi possível carregar a história.'
+          );
+          return;
+        }
+
+        setStory(data.story);
+      } catch {
+        setError(
+          'Não foi possível carregar a história.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (id) {
+      loadStory();
+    }
+  }, [id]);
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#100b12] text-white">
+        <p className="text-sm text-white/40">
+          Carregando história...
+        </p>
+      </main>
+    );
+  }
+
+  if (error || !story) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#100b12] px-5 text-white">
+        <div className="text-center">
+          <h1 className="text-2xl font-black">
+            História não encontrada
+          </h1>
+
+          <p className="mt-2 text-sm text-white/40">
+            {error ||
+              'Essa história não existe ou não está disponível.'}
+          </p>
+
+          <button
+            onClick={() => router.push('/')}
+            className="mt-6 rounded-full bg-[#ff78b9] px-6 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110"
+          >
+            Voltar ao início
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  const author = story.profiles;
+
+  const authorName =
+    author?.display_name ||
+    author?.username ||
+    'Autor desconhecido';
+
   return (
     <main className="min-h-screen bg-[#100b12] text-white">
       <header className="border-b border-white/10 bg-[#100b12]">
-        <div className="mx-auto flex max-w-7xl flex-col items-center px-5 pt-5">
-          <Link href="/" className="flex flex-col items-center">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center gap-3"
+          >
             <CloudLogo />
-            <span className="mt-1 text-2xl font-bold tracking-[0.18em] text-[#ff78b9]">
+
+            <span className="text-xl font-bold tracking-[0.15em] text-[#ff78b9]">
               TORILAND
             </span>
-          </Link>
+          </button>
 
-          <nav className="mt-6 flex w-full items-center justify-center gap-1 overflow-x-auto border-t border-white/5 py-3">
-            <Link
-              href="/"
-              className="whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
-            >
-              Início
-            </Link>
-
-            <Link
-              href="/explorar"
-              className="whitespace-nowrap rounded-full bg-[#ff78b9] px-5 py-2 text-sm font-medium text-[#180d15]"
-            >
-              Explorar
-            </Link>
-
-            <Link
-              href="/escrever"
-              className="whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
-            >
-              Escrever
-            </Link>
-
-            <Link
-              href="/notificacoes"
-              className="whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
-            >
-              Notificações
-            </Link>
-
-            <Link
-              href="/perfil"
-              className="whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
-            >
-              Perfil
-            </Link>
-          </nav>
+          <button
+            onClick={() => router.push('/perfil')}
+            className="rounded-full border border-white/10 px-5 py-2 text-sm font-semibold text-white/60 transition hover:border-[#ff78b9]/40 hover:text-white"
+          >
+            Meu perfil
+          </button>
         </div>
       </header>
 
-      <section className="border-b border-white/10 bg-[#151016]">
-        <div className="mx-auto max-w-6xl px-5 py-12 md:py-16">
-          <div className="grid gap-10 md:grid-cols-[260px_1fr] md:items-center">
-            
-            <div className="mx-auto w-full max-w-[260px]">
-              <div className="aspect-[2/3] overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#ff78b9]/30 via-[#241521] to-[#100b12] shadow-2xl shadow-black/30">
-                <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-                  <CloudLogo small />
+      <div className="mx-auto max-w-5xl px-5 py-10">
+        <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#191219]">
+          <div className="relative h-64 w-full overflow-hidden bg-gradient-to-r from-[#3b1b30] via-[#572544] to-[#241322]">
+            {story.cover_url && (
+              <img
+                src={story.cover_url}
+                alt={`Capa de ${story.title}`}
+                className="h-full w-full object-cover"
+              />
+            )}
 
-                  <p className="mt-6 text-xs font-semibold uppercase tracking-[0.3em] text-[#ff78b9]">
+            <div className="absolute inset-0 bg-gradient-to-t from-[#191219] via-black/10 to-transparent" />
+          </div>
+
+          <div className="px-6 pb-8 md:px-10">
+            <div className="-mt-20 flex flex-col gap-6 md:flex-row md:items-end">
+              <div className="h-40 w-28 shrink-0 overflow-hidden rounded-2xl border-4 border-[#191219] bg-[#ff78b9] shadow-xl">
+                {story.cover_url ? (
+                  <img
+                    src={story.cover_url}
+                    alt={`Capa de ${story.title}`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center px-3 text-center text-sm font-black text-[#180d15]">
                     TORILAND
-                  </p>
+                  </div>
+                )}
+              </div>
 
-                  <h2 className="mt-3 text-3xl font-black leading-tight">
-                    Entre Dois Mundos
-                  </h2>
-
-                  <p className="mt-4 text-sm text-white/35">
-                    Uma história original
-                  </p>
+              <div className="pb-1">
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <span className="rounded-full bg-[#ff78b9]/10 px-3 py-1 text-xs font-bold text-[#ff78b9]">
+                    {story.status || 'Em andamento'}
+                  </span>
                 </div>
-              </div>
-            </div>
 
-            <div>
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-[#ff78b9]/10 px-3 py-1.5 text-xs font-semibold text-[#ff78b9]">
-                  Romance
-                </span>
+                <h1 className="text-3xl font-black md:text-4xl">
+                  {story.title}
+                </h1>
 
-                <span className="rounded-full bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/45">
-                  16+
-                </span>
-
-                <span className="rounded-full bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/45">
-                  Completa
-                </span>
-              </div>
-
-              <h1 className="mt-5 text-4xl font-black leading-tight md:text-6xl">
-                Entre Dois Mundos
-              </h1>
-
-              <p className="mt-4 text-base text-white/50">
-                por{' '}
-                <Link
-                  href="/perfil"
-                  className="font-semibold text-white/80 hover:text-[#ff78b9]"
+                <button
+                  onClick={() =>
+                    author?.username &&
+                    router.push(
+                      `/perfil/${author.username}`
+                    )
+                  }
+                  className="mt-2 text-sm text-white/40 transition hover:text-[#ff78b9]"
                 >
-                  autora
-                </Link>
-              </p>
-
-              <p className="mt-7 max-w-2xl text-base leading-8 text-white/60">
-                Ela nunca acreditou que sua vida pudesse mudar em uma única
-                noite. Até conhecer alguém que parecia pertencer a um mundo
-                completamente diferente do seu.
-              </p>
-
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/ler/1"
-                  className="rounded-full bg-[#ff78b9] px-7 py-3.5 text-center text-sm font-bold text-[#180d15] transition hover:brightness-110"
-                >
-                  Começar a ler
-                </Link>
-
-                <button className="rounded-full border border-white/10 px-7 py-3.5 text-sm font-semibold text-white/60 transition hover:border-[#ff78b9]/30 hover:text-white">
-                  Adicionar à biblioteca
+                  por @{author?.username || 'autor'}
                 </button>
               </div>
+            </div>
 
-              <div className="mt-8 flex flex-wrap gap-6 border-t border-white/10 pt-6">
-                <div>
-                  <p className="text-xl font-bold">24</p>
-                  <p className="mt-1 text-xs text-white/30">Capítulos</p>
-                </div>
+            <div className="mt-8 max-w-3xl">
+              <h2 className="text-lg font-black">
+                Sinopse
+              </h2>
 
-                <div>
-                  <p className="text-xl font-bold">8.4K</p>
-                  <p className="mt-1 text-xs text-white/30">Leituras</p>
-                </div>
+              <p className="mt-3 whitespace-pre-line text-sm leading-7 text-white/50">
+                {story.description ||
+                  'Esta história ainda não possui uma sinopse.'}
+              </p>
+            </div>
 
-                <div>
-                  <p className="text-xl font-bold">1.2K</p>
-                  <p className="mt-1 text-xs text-white/30">Curtidas</p>
-                </div>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={() => {}}
+                className="rounded-full bg-[#ff78b9] px-7 py-3.5 text-sm font-black text-[#180d15] transition hover:brightness-110"
+              >
+                Começar a ler
+              </button>
 
-                <div>
-                  <p className="text-xl font-bold">4.8</p>
-                  <p className="mt-1 text-xs text-white/30">Avaliação</p>
-                </div>
-              </div>
+              <button
+                onClick={() => router.push('/')}
+                className="rounded-full border border-white/10 px-7 py-3.5 text-sm font-semibold text-white/60 transition hover:border-[#ff78b9]/40 hover:text-white"
+              >
+                Voltar
+              </button>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="mx-auto max-w-6xl px-5 py-12">
-        <div className="grid gap-10 lg:grid-cols-[1fr_300px]">
-          
-          <div>
-            <h2 className="text-2xl font-black">Sobre a história</h2>
+        <section className="mt-10">
+          <h2 className="text-2xl font-black">
+            Capítulos
+          </h2>
 
-            <p className="mt-5 text-base leading-8 text-white/50">
-              Algumas histórias começam com um encontro. Outras começam com
-              uma escolha. Esta começa quando duas pessoas completamente
-              diferentes descobrem que talvez tenham mais em comum do que
-              imaginavam.
+          <div className="mt-5 rounded-3xl border border-dashed border-white/10 bg-[#191219] px-6 py-14 text-center">
+            <p className="text-sm text-white/35">
+              Esta história ainda não possui capítulos.
             </p>
-
-            <p className="mt-5 text-base leading-8 text-white/50">
-              Entre segredos, sentimentos inesperados e decisões que podem
-              mudar tudo, os dois precisarão descobrir se é possível construir
-              algo verdadeiro quando seus mundos parecem estar destinados a
-              permanecer separados.
-            </p>
-
-            <div className="mt-10">
-              <h2 className="text-2xl font-black">Tags</h2>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {[
-                  'romance',
-                  'slow burn',
-                  'drama',
-                  'enemies to lovers',
-                  'universidade',
-                ].map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-white/10 px-4 py-2 text-xs font-medium text-white/45"
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            </div>
           </div>
-
-          <aside className="h-fit rounded-3xl border border-white/10 bg-[#191219] p-6">
-            <h3 className="font-bold">Informações</h3>
-
-            <div className="mt-6 space-y-5">
-              <Info label="Gênero" value="Romance" />
-              <Info label="Classificação" value="16+" />
-              <Info label="Status" value="Completa" />
-              <Info label="Capítulos" value="24" />
-              <Info label="Publicado" value="2026" />
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <footer className="border-t border-white/10 bg-[#0b080d]">
-        <div className="mx-auto max-w-7xl px-5 py-8 text-center text-sm text-white/30">
-          TORILAND — Um lar para histórias.
-        </div>
-      </footer>
+        </section>
+      </div>
     </main>
   );
 }
 
-function Info({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-sm text-white/30">{label}</span>
-      <span className="text-sm font-semibold text-white/70">{value}</span>
-    </div>
-  );
-}
-
-function CloudLogo({ small = false }: { small?: boolean }) {
+function CloudLogo() {
   return (
     <svg
-      width={small ? '62' : '82'}
-      height={small ? '36' : '48'}
+      width="48"
+      height="30"
       viewBox="0 0 180 105"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      aria-label="Logo Toriland"
     >
       <path
         d="M45 79C26 79 14 67 14 51C14 36 25 24 40 23C45 9 58 2 73 2C89 2 102 12 106 27C111 24 117 22 124 22C143 22 158 36 158 54C158 57 158 60 157 63C168 66 174 74 174 84C174 96 164 103 151 103H45C28 103 17 94 17 83C17 81 17 80 18 78C26 79 35 79 45 79Z"
