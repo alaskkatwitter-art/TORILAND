@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type User = {
@@ -15,6 +15,7 @@ type User = {
 
 export default function PerfilPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,6 +24,9 @@ export default function PerfilPage() {
   const [editDisplayName, setEditDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -114,6 +118,72 @@ export default function PerfilPage() {
     }
   }
 
+  function openAvatarPicker() {
+    if (uploadingAvatar) return;
+
+    setError('');
+    setSuccess('');
+
+    fileInputRef.current?.click();
+  }
+
+  async function handleAvatarChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    setUploadingAvatar(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/profile/avatar', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error ||
+            'Não foi possível atualizar sua foto de perfil.'
+        );
+        return;
+      }
+
+      setUser((currentUser) =>
+        currentUser
+          ? {
+              ...currentUser,
+              avatar_url: data.avatar_url,
+            }
+          : currentUser
+      );
+
+      setSuccess('Foto de perfil atualizada.');
+
+      setTimeout(() => {
+        setSuccess('');
+      }, 2000);
+    } catch {
+      setError(
+        'Não foi possível enviar a foto. Tente novamente.'
+      );
+    } finally {
+      setUploadingAvatar(false);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }
+
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#100b12] text-white">
@@ -162,9 +232,36 @@ export default function PerfilPage() {
 
           <div className="relative px-6 pb-8 md:px-10">
             <div className="-mt-14 flex flex-col items-start gap-5 md:flex-row md:items-end">
-              <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full border-4 border-[#191219] bg-[#ff78b9] text-4xl font-black text-[#180d15]">
-                {user.username.charAt(0).toUpperCase()}
-              </div>
+              <button
+                type="button"
+                onClick={openAvatarPicker}
+                disabled={uploadingAvatar}
+                className="group relative flex h-28 w-28 shrink-0 overflow-hidden items-center justify-center rounded-full border-4 border-[#191219] bg-[#ff78b9] text-4xl font-black text-[#180d15] disabled:cursor-wait"
+              >
+                {user.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={`Foto de perfil de ${displayName}`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  user.username.charAt(0).toUpperCase()
+                )}
+
+                <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100">
+                  {uploadingAvatar
+                    ? 'Enviando...'
+                    : 'Alterar foto'}
+                </span>
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
 
               <div className="pb-1">
                 <h1 className="text-3xl font-black">
@@ -189,6 +286,18 @@ export default function PerfilPage() {
                 {user.bio || 'Ainda não há uma bio por aqui.'}
               </p>
             </div>
+
+            {error && (
+              <div className="mt-5 max-w-2xl rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">
+                {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="mt-5 max-w-2xl rounded-2xl border border-green-400/20 bg-green-400/5 px-4 py-3 text-sm text-green-300">
+                {success}
+              </div>
+            )}
 
             <div className="mt-8 flex gap-8 border-t border-white/5 pt-6">
               <div>
