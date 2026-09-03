@@ -22,6 +22,15 @@ type Story = {
   profiles: Author | null;
 };
 
+type Chapter = {
+  id: string;
+  story_id: string;
+  chapter_number: number;
+  title: string;
+  published: boolean;
+  created_at: string;
+};
+
 export default function HistoriaPage() {
   const router = useRouter();
   const params = useParams();
@@ -29,6 +38,7 @@ export default function HistoriaPage() {
   const id = params.id as string;
 
   const [story, setStory] = useState<Story | null>(null);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -53,6 +63,7 @@ export default function HistoriaPage() {
         }
 
         setStory(data.story);
+        setChapters(data.chapters || []);
       } catch {
         setError(
           'Não foi possível carregar a história.'
@@ -102,11 +113,6 @@ export default function HistoriaPage() {
   }
 
   const author = story.profiles;
-
-  const authorName =
-    author?.display_name ||
-    author?.username ||
-    'Autor desconhecido';
 
   return (
     <main className="min-h-screen bg-[#100b12] text-white">
@@ -199,11 +205,28 @@ export default function HistoriaPage() {
             </div>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              {chapters.length > 0 && (
+                <button
+                  onClick={() =>
+                    router.push(
+                      `/capitulo/${chapters[0].id}`
+                    )
+                  }
+                  className="rounded-full bg-[#ff78b9] px-7 py-3.5 text-sm font-black text-[#180d15] transition hover:brightness-110"
+                >
+                  Começar a ler
+                </button>
+              )}
+
               <button
-                onClick={() => {}}
-                className="rounded-full bg-[#ff78b9] px-7 py-3.5 text-sm font-black text-[#180d15] transition hover:brightness-110"
+                onClick={() =>
+                  router.push(
+                    `/novo-capitulo/${story.id}`
+                  )
+                }
+                className="rounded-full border border-[#ff78b9]/30 px-7 py-3.5 text-sm font-bold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
               >
-                Começar a ler
+                Novo capítulo
               </button>
 
               <button
@@ -217,15 +240,76 @@ export default function HistoriaPage() {
         </section>
 
         <section className="mt-10">
-          <h2 className="text-2xl font-black">
-            Capítulos
-          </h2>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-black">
+                Capítulos
+              </h2>
 
-          <div className="mt-5 rounded-3xl border border-dashed border-white/10 bg-[#191219] px-6 py-14 text-center">
-            <p className="text-sm text-white/35">
-              Esta história ainda não possui capítulos.
-            </p>
+              <p className="mt-1 text-sm text-white/35">
+                {chapters.length === 0
+                  ? 'Nenhum capítulo publicado ainda.'
+                  : `${chapters.length} ${
+                      chapters.length === 1
+                        ? 'capítulo'
+                        : 'capítulos'
+                    } publicado${
+                      chapters.length === 1 ? '' : 's'
+                    }`}
+              </p>
+            </div>
           </div>
+
+          {chapters.length === 0 ? (
+            <div className="mt-5 rounded-3xl border border-dashed border-white/10 bg-[#191219] px-6 py-14 text-center">
+              <p className="text-sm text-white/35">
+                Esta história ainda não possui capítulos.
+              </p>
+
+              <button
+                onClick={() =>
+                  router.push(
+                    `/novo-capitulo/${story.id}`
+                  )
+                }
+                className="mt-5 rounded-full bg-[#ff78b9] px-6 py-3 text-sm font-black text-[#180d15] transition hover:brightness-110"
+              >
+                Escrever primeiro capítulo
+              </button>
+            </div>
+          ) : (
+            <div className="mt-5 space-y-3">
+              {chapters.map((chapter) => (
+                <button
+                  key={chapter.id}
+                  onClick={() =>
+                    router.push(
+                      `/capitulo/${chapter.id}`
+                    )
+                  }
+                  className="group flex w-full items-center gap-5 rounded-2xl border border-white/10 bg-[#191219] p-5 text-left transition hover:border-[#ff78b9]/40 hover:bg-[#211721]"
+                >
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#ff78b9]/10 text-sm font-black text-[#ff78b9]">
+                    {chapter.chapter_number}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-white/30">
+                      Capítulo {chapter.chapter_number}
+                    </p>
+
+                    <h3 className="mt-1 truncate text-base font-bold text-white transition group-hover:text-[#ff78b9]">
+                      {chapter.title}
+                    </h3>
+                  </div>
+
+                  <span className="text-xl text-white/20 transition group-hover:translate-x-1 group-hover:text-[#ff78b9]">
+                    →
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </main>
