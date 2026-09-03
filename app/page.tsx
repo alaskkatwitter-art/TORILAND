@@ -222,3 +222,4 @@ export default function HomePage() {
                     style={{
                       borderColor: `${theme}55`,
                       background: `radial-gradient(circle, ${theme}
+background: `radial-gradient(circle, ${theme}
