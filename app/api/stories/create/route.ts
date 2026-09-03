@@ -21,10 +21,6 @@ export async function POST(request: Request) {
   let uploadedCoverPath = '';
 
   try {
-    // =====================================================
-    // AUTENTICAÇÃO
-    // =====================================================
-
     const cookieHeader = request.headers.get('cookie') || '';
 
     const sessionCookie = cookieHeader
@@ -78,10 +74,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // =====================================================
-    // FORMULÁRIO
-    // =====================================================
-
     const formData = await request.formData();
 
     const titleValue = formData.get('title');
@@ -121,10 +113,6 @@ export async function POST(request: Request) {
       typeof tagsValue === 'string'
         ? tagsValue.trim()
         : '';
-
-    // =====================================================
-    // VALIDAÇÕES
-    // =====================================================
 
     if (!title) {
       return NextResponse.json(
@@ -189,10 +177,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
-    // =====================================================
-    // UPLOAD DA CAPA
-    // =====================================================
 
     let coverUrl: string | null = null;
 
@@ -271,10 +255,6 @@ export async function POST(request: Request) {
       coverUrl = publicUrlData.publicUrl;
     }
 
-    // =====================================================
-    // CRIAR HISTÓRIA
-    // =====================================================
-
     const { data: story, error: storyError } =
       await supabase
         .from('stories')
@@ -284,9 +264,10 @@ export async function POST(request: Request) {
           description: description || null,
           cover_url: coverUrl,
           status,
+          rating: rating || null,
         })
         .select(
-          'id, author_id, title, description, cover_url, status, created_at, updated_at'
+          'id, author_id, title, description, cover_url, status, rating, created_at, updated_at'
         )
         .single();
 
@@ -307,16 +288,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // =====================================================
-    // PROCESSAR TAGS
-    // =====================================================
-
     const tagNames = tagsText
       .split(',')
       .map((tag) => tag.trim())
       .filter(Boolean);
 
-    // Evita tags repetidas no mesmo formulário
     const uniqueTagNames = Array.from(
       new Map(
         tagNames.map((tag) => [
@@ -326,7 +302,6 @@ export async function POST(request: Request) {
       ).values()
     );
 
-    // O gênero também entra como tag.
     if (genre) {
       const genreSlug = createSlug(genre);
 
@@ -339,15 +314,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // Limite de segurança
     const limitedTags =
       uniqueTagNames.slice(0, 30);
 
     if (limitedTags.length > 0) {
-      // ---------------------------------------------------
-      // Buscar categorias
-      // ---------------------------------------------------
-
       const { data: genreCategory } =
         await supabase
           .from('tag_categories')
@@ -361,10 +331,6 @@ export async function POST(request: Request) {
           .select('id')
           .eq('slug', 'freeform')
           .maybeSingle();
-
-      // ---------------------------------------------------
-      // Criar / reutilizar tags
-      // ---------------------------------------------------
 
       const tagIds: string[] = [];
 
@@ -383,7 +349,6 @@ export async function POST(request: Request) {
           ? genreCategory?.id || null
           : freeformCategory?.id || null;
 
-        // Primeiro tenta encontrar a tag existente
         const { data: existingTag } =
           await supabase
             .from('tags')
@@ -396,7 +361,6 @@ export async function POST(request: Request) {
           continue;
         }
 
-        // Se não existir, cria
         const { data: newTag, error: tagError } =
           await supabase
             .from('tags')
@@ -413,10 +377,6 @@ export async function POST(request: Request) {
           tagIds.push(newTag.id);
         }
       }
-
-      // ---------------------------------------------------
-      // Relacionar tags com a história
-      // ---------------------------------------------------
 
       if (tagIds.length > 0) {
         const storyTags = tagIds.map((tagId) => ({
@@ -437,10 +397,6 @@ export async function POST(request: Request) {
         }
       }
     }
-
-    // =====================================================
-    // RESPOSTA
-    // =====================================================
 
     return NextResponse.json(
       {
