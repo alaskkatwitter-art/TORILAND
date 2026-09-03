@@ -94,8 +94,8 @@ export default function LoginPage() {
 
     setError('');
 
-    const form = event.currentTarget;
-    const formData = new FormData(form);
+    const form = event.currentTarget as HTMLFormElement;
+const formData = new FormData(form);
 
     const recoveryKeyValue = formData.get('recoveryKey');
     const newPassword = formData.get('newPassword');
