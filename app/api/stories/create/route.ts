@@ -8,6 +8,8 @@ const supabase = createClient(
 );
 
 export async function POST(request: Request) {
+  let uploadedCoverPath = '';
+
   try {
     const cookieHeader = request.headers.get('cookie') || '';
 
@@ -59,27 +61,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
+    const formData = await request.formData();
+
+    const titleValue = formData.get('title');
+    const descriptionValue = formData.get('description');
+    const statusValue = formData.get('status');
+    const coverValue = formData.get('cover');
 
     const title =
-      typeof body.title === 'string'
-        ? body.title.trim()
+      typeof titleValue === 'string'
+        ? titleValue.trim()
         : '';
 
     const description =
-      typeof body.description === 'string'
-        ? body.description.trim()
+      typeof descriptionValue === 'string'
+        ? descriptionValue.trim()
         : '';
 
     const status =
-      typeof body.status === 'string'
-        ? body.status.trim()
+      typeof statusValue === 'string'
+        ? statusValue.trim()
         : 'Em andamento';
-
-    const coverUrl =
-      typeof body.cover_url === 'string'
-        ? body.cover_url.trim()
-        : '';
 
     if (!title) {
       return NextResponse.json(
@@ -124,6 +126,80 @@ export async function POST(request: Request) {
       );
     }
 
+    let coverUrl: string | null = null;
+
+    if (coverValue instanceof File && coverValue.size > 0) {
+      const allowedTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+      ];
+
+      if (!allowedTypes.includes(coverValue.type)) {
+        return NextResponse.json(
+          {
+            error:
+              'Formato de capa inválido. Use JPG, PNG ou WEBP.',
+          },
+          { status: 400 }
+        );
+      }
+
+      if (coverValue.size > 8 * 1024 * 1024) {
+        return NextResponse.json(
+          {
+            error:
+              'A capa pode ter no máximo 8 MB.',
+          },
+          { status: 400 }
+        );
+      }
+
+      const extension =
+        coverValue.type === 'image/jpeg'
+          ? 'jpg'
+          : coverValue.type === 'image/png'
+          ? 'png'
+          : 'webp';
+
+      uploadedCoverPath =
+        `${session.user_id}/story-${Date.now()}.${extension}`;
+
+      const arrayBuffer =
+        await coverValue.arrayBuffer();
+
+      const fileBuffer = Buffer.from(arrayBuffer);
+
+      const { error: uploadError } =
+        await supabase.storage
+          .from('story-covers')
+          .upload(
+            uploadedCoverPath,
+            fileBuffer,
+            {
+              contentType: coverValue.type,
+              upsert: false,
+            }
+          );
+
+      if (uploadError) {
+        return NextResponse.json(
+          {
+            error:
+              'Não foi possível enviar a capa da história.',
+          },
+          { status: 500 }
+        );
+      }
+
+      const { data: publicUrlData } =
+        supabase.storage
+          .from('story-covers')
+          .getPublicUrl(uploadedCoverPath);
+
+      coverUrl = publicUrlData.publicUrl;
+    }
+
     const { data: story, error: storyError } =
       await supabase
         .from('stories')
@@ -131,8 +207,8 @@ export async function POST(request: Request) {
           author: session.user_id,
           title,
           description: description || null,
+          cover_url: coverUrl,
           status,
-          cover_url: coverUrl || null,
         })
         .select(
           'id, author, title, description, cover_url, status, created_at, updated_at'
@@ -140,6 +216,12 @@ export async function POST(request: Request) {
         .single();
 
     if (storyError || !story) {
+      if (uploadedCoverPath) {
+        await supabase.storage
+          .from('story-covers')
+          .remove([uploadedCoverPath]);
+      }
+
       return NextResponse.json(
         {
           error:
@@ -157,6 +239,12 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch {
+    if (uploadedCoverPath) {
+      await supabase.storage
+        .from('story-covers')
+        .remove([uploadedCoverPath]);
+    }
+
     return NextResponse.json(
       {
         error:
