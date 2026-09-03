@@ -5,12 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 
 type Chapter = {
   id: string;
-  story_id: string;
+  story_id?: string;
   chapter_number: number;
   title: string;
-  body: string;
-  published: boolean;
-  created_at: string;
+  body?: string;
+  published?: boolean;
+  created_at?: string;
 };
 
 export default function CapituloPage() {
@@ -20,33 +20,40 @@ export default function CapituloPage() {
   const id = params.id as string;
 
   const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [previousChapter, setPreviousChapter] =
+    useState<Chapter | null>(null);
+  const [nextChapter, setNextChapter] =
+    useState<Chapter | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     async function loadChapter() {
       try {
-        const response = await fetch(
-          `/api/chapters/${id}`,
-          {
-            cache: 'no-store',
-          }
-        );
+        setLoading(true);
+        setError('');
+
+        const response = await fetch(`/api/chapters/${id}`, {
+          cache: 'no-store',
+        });
 
         const data = await response.json();
 
         if (!response.ok) {
-          setError(
-            data.error ||
-              'Não foi possível carregar o capítulo.'
+          throw new Error(
+            data.error || 'Não foi possível carregar o capítulo.'
           );
-          return;
         }
 
         setChapter(data.chapter);
-      } catch {
+        setPreviousChapter(data.previousChapter || null);
+        setNextChapter(data.nextChapter || null);
+      } catch (err) {
         setError(
-          'Não foi possível carregar o capítulo.'
+          err instanceof Error
+            ? err.message
+            : 'Não foi possível carregar o capítulo.'
         );
       } finally {
         setLoading(false);
@@ -60,32 +67,25 @@ export default function CapituloPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#100b12] text-white">
-        <p className="text-sm text-white/40">
-          Carregando capítulo...
-        </p>
+      <main className="min-h-screen bg-[#0d0d0d] text-white flex items-center justify-center">
+        <p className="text-[#ff4f9a]">Carregando capítulo...</p>
       </main>
     );
   }
 
   if (error || !chapter) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#100b12] px-5 text-white">
+      <main className="min-h-screen bg-[#0d0d0d] text-white flex items-center justify-center px-6">
         <div className="text-center">
-          <h1 className="text-2xl font-black">
-            Capítulo não encontrado
-          </h1>
-
-          <p className="mt-2 text-sm text-white/40">
-            {error ||
-              'Esse capítulo não existe ou não está disponível.'}
+          <p className="text-red-400 mb-5">
+            {error || 'Capítulo não encontrado.'}
           </p>
 
           <button
-            onClick={() => router.push('/')}
-            className="mt-6 rounded-full bg-[#ff78b9] px-6 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110"
+            onClick={() => router.back()}
+            className="px-5 py-3 rounded-xl bg-[#ff4f9a] text-black font-semibold"
           >
-            Voltar ao início
+            Voltar
           </button>
         </div>
       </main>
@@ -93,61 +93,79 @@ export default function CapituloPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#100b12] text-white">
-      <header className="border-b border-white/10 bg-[#100b12]">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-5">
-          <button
-            onClick={() =>
-              router.push(
-                `/historia/${chapter.story_id}`
-              )
-            }
-            className="text-sm font-semibold text-white/50 transition hover:text-[#ff78b9]"
-          >
-            ← Voltar para a história
-          </button>
+    <main className="min-h-screen bg-[#0d0d0d] text-white">
+      <div className="max-w-3xl mx-auto px-5 py-8">
 
-          <button
-            onClick={() => router.push('/perfil')}
-            className="rounded-full border border-white/10 px-5 py-2 text-sm font-semibold text-white/60 transition hover:border-[#ff78b9]/40 hover:text-white"
-          >
-            Meu perfil
-          </button>
-        </div>
-      </header>
+        {/* Voltar para a história */}
+        <button
+          onClick={() =>
+            router.push(`/historia/${chapter.story_id}`)
+          }
+          className="text-sm text-gray-400 hover:text-white transition mb-8"
+        >
+          ← Voltar para a história
+        </button>
 
-      <article className="mx-auto max-w-3xl px-5 py-12 md:py-20">
-        <div className="text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#ff78b9]">
+        {/* Cabeçalho */}
+        <header className="mb-10">
+          <p className="text-sm text-[#ff4f9a] mb-2">
             Capítulo {chapter.chapter_number}
           </p>
 
-          <h1 className="mt-4 text-3xl font-black leading-tight md:text-4xl">
+          <h1 className="text-3xl font-bold">
             {chapter.title}
           </h1>
-        </div>
+        </header>
 
-        <div className="my-10 h-px bg-white/10" />
-
-        <div className="whitespace-pre-wrap font-serif text-[18px] leading-[1.9] text-white/80 md:text-[19px]">
+        {/* Texto */}
+        <article className="text-[18px] leading-8 text-gray-200 font-serif whitespace-pre-wrap">
           {chapter.body}
-        </div>
+        </article>
 
-        <div className="my-12 h-px bg-white/10" />
+        {/* Navegação */}
+        <nav className="mt-14 pt-8 border-t border-white/10 flex items-center justify-between gap-4">
 
-        <div className="flex justify-center">
-          <button
-            onClick={() =>
-              router.push(
-                `/historia/${chapter.story_id}`
-              )
-            }
-            className="rounded-full border border-[#ff78b9]/30 px-7 py-3.5 text-sm font-bold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
-          >
-            Voltar para a história
-          </button>
-        </div>
-      </article>
+          {previousChapter ? (
+            <button
+              onClick={() =>
+                router.push(`/capitulo/${previousChapter.id}`)
+              }
+              className="flex-1 text-left px-4 py-4 rounded-xl bg-white/5 border border-white/10 hover:border-[#ff4f9a]/50 transition"
+            >
+              <span className="block text-xs text-gray-500 mb-1">
+                Capítulo anterior
+              </span>
+
+              <span className="text-sm font-semibold text-white">
+                ← Capítulo {previousChapter.chapter_number}
+              </span>
+            </button>
+          ) : (
+            <div className="flex-1" />
+          )}
+
+          {nextChapter ? (
+            <button
+              onClick={() =>
+                router.push(`/capitulo/${nextChapter.id}`)
+              }
+              className="flex-1 text-right px-4 py-4 rounded-xl bg-white/5 border border-white/10 hover:border-[#ff4f9a]/50 transition"
+            >
+              <span className="block text-xs text-gray-500 mb-1">
+                Próximo capítulo
+              </span>
+
+              <span className="text-sm font-semibold text-white">
+                Capítulo {nextChapter.chapter_number} →
+              </span>
+            </button>
+          ) : (
+            <div className="flex-1" />
+          )}
+
+        </nav>
+
+      </div>
     </main>
   );
-      }
+}
