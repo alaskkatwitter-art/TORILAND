@@ -689,4 +689,4 @@ export default function HomePage() {
                 value={commentText}
                 onChange={(event) => setCommentText(event.target.value)}
                 placeholder="Comente este trecho..."
-                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-
+                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none placeholder:text-white/30"
