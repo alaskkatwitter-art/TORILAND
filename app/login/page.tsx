@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 export default function LoginPage() {
   const router = useRouter();
 
-  const [mode, setMode] = useState<'login' | 'signup'>('signup');
+  const [mode, setMode] = useState<'login' | 'signup' | 'recover'>('signup');
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
