@@ -25,6 +25,9 @@ export default function CapituloPage() {
   const [nextChapter, setNextChapter] =
     useState<Chapter | null>(null);
 
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [showContents, setShowContents] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -49,6 +52,21 @@ export default function CapituloPage() {
         setChapter(data.chapter);
         setPreviousChapter(data.previousChapter || null);
         setNextChapter(data.nextChapter || null);
+
+        if (data.chapter?.story_id) {
+          const storyResponse = await fetch(
+            `/api/stories/${data.chapter.story_id}`,
+            {
+              cache: 'no-store',
+            }
+          );
+
+          const storyData = await storyResponse.json();
+
+          if (storyResponse.ok) {
+            setChapters(storyData.chapters || []);
+          }
+        }
       } catch (err) {
         setError(
           err instanceof Error
@@ -96,15 +114,26 @@ export default function CapituloPage() {
     <main className="min-h-screen bg-[#0d0d0d] text-white">
       <div className="max-w-3xl mx-auto px-5 py-8">
 
-        {/* Voltar para a história */}
-        <button
-          onClick={() =>
-            router.push(`/historia/${chapter.story_id}`)
-          }
-          className="text-sm text-gray-400 hover:text-white transition mb-8"
-        >
-          ← Voltar para a história
-        </button>
+        {/* Topo */}
+        <div className="flex items-center justify-between gap-4 mb-8">
+
+          <button
+            onClick={() =>
+              router.push(`/historia/${chapter.story_id}`)
+            }
+            className="text-sm text-gray-400 hover:text-white transition"
+          >
+            ← Voltar para a história
+          </button>
+
+          <button
+            onClick={() => setShowContents(true)}
+            className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm font-semibold hover:border-[#ff4f9a]/50 transition"
+          >
+            ☰ Sumário
+          </button>
+
+        </div>
 
         {/* Cabeçalho */}
         <header className="mb-10">
@@ -166,6 +195,109 @@ export default function CapituloPage() {
         </nav>
 
       </div>
+
+      {/* Painel do Sumário */}
+      {showContents && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70"
+          onClick={() => setShowContents(false)}
+        >
+          <div
+            className="absolute right-0 top-0 h-full w-full max-w-md bg-[#111111] border-l border-white/10 overflow-y-auto"
+            onClick={(event) => event.stopPropagation()}
+          >
+
+            {/* Cabeçalho do painel */}
+            <div className="sticky top-0 bg-[#111111] border-b border-white/10 px-6 py-5 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-[#ff4f9a] uppercase tracking-wider">
+                  História
+                </p>
+
+                <h2 className="text-xl font-bold mt-1">
+                  Sumário
+                </h2>
+              </div>
+
+              <button
+                onClick={() => setShowContents(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Lista */}
+            <div className="p-4">
+
+              {chapters.length === 0 ? (
+                <p className="text-gray-500 text-sm px-2 py-4">
+                  Nenhum capítulo encontrado.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {chapters.map((item) => {
+                    const isCurrent =
+                      item.id === chapter.id;
+
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setShowContents(false);
+
+                          if (!isCurrent) {
+                            router.push(`/capitulo/${item.id}`);
+                          }
+                        }}
+                        className={`w-full text-left px-4 py-4 rounded-xl border transition ${
+                          isCurrent
+                            ? 'bg-[#ff4f9a]/10 border-[#ff4f9a]/50'
+                            : 'bg-white/5 border-white/10 hover:border-[#ff4f9a]/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+
+                          <span
+                            className={`text-xs font-semibold ${
+                              isCurrent
+                                ? 'text-[#ff4f9a]'
+                                : 'text-gray-500'
+                            }`}
+                          >
+                            {item.chapter_number}
+                          </span>
+
+                          <div className="min-w-0">
+                            <p
+                              className={`font-semibold truncate ${
+                                isCurrent
+                                  ? 'text-[#ff4f9a]'
+                                  : 'text-white'
+                              }`}
+                            >
+                              {item.title}
+                            </p>
+
+                            {isCurrent && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Você está aqui
+                              </p>
+                            )}
+                          </div>
+
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }
