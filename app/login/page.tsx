@@ -15,6 +15,57 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recoveryKey, setRecoveryKey] = useState('');
+  async function handleRecovery(event: React.FormEvent) {
+  event.preventDefault();
+
+  setError('');
+  setLoading(true);
+
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+
+  const recoveryKey = formData.get('recoveryKey');
+  const newPassword = formData.get('newPassword');
+  const confirmNewPassword = formData.get('confirmNewPassword');
+
+  if (newPassword !== confirmNewPassword) {
+    setError('As senhas não coincidem.');
+    setLoading(false);
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/auth/recover', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username,
+        recoveryKey,
+        newPassword,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setError(
+        data.error || 'Não foi possível recuperar sua conta.'
+      );
+      return;
+    }
+
+    setMode('login');
+    setPassword('');
+    setConfirmPassword('');
+    setError('Senha alterada com sucesso. Agora você pode entrar.');
+  } catch {
+    setError('Não foi possível conectar ao Toriland.');
+  } finally {
+    setLoading(false);
+  }
+  }
 
   async function handleSignup(event: React.FormEvent) {
     event.preventDefault();
