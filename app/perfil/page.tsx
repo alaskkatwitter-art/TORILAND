@@ -76,18 +76,38 @@ export default function PerfilPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!user?.id) return;
+  const userId = user?.id;
 
-    async function loadStories() {
-      setLoadingStories(true);
+  if (!userId) return;
 
-      try {
-        const response = await fetch(
-          `/api/stories/author/${user.id}`,
-          {
-            cache: 'no-store',
-          }
-        );
+  async function loadStories() {
+    setLoadingStories(true);
+
+    try {
+      const response = await fetch(
+        `/api/stories/author/${userId}`,
+        {
+          cache: 'no-store',
+        }
+      );
+
+      if (!response.ok) {
+        setStories([]);
+        return;
+      }
+
+      const data = await response.json();
+
+      setStories(data.stories || []);
+    } catch {
+      setStories([]);
+    } finally {
+      setLoadingStories(false);
+    }
+  }
+
+  loadStories();
+}, [user?.id]);
 
         if (!response.ok) {
           setStories([]);
