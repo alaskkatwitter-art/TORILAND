@@ -3,6 +3,7 @@
 import {
   ChangeEvent,
   TouchEvent,
+  ReactNode,
   useEffect,
   useRef,
   useState,
@@ -744,7 +745,8 @@ export default function PerfilPage() {
         {
           method: 'PATCH',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':
+              'application/json',
           },
           body: JSON.stringify({
             content,
@@ -1448,11 +1450,9 @@ export default function PerfilPage() {
       setMediaFiles([]);
       setMediaPreviews([]);
 
-      if (!error) {
-        setSuccess(
-          'Post publicado no seu Nook!'
-        );
-      }
+      setSuccess(
+        'Post publicado no seu Nook!'
+      );
 
       setTimeout(() => {
         setSuccess('');
@@ -1807,7 +1807,8 @@ export default function PerfilPage() {
               post_id: post.id,
               media_url:
                 post.image_url,
-              media_type: 'image' as const,
+              media_type:
+                'image' as const,
               position: 0,
             },
           ]
@@ -1880,7 +1881,7 @@ export default function PerfilPage() {
     comment: NookComment,
     allComments: NookComment[],
     depth = 0
-  ): JSX.Element {
+  ): ReactNode {
     const replies =
       allComments.filter(
         (item) =>
