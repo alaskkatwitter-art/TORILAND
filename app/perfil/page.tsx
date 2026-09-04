@@ -58,23 +58,27 @@ export default function PerfilPage() {
   const [selectedStoryId, setSelectedStoryId] = useState('');
   const [creatingPost, setCreatingPost] = useState(false);
 
-  const [editingNookPost, setEditingNookPost] =
-    useState<NookPost | null>(null);
+  const [editingNookPostId, setEditingNookPostId] =
+    useState<string | null>(null);
+
   const [editNookBody, setEditNookBody] = useState('');
   const [editNookStoryId, setEditNookStoryId] =
     useState('');
+
   const [savingNookPost, setSavingNookPost] =
     useState(false);
 
-  const [openPostMenu, setOpenPostMenu] =
-    useState<string | null>(null);
-  const [deletingPostId, setDeletingPostId] =
-    useState<string | null>(null);
-  const [updatingPostId, setUpdatingPostId] =
+  const [deletingNookPostId, setDeletingNookPostId] =
     useState<string | null>(null);
 
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [uploadingCover, setUploadingCover] = useState(false);
+  const [menuOpenPostId, setMenuOpenPostId] =
+    useState<string | null>(null);
+
+  const [uploadingAvatar, setUploadingAvatar] =
+    useState(false);
+
+  const [uploadingCover, setUploadingCover] =
+    useState(false);
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -113,9 +117,12 @@ export default function PerfilPage() {
       setLoadingStories(true);
 
       try {
-        const response = await fetch('/api/profile/stories', {
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          '/api/profile/stories',
+          {
+            cache: 'no-store',
+          }
+        );
 
         const data = await response.json();
 
@@ -155,9 +162,12 @@ export default function PerfilPage() {
       setLoadingNook(true);
 
       try {
-        const response = await fetch('/api/nook-posts', {
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          '/api/nook-posts',
+          {
+            cache: 'no-store',
+          }
+        );
 
         const data = await response.json();
 
@@ -228,16 +238,19 @@ export default function PerfilPage() {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/profile/update', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          display_name: editDisplayName,
-          bio,
-        }),
-      });
+      const response = await fetch(
+        '/api/profile/update',
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            display_name: editDisplayName,
+            bio,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -250,7 +263,9 @@ export default function PerfilPage() {
       }
 
       setUser(data.user);
-      setSuccess('Perfil atualizado com sucesso.');
+      setSuccess(
+        'Perfil atualizado com sucesso.'
+      );
 
       setTimeout(() => {
         setEditing(false);
@@ -289,10 +304,13 @@ export default function PerfilPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/profile/avatar', {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await fetch(
+        '/api/profile/avatar',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const data = await response.json();
 
@@ -313,7 +331,9 @@ export default function PerfilPage() {
           : currentUser
       );
 
-      setSuccess('Foto de perfil atualizada.');
+      setSuccess(
+        'Foto de perfil atualizada.'
+      );
 
       setTimeout(() => {
         setSuccess('');
@@ -355,10 +375,13 @@ export default function PerfilPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/profile/cover', {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await fetch(
+        '/api/profile/cover',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const data = await response.json();
 
@@ -379,7 +402,9 @@ export default function PerfilPage() {
           : currentUser
       );
 
-      setSuccess('Capa atualizada com sucesso.');
+      setSuccess(
+        'Capa atualizada com sucesso.'
+      );
 
       setTimeout(() => {
         setSuccess('');
@@ -419,17 +444,20 @@ export default function PerfilPage() {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/nook-posts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          body: text,
-          image_url: null,
-          story_id: selectedStoryId || null,
-        }),
-      });
+      const response = await fetch(
+        '/api/nook-posts',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            body: text,
+            image_url: null,
+            story_id: selectedStoryId || null,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -453,7 +481,9 @@ export default function PerfilPage() {
       setNewPost('');
       setSelectedStoryId('');
 
-      setSuccess('Post publicado no seu Nook!');
+      setSuccess(
+        'Post publicado no seu Nook!'
+      );
 
       setTimeout(() => {
         setSuccess('');
@@ -467,30 +497,41 @@ export default function PerfilPage() {
     }
   }
 
-  function openNookPostEditor(post: NookPost) {
-    setEditingNookPost(post);
-    setEditNookBody(post.body);
-    setEditNookStoryId(post.story_id || '');
-    setOpenPostMenu(null);
-    setError('');
+  function getStoryTitle(storyId: string | null) {
+    if (!storyId) return null;
+
+    const story = stories.find(
+      (item) => item.id === storyId
+    );
+
+    return story?.title || null;
   }
 
-  function closeNookPostEditor() {
+  function startEditNookPost(post: NookPost) {
+    setEditingNookPostId(post.id);
+    setEditNookBody(post.body);
+    setEditNookStoryId(post.story_id || '');
+    setMenuOpenPostId(null);
+    setError('');
+    setSuccess('');
+  }
+
+  function cancelEditNookPost() {
     if (savingNookPost) return;
 
-    setEditingNookPost(null);
+    setEditingNookPostId(null);
     setEditNookBody('');
     setEditNookStoryId('');
   }
 
-  async function handleSaveNookPost() {
-    if (!editingNookPost) return;
+  async function handleSaveNookPostEdit() {
+    if (!editingNookPostId) return;
 
     const text = editNookBody.trim();
 
     if (!text) {
       setError(
-        'O post precisa ter algum conteúdo.'
+        'O post não pode ficar vazio.'
       );
       return;
     }
@@ -508,7 +549,7 @@ export default function PerfilPage() {
 
     try {
       const response = await fetch(
-        `/api/nook-posts/${editingNookPost.id}`,
+        `/api/nook-posts/${editingNookPostId}`,
         {
           method: 'PATCH',
           headers: {
@@ -516,7 +557,8 @@ export default function PerfilPage() {
           },
           body: JSON.stringify({
             body: text,
-            story_id: editNookStoryId || null,
+            story_id:
+              editNookStoryId || null,
           }),
         }
       );
@@ -543,11 +585,13 @@ export default function PerfilPage() {
         );
       }
 
-      setEditingNookPost(null);
+      setEditingNookPostId(null);
       setEditNookBody('');
       setEditNookStoryId('');
 
-      setSuccess('Post atualizado.');
+      setSuccess(
+        'Post atualizado com sucesso.'
+      );
 
       setTimeout(() => {
         setSuccess('');
@@ -561,9 +605,10 @@ export default function PerfilPage() {
     }
   }
 
-  async function handleTogglePin(post: NookPost) {
-    setOpenPostMenu(null);
-    setUpdatingPostId(post.id);
+  async function handleTogglePinNookPost(
+    post: NookPost
+  ) {
+    setMenuOpenPostId(null);
     setError('');
     setSuccess('');
 
@@ -586,7 +631,7 @@ export default function PerfilPage() {
       if (!response.ok) {
         setError(
           data.error ||
-            'Não foi possível alterar o destaque do post.'
+            'Não foi possível alterar o post.'
         );
         return;
       }
@@ -616,27 +661,20 @@ export default function PerfilPage() {
       setError(
         'Não foi possível alterar o post. Tente novamente.'
       );
-    } finally {
-      setUpdatingPostId(null);
     }
   }
 
-  async function handleDeleteNookPost(post: NookPost) {
-    setOpenPostMenu(null);
-
-    const confirmed = window.confirm(
-      'Tem certeza que deseja excluir este post? Essa ação não pode ser desfeita.'
-    );
-
-    if (!confirmed) return;
-
-    setDeletingPostId(post.id);
+  async function handleDeleteNookPost(
+    postId: string
+  ) {
+    setMenuOpenPostId(null);
+    setDeletingNookPostId(postId);
     setError('');
     setSuccess('');
 
     try {
       const response = await fetch(
-        `/api/nook-posts/${post.id}`,
+        `/api/nook-posts/${postId}`,
         {
           method: 'DELETE',
         }
@@ -654,12 +692,13 @@ export default function PerfilPage() {
 
       setNookPosts((currentPosts) =>
         currentPosts.filter(
-          (currentPost) =>
-            currentPost.id !== post.id
+          (post) => post.id !== postId
         )
       );
 
-      setSuccess('Post excluído.');
+      setSuccess(
+        'Post excluído com sucesso.'
+      );
 
       setTimeout(() => {
         setSuccess('');
@@ -669,18 +708,8 @@ export default function PerfilPage() {
         'Não foi possível excluir o post. Tente novamente.'
       );
     } finally {
-      setDeletingPostId(null);
+      setDeletingNookPostId(null);
     }
-  }
-
-  function getStoryTitle(storyId: string | null) {
-    if (!storyId) return null;
-
-    const story = stories.find(
-      (item) => item.id === storyId
-    );
-
-    return story?.title || null;
   }
 
   if (loading) {
@@ -701,11 +730,21 @@ export default function PerfilPage() {
     user.display_name || user.username;
 
   return (
-    <main className="min-h-screen bg-[#100b12] text-white">
+    <main
+      className="min-h-screen bg-[#100b12] text-white"
+      onClick={() => {
+        if (menuOpenPostId) {
+          setMenuOpenPostId(null);
+        }
+      }}
+    >
       <header className="border-b border-white/10 bg-[#100b12]">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
           <button
-            onClick={() => router.push('/')}
+            onClick={(event) => {
+              event.stopPropagation();
+              router.push('/');
+            }}
             className="flex items-center gap-3"
           >
             <CloudLogo />
@@ -716,7 +755,10 @@ export default function PerfilPage() {
           </button>
 
           <button
-            onClick={() => router.push('/')}
+            onClick={(event) => {
+              event.stopPropagation();
+              router.push('/');
+            }}
             className="rounded-full border border-white/10 px-5 py-2 text-sm font-semibold text-white/60 transition hover:border-[#ff78b9]/40 hover:text-white"
           >
             Voltar
@@ -775,7 +817,9 @@ export default function PerfilPage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  user.username.charAt(0).toUpperCase()
+                  user.username
+                    .charAt(0)
+                    .toUpperCase()
                 )}
 
                 <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100">
@@ -866,21 +910,9 @@ export default function PerfilPage() {
 
         {/* MEU NOOK */}
         <section className="relative mt-10 overflow-hidden rounded-3xl border border-[#ff78b9]/15 bg-[#191219]">
-          <div className="pointer-events-none absolute -right-8 -top-10 text-8xl opacity-[0.06]">
-            ☁
-          </div>
-
-          <div className="pointer-events-none absolute -bottom-10 -left-8 text-8xl opacity-[0.04]">
-            ☁
-          </div>
-
           <div className="relative p-6 md:p-8">
             <div className="mb-6">
               <div className="flex items-center gap-3">
-                <span className="text-3xl">
-                  ☁️
-                </span>
-
                 <div>
                   <h2 className="text-2xl font-black">
                     Meu Nook
@@ -911,7 +943,9 @@ export default function PerfilPage() {
                   <select
                     value={selectedStoryId}
                     onChange={(event) =>
-                      setSelectedStoryId(event.target.value)
+                      setSelectedStoryId(
+                        event.target.value
+                      )
                     }
                     className="max-w-full rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-[#ff78b9]/50"
                   >
@@ -960,11 +994,7 @@ export default function PerfilPage() {
                 </div>
               ) : nookPosts.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-white/10 bg-[#100b12] px-6 py-12 text-center">
-                  <div className="text-4xl opacity-40">
-                    ☁️
-                  </div>
-
-                  <p className="mt-3 text-sm font-semibold text-white/50">
+                  <p className="text-sm font-semibold text-white/50">
                     Seu Nook ainda está vazio.
                   </p>
 
@@ -978,174 +1008,220 @@ export default function PerfilPage() {
                     const storyTitle =
                       getStoryTitle(post.story_id);
 
-                    const isDeleting =
-                      deletingPostId === post.id;
+                    const isEditing =
+                      editingNookPostId === post.id;
 
-                    const isUpdating =
-                      updatingPostId === post.id;
+                    const isDeleting =
+                      deletingNookPostId === post.id;
 
                     return (
                       <article
                         key={post.id}
                         className="relative rounded-3xl border border-white/5 bg-[#100b12] p-5 transition hover:border-[#ff78b9]/15"
                       >
-                        {/* CABEÇALHO DO POST */}
-                        <div className="mb-3 flex items-start justify-between gap-4">
-                          <div>
-                            {post.pinned && (
-                              <div className="flex items-center gap-2 text-xs font-bold text-[#ff78b9]">
-                                <span>📌</span>
-
-                                <span>
-                                  Post fixado
-                                </span>
-                              </div>
-                            )}
+                        {post.pinned && (
+                          <div className="mb-3 text-xs font-bold text-[#ff78b9]">
+                            Post fixado
                           </div>
+                        )}
 
-                          {/* MENU */}
-                          <div className="relative">
+                        {/* MENU */}
+                        {!isEditing && (
+                          <div
+                            className="absolute right-4 top-4"
+                            onClick={(event) =>
+                              event.stopPropagation()
+                            }
+                          >
                             <button
                               type="button"
                               onClick={() =>
-                                setOpenPostMenu(
-                                  openPostMenu ===
+                                setMenuOpenPostId(
+                                  menuOpenPostId ===
                                     post.id
                                     ? null
                                     : post.id
                                 )
                               }
-                              disabled={
-                                isDeleting ||
-                                isUpdating
-                              }
-                              className="flex h-9 w-9 items-center justify-center rounded-full text-xl font-bold text-white/30 transition hover:bg-white/5 hover:text-white disabled:opacity-30"
+                              className="flex h-9 w-9 items-center justify-center rounded-full text-lg font-bold text-white/35 transition hover:bg-white/5 hover:text-white"
                               aria-label="Opções do post"
                             >
                               ⋯
                             </button>
 
-                            {openPostMenu ===
+                            {menuOpenPostId ===
                               post.id && (
-                              <div className="absolute right-0 top-10 z-20 w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#191219] p-1.5 shadow-2xl">
+                              <div className="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#191219] p-1.5 shadow-2xl">
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    openNookPostEditor(
+                                    handleTogglePinNookPost(
                                       post
                                     )
                                   }
-                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-white/70 transition hover:bg-white/5 hover:text-white"
+                                  className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-white/65 transition hover:bg-white/5 hover:text-white"
                                 >
-                                  <span>✏️</span>
-                                  <span>
-                                    Editar
-                                  </span>
+                                  {post.pinned
+                                    ? 'Desafixar post'
+                                    : 'Fixar post'}
                                 </button>
 
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    handleTogglePin(
+                                    startEditNookPost(
                                       post
                                     )
                                   }
-                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-white/70 transition hover:bg-white/5 hover:text-white"
+                                  className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-white/65 transition hover:bg-white/5 hover:text-white"
                                 >
-                                  <span>
-                                    {post.pinned
-                                      ? '📍'
-                                      : '📌'}
-                                  </span>
-
-                                  <span>
-                                    {post.pinned
-                                      ? 'Desafixar'
-                                      : 'Fixar no Nook'}
-                                  </span>
+                                  Editar
                                 </button>
-
-                                <div className="my-1 border-t border-white/5" />
 
                                 <button
                                   type="button"
                                   onClick={() =>
                                     handleDeleteNookPost(
-                                      post
+                                      post.id
                                     )
                                   }
-                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-red-300 transition hover:bg-red-400/10"
+                                  disabled={isDeleting}
+                                  className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-red-300 transition hover:bg-red-400/5 disabled:opacity-40"
                                 >
-                                  <span>🗑️</span>
-
-                                  <span>
-                                    Excluir
-                                  </span>
+                                  {isDeleting
+                                    ? 'Excluindo...'
+                                    : 'Excluir'}
                                 </button>
                               </div>
                             )}
                           </div>
-                        </div>
-
-                        {/* CONTEÚDO */}
-                        <p className="whitespace-pre-wrap text-sm leading-7 text-white/75">
-                          {post.body}
-                        </p>
-
-                        {post.image_url && (
-                          <div className="mt-4 overflow-hidden rounded-2xl">
-                            <img
-                              src={post.image_url}
-                              alt=""
-                              className="max-h-[500px] w-full object-cover"
-                            />
-                          </div>
                         )}
 
-                        {storyTitle && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              router.push(
-                                `/historia/${post.story_id}`
-                              )
-                            }
-                            className="mt-4 flex items-center gap-2 rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/5 px-4 py-2 text-xs font-semibold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
-                          >
-                            <span>📖</span>
-
-                            <span>
-                              {storyTitle}
-                            </span>
-                          </button>
-                        )}
-
-                        <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
-                          <span className="text-xs text-white/25">
-                            {new Date(
-                              post.created_at
-                            ).toLocaleDateString(
-                              'pt-BR',
-                              {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
+                        {isEditing ? (
+                          <div className="pr-0">
+                            <textarea
+                              value={editNookBody}
+                              onChange={(event) =>
+                                setEditNookBody(
+                                  event.target.value
+                                )
                               }
+                              maxLength={5000}
+                              rows={6}
+                              className="w-full resize-none rounded-2xl border border-white/10 bg-[#191219] px-4 py-3 text-sm leading-7 text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/50"
+                            />
+
+                            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                              <select
+                                value={
+                                  editNookStoryId
+                                }
+                                onChange={(event) =>
+                                  setEditNookStoryId(
+                                    event.target.value
+                                  )
+                                }
+                                className="flex-1 rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-[#ff78b9]/50"
+                              >
+                                <option value="">
+                                  Sem história vinculada
+                                </option>
+
+                                {stories.map(
+                                  (story) => (
+                                    <option
+                                      key={story.id}
+                                      value={story.id}
+                                    >
+                                      {story.title}
+                                    </option>
+                                  )
+                                )}
+                              </select>
+
+                              <span className="text-xs text-white/25">
+                                {editNookBody.length}
+                                /5000
+                              </span>
+                            </div>
+
+                            <div className="mt-4 flex gap-3">
+                              <button
+                                type="button"
+                                onClick={
+                                  cancelEditNookPost
+                                }
+                                disabled={
+                                  savingNookPost
+                                }
+                                className="rounded-full border border-white/10 px-5 py-2.5 text-xs font-semibold text-white/50 transition hover:border-white/20 hover:text-white disabled:opacity-40"
+                              >
+                                Cancelar
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={
+                                  handleSaveNookPostEdit
+                                }
+                                disabled={
+                                  savingNookPost ||
+                                  !editNookBody.trim()
+                                }
+                                className="rounded-full bg-[#ff78b9] px-5 py-2.5 text-xs font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-40"
+                              >
+                                {savingNookPost
+                                  ? 'Salvando...'
+                                  : 'Salvar'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="whitespace-pre-wrap pr-8 text-sm leading-7 text-white/75">
+                              {post.body}
+                            </p>
+
+                            {post.image_url && (
+                              <div className="mt-4 overflow-hidden rounded-2xl">
+                                <img
+                                  src={post.image_url}
+                                  alt=""
+                                  className="max-h-[500px] w-full object-cover"
+                                />
+                              </div>
                             )}
-                          </span>
 
-                          {isDeleting && (
-                            <span className="text-xs text-white/30">
-                              Excluindo...
-                            </span>
-                          )}
+                            {storyTitle && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  router.push(
+                                    `/historia/${post.story_id}`
+                                  )
+                                }
+                                className="mt-4 rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/5 px-4 py-2 text-xs font-semibold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
+                              >
+                                {storyTitle}
+                              </button>
+                            )}
 
-                          {isUpdating && (
-                            <span className="text-xs text-white/30">
-                              Atualizando...
-                            </span>
-                          )}
-                        </div>
+                            <div className="mt-4 border-t border-white/5 pt-3">
+                              <span className="text-xs text-white/25">
+                                {new Date(
+                                  post.created_at
+                                ).toLocaleDateString(
+                                  'pt-BR',
+                                  {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                  }
+                                )}
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </article>
                     );
                   })}
@@ -1193,7 +1269,9 @@ export default function PerfilPage() {
                   key={story.id}
                   type="button"
                   onClick={() =>
-                    router.push(`/historia/${story.id}`)
+                    router.push(
+                      `/historia/${story.id}`
+                    )
                   }
                   className="group overflow-hidden rounded-3xl border border-white/10 bg-[#191219] text-left transition hover:-translate-y-1 hover:border-[#ff78b9]/30"
                 >
@@ -1284,7 +1362,9 @@ export default function PerfilPage() {
                   type="text"
                   value={editDisplayName}
                   onChange={(event) =>
-                    setEditDisplayName(event.target.value)
+                    setEditDisplayName(
+                      event.target.value
+                    )
                   }
                   maxLength={50}
                   placeholder="Como você quer ser chamado?"
@@ -1344,116 +1424,6 @@ export default function PerfilPage() {
                   {saving
                     ? 'Salvando...'
                     : 'Salvar alterações'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* EDITOR DO POST DO NOOK */}
-      {editingNookPost && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#191219] p-6 shadow-2xl">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-black">
-                  Editar post
-                </h2>
-
-                <p className="mt-1 text-sm text-white/40">
-                  Altere o que você compartilhou no seu Nook.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeNookPostEditor}
-                disabled={savingNookPost}
-                className="text-2xl leading-none text-white/40 transition hover:text-white disabled:opacity-40"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="space-y-5">
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-semibold text-white/80">
-                    Conteúdo
-                  </label>
-
-                  <span className="text-xs text-white/30">
-                    {editNookBody.length}/5000
-                  </span>
-                </div>
-
-                <textarea
-                  value={editNookBody}
-                  onChange={(event) =>
-                    setEditNookBody(event.target.value)
-                  }
-                  maxLength={5000}
-                  rows={7}
-                  className="w-full resize-none rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm leading-7 text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-white/80">
-                  História vinculada
-                </label>
-
-                <select
-                  value={editNookStoryId}
-                  onChange={(event) =>
-                    setEditNookStoryId(event.target.value)
-                  }
-                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm text-white/60 outline-none transition focus:border-[#ff78b9]/60"
-                >
-                  <option value="">
-                    Nenhuma história
-                  </option>
-
-                  {stories.map((story) => (
-                    <option
-                      key={story.id}
-                      value={story.id}
-                    >
-                      {story.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {error && (
-                <div className="rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">
-                  {error}
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeNookPostEditor}
-                  disabled={savingNookPost}
-                  className="flex-1 rounded-full border border-white/10 px-5 py-3 text-sm font-semibold text-white/60 transition hover:border-white/20 hover:text-white disabled:opacity-40"
-                >
-                  Cancelar
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSaveNookPost}
-                  disabled={
-                    savingNookPost ||
-                    !editNookBody.trim()
-                  }
-                  className="flex-1 rounded-full bg-[#ff78b9] px-5 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-50"
-                >
-                  {savingNookPost
-                    ? 'Salvando...'
-                    : 'Salvar post'}
                 </button>
               </div>
             </div>
