@@ -1057,3 +1057,555 @@ function FeedPost({
                   {post.author
                     ?.username ||
                     'usuario'}
+                </Link>
+              </div>
+
+              <span className="shrink-0 text-[10px] text-white/30 sm:text-xs">
+                {formatPostDateTime(
+                  post.created_at
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* BODY */}
+
+        <PostBody
+          body={post.body}
+        />
+
+        {/* MEDIA */}
+
+        <PostMedia
+          post={post}
+        />
+
+        {/* ACTIONS */}
+
+        <div className="mt-5 flex items-center justify-between border-t border-white/[0.06] pt-3">
+
+          {/* LIKE */}
+
+          <button
+            type="button"
+            onClick={toggleLike}
+            disabled={liking}
+            aria-label="Curtir"
+            title="Curtir"
+            className={`group flex h-11 min-w-[64px] items-center justify-center gap-1.5 rounded-xl px-3 transition active:scale-95 ${
+              liked
+                ? 'text-[#ff78b9]'
+                : 'text-white/45 hover:bg-white/[0.04] hover:text-[#ff78b9]'
+            }`}
+          >
+            <span
+              className={`transition-transform ${
+                liked
+                  ? 'scale-110'
+                  : 'group-hover:scale-110'
+              }`}
+            >
+              <CloudIcon
+                filled={liked}
+              />
+            </span>
+
+            {likeCount > 0 && (
+              <span className="text-[11px] font-semibold text-current">
+                {likeCount}
+              </span>
+            )}
+          </button>
+
+          {/* COMMENT */}
+
+          <button
+            type="button"
+            onClick={() =>
+              setCommentsOpen(
+                (value) => !value
+              )
+            }
+            aria-label="Comentar"
+            title="Comentar"
+            className="group flex h-11 min-w-[64px] items-center justify-center gap-1.5 rounded-xl px-3 text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9] active:scale-95"
+          >
+            <span className="transition-transform group-hover:scale-110">
+              <CommentIcon />
+            </span>
+
+            {post.comments_count > 0 && (
+              <span className="text-[11px] font-semibold text-current">
+                {post.comments_count}
+              </span>
+            )}
+          </button>
+
+          {/* SHARE */}
+
+          <button
+            type="button"
+            onClick={sharePost}
+            aria-label="Compartilhar"
+            title="Compartilhar"
+            className="group relative flex h-11 min-w-[64px] items-center justify-center rounded-xl px-3 text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9] active:scale-95"
+          >
+            <span className="transition-transform group-hover:scale-110">
+              <ShareIcon />
+            </span>
+
+            {shareMessage && (
+              <span className="absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#ff78b9] px-3 py-1.5 text-[10px] font-bold text-[#190d16] shadow-xl">
+                {shareMessage}
+              </span>
+            )}
+          </button>
+
+          {/* SAVE */}
+
+          <button
+            type="button"
+            onClick={toggleSave}
+            disabled={saving}
+            aria-label={
+              post.saved
+                ? 'Remover dos salvos'
+                : 'Salvar'
+            }
+            title={
+              post.saved
+                ? 'Remover dos salvos'
+                : 'Salvar'
+            }
+            className={`group flex h-11 min-w-[64px] items-center justify-center rounded-xl px-3 transition active:scale-95 ${
+              post.saved
+                ? 'text-[#ff78b9]'
+                : 'text-white/45 hover:bg-white/[0.04] hover:text-[#ff78b9]'
+            }`}
+          >
+            <span className="transition-transform group-hover:scale-110">
+              <BookmarkIcon
+                filled={post.saved}
+              />
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* COMMENTS */}
+
+      {commentsOpen && (
+        <div className="border-t border-white/[0.06] bg-black/10 px-5 py-5 sm:px-6">
+
+          {replyingTo && (
+            <div className="mb-3 flex items-center justify-between rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05] px-3 py-2">
+              <span className="text-xs text-white/50">
+                Respondendo a{' '}
+                <strong className="text-[#ff78b9]">
+                  @
+                  {replyingTo.author
+                    ?.username ||
+                    'usuario'}
+                </strong>
+              </span>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setReplyingTo(
+                    null
+                  )
+                }
+                className="text-xs font-bold text-white/40 hover:text-white"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+
+          <div className="mb-5 flex gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ff78b9]/20 text-xs font-black text-[#ff78b9]">
+              N
+            </div>
+
+            <div className="flex min-w-0 flex-1 items-end gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-2">
+              <textarea
+                value={commentText}
+                onChange={(event) =>
+                  setCommentText(
+                    event.target.value.slice(
+                      0,
+                      2000
+                    )
+                  )
+                }
+                onKeyDown={(event) => {
+                  if (
+                    event.key ===
+                      'Enter' &&
+                    !event.shiftKey
+                  ) {
+                    event.preventDefault();
+                    submitComment();
+                  }
+                }}
+                placeholder={
+                  replyingTo
+                    ? 'Escreva sua resposta...'
+                    : 'Escreva um comentário...'
+                }
+                rows={1}
+                className="max-h-32 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-sm text-white outline-none placeholder:text-white/25"
+              />
+
+              <button
+                type="button"
+                onClick={submitComment}
+                disabled={
+                  !commentText.trim() ||
+                  sendingComment
+                }
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ff78b9] text-[#190d16] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30"
+                aria-label="Enviar comentário"
+              >
+                <SendIcon />
+              </button>
+            </div>
+          </div>
+
+          {commentsLoading ? (
+            <div className="py-6 text-center text-xs text-white/30">
+              Carregando comentários...
+            </div>
+          ) : mainComments.length ===
+            0 ? (
+            <div className="py-6 text-center">
+              <p className="text-sm font-semibold text-white/45">
+                Ainda não há comentários.
+              </p>
+
+              <p className="mt-1 text-xs text-white/25">
+                Seja a primeira pessoa a
+                comentar.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {mainComments.map(
+                (comment) => (
+                  <CommentItem
+                    key={comment.id}
+                    comment={comment}
+                    replies={
+                      commentsByParent.get(
+                        comment.id
+                      ) || []
+                    }
+                    onReply={
+                      setReplyingTo
+                    }
+                  />
+                )
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+/* =========================================================
+   FEED PAGE
+========================================================= */
+
+export default function FeedPage() {
+  const [posts, setPosts] =
+    useState<Post[]>([]);
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+  const [
+    error,
+    setError,
+  ] = useState('');
+
+  /* =======================================================
+     COMPOSITOR DE PUBLICAÇÃO
+  ======================================================= */
+
+  const [
+    composerOpen,
+    setComposerOpen,
+  ] = useState(false);
+
+  const loadFeed =
+    useCallback(
+      async (
+        showRefresh = false
+      ) => {
+        if (showRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+
+        setError('');
+
+        try {
+          const response =
+            await fetch(
+              '/api/feed',
+              {
+                cache: 'no-store',
+              }
+            );
+
+          const data =
+            await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              data.error ||
+                'Não foi possível carregar o Feed.'
+            );
+          }
+
+          setPosts(
+            data.posts || []
+          );
+        } catch (err) {
+          console.error(err);
+
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Não foi possível carregar o Feed.'
+          );
+        } finally {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      },
+      []
+    );
+
+  useEffect(() => {
+    loadFeed();
+  }, [loadFeed]);
+
+  function updatePost(
+    postId: string,
+    changes: Partial<Post>
+  ) {
+    setPosts(
+      (current) =>
+        current.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                ...changes,
+              }
+            : post
+        )
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-[#080609] text-white">
+
+      {/* BACKGROUND GLOW */}
+
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -left-40 top-[-180px] h-[500px] w-[500px] rounded-full bg-[#ff4d9d]/[0.08] blur-[130px]" />
+
+        <div className="absolute right-[-180px] top-[25%] h-[500px] w-[500px] rounded-full bg-[#c63dff]/[0.045] blur-[140px]" />
+
+        <div className="absolute bottom-[-200px] left-[35%] h-[450px] w-[450px] rounded-full bg-[#ff78b9]/[0.035] blur-[130px]" />
+      </div>
+
+      <div className="relative mx-auto min-h-screen w-full max-w-5xl px-4 pb-20 pt-5 sm:px-6 lg:px-8">
+
+        {/* HEADER */}
+
+        <header className="mb-6 flex items-center justify-between">
+
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9]">
+              <CloudIcon />
+            </div>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#ff78b9]/70">
+                Nooklie
+              </p>
+
+              <p className="mt-0.5 text-sm font-semibold text-white/65">
+                Entre escritores
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              loadFeed(true)
+            }
+            disabled={refreshing}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/45 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9] disabled:opacity-40"
+            aria-label="Atualizar Feed"
+            title="Atualizar"
+          >
+            <span
+              className={
+                refreshing
+                  ? 'animate-spin'
+                  : ''
+              }
+            >
+              <RefreshIcon />
+            </span>
+          </button>
+        </header>
+
+        {/* CREATE POST */}
+
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={() =>
+              setComposerOpen(true)
+            }
+            className="group flex w-full items-center gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.025] p-3 text-left shadow-[0_15px_50px_rgba(0,0,0,0.16)] transition hover:border-[#ff78b9]/25 hover:bg-[#ff78b9]/[0.035]"
+          >
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#ff78b9]/20 bg-[#ff78b9]/[0.08] text-2xl font-light text-[#ff78b9] transition-transform group-hover:scale-105">
+              +
+            </span>
+
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-white/75">
+                Compartilhe alguma coisa
+              </span>
+
+              <span className="mt-0.5 block text-xs text-white/30">
+                Uma ideia, uma descoberta, uma história...
+              </span>
+            </span>
+          </button>
+        </div>
+
+        {/* ERROR */}
+
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-400/15 bg-red-400/[0.05] px-5 py-4">
+            <p className="text-sm font-semibold text-red-300">
+              {error}
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                loadFeed()
+              }
+              className="mt-2 text-xs font-bold text-red-300 underline underline-offset-2"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {/* LOADING */}
+
+        {loading ? (
+          <div className="space-y-5">
+            {[1, 2, 3].map(
+              (item) => (
+                <div
+                  key={item}
+                  className="animate-pulse rounded-[26px] border border-white/[0.06] bg-white/[0.025] p-6"
+                >
+                  <div className="flex gap-3">
+                    <div className="h-11 w-11 rounded-full bg-white/[0.06]" />
+
+                    <div className="flex-1">
+                      <div className="h-3 w-32 rounded bg-white/[0.06]" />
+
+                      <div className="mt-2 h-2 w-20 rounded bg-white/[0.04]" />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 h-4 w-4/5 rounded bg-white/[0.05]" />
+
+                  <div className="mt-3 h-4 w-3/5 rounded bg-white/[0.04]" />
+
+                  <div className="mt-5 h-32 rounded-2xl bg-white/[0.04]" />
+                </div>
+              )
+            )}
+          </div>
+        ) : posts.length ===
+          0 ? (
+          /* EMPTY */
+
+          <div className="flex min-h-[55vh] items-center justify-center">
+            <div className="max-w-md text-center">
+
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05]">
+                <CloudIcon />
+              </div>
+
+              <h2 className="mt-6 text-xl font-black text-white">
+                O Feed está quieto.
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-white/35">
+                Ainda não há publicações por
+                aqui. Quando os escritores
+                começarem a postar, elas
+                aparecerão aqui.
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* POSTS */
+
+          <div className="space-y-5">
+            {posts.map((post) => (
+              <FeedPost
+                key={post.id}
+                post={post}
+                onPostUpdated={
+                  updatePost
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* =====================================================
+          NOVA PUBLICAÇÃO
+      ===================================================== */}
+
+      <NookPostComposer
+        open={composerOpen}
+        onClose={() =>
+          setComposerOpen(false)
+        }
+        onPublished={() => {
+          setComposerOpen(false);
+          loadFeed(true);
+        }}
+      />
+    </main>
+  );
+}
