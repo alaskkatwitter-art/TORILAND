@@ -24,6 +24,17 @@ type Story = {
   updated_at: string;
 };
 
+type NookPost = {
+  id: string;
+  user_id: string;
+  body: string;
+  image_url: string | null;
+  story_id: string | null;
+  pinned: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export default function PerfilPage() {
   const router = useRouter();
 
@@ -32,14 +43,20 @@ export default function PerfilPage() {
 
   const [user, setUser] = useState<User | null>(null);
   const [stories, setStories] = useState<Story[]>([]);
+  const [nookPosts, setNookPosts] = useState<NookPost[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [loadingStories, setLoadingStories] = useState(true);
+  const [loadingNook, setLoadingNook] = useState(true);
 
   const [editing, setEditing] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [newPost, setNewPost] = useState('');
+  const [selectedStoryId, setSelectedStoryId] = useState('');
+  const [creatingPost, setCreatingPost] = useState(false);
 
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -123,6 +140,54 @@ export default function PerfilPage() {
     }
 
     loadStories();
+  }, []);
+
+  /*
+   * Carrega os posts do Meu Nook.
+   *
+   * A API /api/nook-posts identifica automaticamente
+   * o usuário através da sessão atual.
+   */
+  useEffect(() => {
+    async function loadNookPosts() {
+      setLoadingNook(true);
+
+      try {
+        const response = await fetch('/api/nook-posts', {
+          cache: 'no-store',
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          console.error(
+            'Erro ao carregar posts do Meu Nook:',
+            data.error,
+            data.details
+          );
+
+          setNookPosts([]);
+          return;
+        }
+
+        setNookPosts(
+          Array.isArray(data.posts)
+            ? data.posts
+            : []
+        );
+      } catch (error) {
+        console.error(
+          'Erro ao carregar posts do Meu Nook:',
+          error
+        );
+
+        setNookPosts([]);
+      } finally {
+        setLoadingNook(false);
+      }
+    }
+
+    loadNookPosts();
   }, []);
 
   function openEditor() {
@@ -317,6 +382,77 @@ export default function PerfilPage() {
     }
   }
 
+  /*
+   * Cria um novo post no Meu Nook.
+   */
+  async function handleCreateNookPost() {
+    const text = newPost.trim();
+
+    if (!text) {
+      setError(
+        'Escreva alguma coisa antes de publicar.'
+      );
+      return;
+    }
+
+    if (text.length > 5000) {
+      setError(
+        'O post pode ter no máximo 5000 caracteres.'
+      );
+      return;
+    }
+
+    setCreatingPost(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch('/api/nook-posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          body: text,
+          image_url: null,
+          story_id: selectedStoryId || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error ||
+            'Não foi possível publicar o post.'
+        );
+        return;
+      }
+
+      if (data.post) {
+        setNookPosts((currentPosts) => [
+          data.post,
+          ...currentPosts,
+        ]);
+      }
+
+      setNewPost('');
+      setSelectedStoryId('');
+
+      setSuccess('Post publicado no seu Nook!');
+
+      setTimeout(() => {
+        setSuccess('');
+      }, 2000);
+    } catch {
+      setError(
+        'Não foi possível publicar o post. Tente novamente.'
+      );
+    } finally {
+      setCreatingPost(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#100b12] text-white">
@@ -331,7 +467,8 @@ export default function PerfilPage() {
     return null;
   }
 
-  const displayName = user.display_name || user.username;
+  const displayName =
+    user.display_name || user.username;
 
   return (
     <main className="min-h-screen bg-[#100b12] text-white">
@@ -445,7 +582,8 @@ export default function PerfilPage() {
 
             <div className="mt-7 max-w-2xl">
               <p className="text-sm leading-7 text-white/50">
-                {user.bio || 'Ainda não há uma bio por aqui.'}
+                {user.bio ||
+                  'Ainda não há uma bio por aqui.'}
               </p>
             </div>
 
