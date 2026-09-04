@@ -93,11 +93,6 @@ export default function PerfilPage() {
     loadUser();
   }, [router]);
 
-  /*
-   * A API /api/profile/stories já identifica o usuário
-   * através da sessão. Portanto, não precisamos esperar
-   * o estado "user" para carregar as histórias.
-   */
   useEffect(() => {
     async function loadStories() {
       setLoadingStories(true);
@@ -108,8 +103,6 @@ export default function PerfilPage() {
         });
 
         const data = await response.json();
-
-        console.log('RESPOSTA DAS HISTÓRIAS:', data);
 
         if (!response.ok) {
           console.error(
@@ -142,12 +135,6 @@ export default function PerfilPage() {
     loadStories();
   }, []);
 
-  /*
-   * Carrega os posts do Meu Nook.
-   *
-   * A API /api/nook-posts identifica automaticamente
-   * o usuário através da sessão atual.
-   */
   useEffect(() => {
     async function loadNookPosts() {
       setLoadingNook(true);
@@ -382,9 +369,6 @@ export default function PerfilPage() {
     }
   }
 
-  /*
-   * Cria um novo post no Meu Nook.
-   */
   async function handleCreateNookPost() {
     const text = newPost.trim();
 
@@ -453,6 +437,16 @@ export default function PerfilPage() {
     }
   }
 
+  function getStoryTitle(storyId: string | null) {
+    if (!storyId) return null;
+
+    const story = stories.find(
+      (item) => item.id === storyId
+    );
+
+    return story?.title || null;
+  }
+
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#100b12] text-white">
@@ -495,6 +489,7 @@ export default function PerfilPage() {
       </header>
 
       <div className="mx-auto max-w-5xl px-5 py-8">
+        {/* PERFIL */}
         <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#191219]">
           <button
             type="button"
@@ -633,6 +628,187 @@ export default function PerfilPage() {
           </div>
         </section>
 
+        {/* MEU NOOK */}
+        <section className="relative mt-10 overflow-hidden rounded-3xl border border-[#ff78b9]/15 bg-[#191219]">
+          {/* Decoração */}
+          <div className="pointer-events-none absolute -right-8 -top-10 text-8xl opacity-[0.06]">
+            ☁
+          </div>
+
+          <div className="pointer-events-none absolute -bottom-10 -left-8 text-8xl opacity-[0.04]">
+            ☁
+          </div>
+
+          <div className="relative p-6 md:p-8">
+            <div className="mb-6">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">
+                  ☁️
+                </span>
+
+                <div>
+                  <h2 className="text-2xl font-black">
+                    Meu Nook
+                  </h2>
+
+                  <p className="mt-1 text-sm text-white/40">
+                    Um cantinho para compartilhar seus pensamentos como escritor.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* NOVO POST */}
+            <div className="rounded-3xl border border-white/10 bg-[#100b12] p-4 md:p-5">
+              <textarea
+                value={newPost}
+                onChange={(event) =>
+                  setNewPost(event.target.value)
+                }
+                maxLength={5000}
+                rows={5}
+                placeholder="O que está passando pela sua cabeça?"
+                className="w-full resize-none bg-transparent text-sm leading-7 text-white outline-none placeholder:text-white/20"
+              />
+
+              <div className="mt-4 flex flex-col gap-3 border-t border-white/5 pt-4 sm:flex-row sm:items-center">
+                <div className="flex flex-1 items-center gap-3">
+                  <select
+                    value={selectedStoryId}
+                    onChange={(event) =>
+                      setSelectedStoryId(event.target.value)
+                    }
+                    className="max-w-full rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-[#ff78b9]/50"
+                  >
+                    <option value="">
+                      Vincular uma história
+                    </option>
+
+                    {stories.map((story) => (
+                      <option
+                        key={story.id}
+                        value={story.id}
+                      >
+                        {story.title}
+                      </option>
+                    ))}
+                  </select>
+
+                  <span className="text-xs text-white/25">
+                    {newPost.length}/5000
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCreateNookPost}
+                  disabled={
+                    creatingPost ||
+                    !newPost.trim()
+                  }
+                  className="rounded-full bg-[#ff78b9] px-6 py-2.5 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {creatingPost
+                    ? 'Publicando...'
+                    : 'Publicar'}
+                </button>
+              </div>
+            </div>
+
+            {/* POSTS */}
+            <div className="mt-6">
+              {loadingNook ? (
+                <div className="rounded-3xl border border-white/5 bg-[#100b12] px-6 py-12 text-center">
+                  <p className="text-sm text-white/30">
+                    Carregando seu Nook...
+                  </p>
+                </div>
+              ) : nookPosts.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-white/10 bg-[#100b12] px-6 py-12 text-center">
+                  <div className="text-4xl opacity-40">
+                    ☁️
+                  </div>
+
+                  <p className="mt-3 text-sm font-semibold text-white/50">
+                    Seu Nook ainda está vazio.
+                  </p>
+
+                  <p className="mt-1 text-xs text-white/25">
+                    Escreva alguma coisa acima para começar.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {nookPosts.map((post) => {
+                    const storyTitle =
+                      getStoryTitle(post.story_id);
+
+                    return (
+                      <article
+                        key={post.id}
+                        className="rounded-3xl border border-white/5 bg-[#100b12] p-5 transition hover:border-[#ff78b9]/15"
+                      >
+                        {post.pinned && (
+                          <div className="mb-3 flex items-center gap-2 text-xs font-bold text-[#ff78b9]">
+                            <span>📌</span>
+                            <span>
+                              Post fixado
+                            </span>
+                          </div>
+                        )}
+
+                        <p className="whitespace-pre-wrap text-sm leading-7 text-white/75">
+                          {post.body}
+                        </p>
+
+                        {post.image_url && (
+                          <div className="mt-4 overflow-hidden rounded-2xl">
+                            <img
+                              src={post.image_url}
+                              alt=""
+                              className="max-h-[500px] w-full object-cover"
+                            />
+                          </div>
+                        )}
+
+                        {storyTitle && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(
+                                `/historia/${post.story_id}`
+                              )
+                            }
+                            className="mt-4 flex items-center gap-2 rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/5 px-4 py-2 text-xs font-semibold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
+                          >
+                            <span>📖</span>
+                            <span>
+                              {storyTitle}
+                            </span>
+                          </button>
+                        )}
+
+                        <div className="mt-4 border-t border-white/5 pt-3">
+                          <span className="text-xs text-white/25">
+                            {new Date(
+                              post.created_at
+                            ).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* HISTÓRIAS */}
         <section className="mt-10">
           <div className="mb-5">
             <h2 className="text-2xl font-black">
@@ -721,6 +897,7 @@ export default function PerfilPage() {
         </section>
       </div>
 
+      {/* EDITOR DO PERFIL */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#191219] p-6 shadow-2xl">
