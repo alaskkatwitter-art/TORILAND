@@ -58,6 +58,34 @@ export default function HistoriaPage() {
   const [likes, setLikes] = useState(0);
   const [liking, setLiking] = useState(false);
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(
+    null
+  );
+
+  useEffect(() => {
+    async function loadCurrentUser() {
+      try {
+        const response = await fetch('/api/auth/me', {
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          setCurrentUserId(null);
+          return;
+        }
+
+        const data = await response.json();
+
+        setCurrentUserId(data?.user?.id || data?.id || null);
+      } catch (err) {
+        console.error('Erro ao carregar usuário:', err);
+        setCurrentUserId(null);
+      }
+    }
+
+    loadCurrentUser();
+  }, []);
+
   useEffect(() => {
     if (!id) return;
 
@@ -66,12 +94,9 @@ export default function HistoriaPage() {
         setLoading(true);
         setError('');
 
-        const response = await fetch(
-          `/api/stories/${id}`,
-          {
-            cache: 'no-store',
-          }
-        );
+        const response = await fetch(`/api/stories/${id}`, {
+          cache: 'no-store',
+        });
 
         const data = await response.json();
 
@@ -169,6 +194,11 @@ export default function HistoriaPage() {
   const warningTags =
     getCategoryTags('content-warning');
   const freeformTags = getFreeformTags();
+
+  const isOwner =
+    Boolean(currentUserId) &&
+    Boolean(story) &&
+    currentUserId === story.author_id;
 
   if (loading) {
     return (
@@ -410,6 +440,21 @@ export default function HistoriaPage() {
                 {' · '}
                 {likes}
               </button>
+
+              {/* EDITAR OBRA */}
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/escrever?id=${story.id}`
+                    )
+                  }
+                  className="rounded-xl border border-pink-400/30 bg-pink-500/10 px-5 py-3 text-sm font-medium text-pink-300 hover:bg-pink-500/20 hover:border-pink-400/50 transition"
+                >
+                  Editar obra
+                </button>
+              )}
 
               <button
                 type="button"
