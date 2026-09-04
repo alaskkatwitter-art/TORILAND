@@ -7,6 +7,15 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY!
 );
 
+const ALLOWED_REACTIONS = [
+  '❤️',
+  '😂',
+  '😭',
+  '😱',
+  '👀',
+  '🔥',
+];
+
 async function getCurrentUserId(request: Request) {
   const meResponse = await fetch(
     new URL('/api/auth/me', request.url),
@@ -35,6 +44,12 @@ async function getCurrentUserId(request: Request) {
  * GET
  *
  * Busca os posts do Meu Nook do usuário atualmente logado.
+ *
+ * Além dos dados básicos do post, retorna:
+ * - autor
+ * - mídias
+ * - reações
+ * - quantidade de comentários
  */
 export async function GET(request: Request) {
   try {
@@ -51,36 +66,37 @@ export async function GET(request: Request) {
       );
     }
 
-    const { data: posts, error } = await supabase
-      .from('nook_posts')
-      .select(`
-        id,
-        user_id,
-        body,
-        image_url,
-        story_id,
-        pinned,
-        created_at,
-        updated_at
-      `)
-      .eq('user_id', userId)
-      .order('pinned', {
-        ascending: false,
-      })
-      .order('created_at', {
-        ascending: false,
-      });
+    const { data: posts, error: postsError } =
+      await supabase
+        .from('nook_posts')
+        .select(`
+          id,
+          user_id,
+          body,
+          image_url,
+          story_id,
+          pinned,
+          created_at,
+          updated_at
+        `)
+        .eq('user_id', userId)
+        .order('pinned', {
+          ascending: false,
+        })
+        .order('created_at', {
+          ascending: false,
+        });
 
-    if (error) {
+    if (postsError) {
       console.error(
         'ERRO AO BUSCAR POSTS DO NOOK:',
-        error
+        postsError
       );
 
       return NextResponse.json(
         {
           error: 'Erro ao buscar os posts.',
-          details: error.message,
+          details: postsError.message,
         },
         {
           status: 500,
@@ -88,8 +104,218 @@ export async function GET(request: Request) {
       );
     }
 
+    const safePosts = posts || [];
+
+    if (safePosts.length === 0) {
+      return NextResponse.json({
+        posts: [],
+      });
+    }
+
+    const postIds = safePosts.map((post) => post.id);
+
+    /*
+     * Busca as mídias de todos os posts de uma vez.
+     */
+    const { data: media, error: mediaError } =
+      await supabase
+        .from('nook_post_media')
+        .select(`
+          id,
+          post_id,
+          media_url,
+          media_type,
+          created_at
+        `)
+        .in('post_id', postIds)
+        .order('created_at', {
+          ascending: true,
+        });
+
+    if (mediaError) {
+      console.error(
+        'ERRO AO BUSCAR MÍDIAS DOS POSTS:',
+        mediaError
+      );
+
+      return NextResponse.json(
+        {
+          error: 'Erro ao buscar as mídias dos posts.',
+          details: mediaError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    /*
+     * Busca todas as reações dos posts de uma vez.
+     */
+    const {
+      data: reactions,
+      error: reactionsError,
+    } = await supabase
+      .from('nook_post_reactions')
+      .select(`
+        post_id,
+        user_id,
+        emoji
+      `)
+      .in('post_id', postIds);
+
+    if (reactionsError) {
+      console.error(
+        'ERRO AO BUSCAR REAÇÕES DOS POSTS:',
+        reactionsError
+      );
+
+      return NextResponse.json(
+        {
+          error: 'Erro ao buscar as reações dos posts.',
+          details: reactionsError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    /*
+     * Busca todos os comentários dos posts apenas
+     * para descobrir a quantidade.
+     */
+    const {
+      data: comments,
+      error: commentsError,
+    } = await supabase
+      .from('nook_comments')
+      .select(`
+        id,
+        post_id
+      `)
+      .in('post_id', postIds);
+
+    if (commentsError) {
+      console.error(
+        'ERRO AO BUSCAR COMENTÁRIOS DOS POSTS:',
+        commentsError
+      );
+
+      return NextResponse.json(
+        {
+          error: 'Erro ao buscar os comentários dos posts.',
+          details: commentsError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    /*
+     * Como o GET atual só traz posts do usuário logado,
+     * usamos o próprio usuário autenticado como autor.
+     *
+     * Isso evita uma segunda consulta desnecessária.
+     */
+    const { data: author, error: authorError } =
+      await supabase
+        .from('profiles')
+        .select(`
+          id,
+          username,
+          display_name,
+          avatar_url
+        `)
+        .eq('id', userId)
+        .maybeSingle();
+
+    if (authorError) {
+      console.error(
+        'ERRO AO BUSCAR AUTOR DOS POSTS:',
+        authorError
+      );
+
+      return NextResponse.json(
+        {
+          error: 'Erro ao buscar os dados do autor.',
+          details: authorError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    /*
+     * Monta os dados finais de cada post.
+     */
+    const enrichedPosts = safePosts.map((post) => {
+      const postMedia =
+        media?.filter(
+          (item) => item.post_id === post.id
+        ) || [];
+
+      const postReactions =
+        reactions?.filter(
+          (reaction) =>
+            reaction.post_id === post.id
+        ) || [];
+
+      const postComments =
+        comments?.filter(
+          (comment) =>
+            comment.post_id === post.id
+        ) || [];
+
+      const reactionCounts: Record<string, number> =
+        {};
+
+      for (const emoji of ALLOWED_REACTIONS) {
+        reactionCounts[emoji] = 0;
+      }
+
+      const userReactions: string[] = [];
+
+      for (const reaction of postReactions) {
+        if (
+          typeof reaction.emoji === 'string' &&
+          ALLOWED_REACTIONS.includes(reaction.emoji)
+        ) {
+          reactionCounts[reaction.emoji] =
+            (reactionCounts[reaction.emoji] || 0) + 1;
+        }
+
+        if (reaction.user_id === userId) {
+          userReactions.push(reaction.emoji);
+        }
+      }
+
+      return {
+        ...post,
+
+        author: author
+          ? {
+              id: author.id,
+              username: author.username,
+              display_name: author.display_name,
+              avatar_url: author.avatar_url,
+            }
+          : null,
+
+        media: postMedia,
+
+        reaction_counts: reactionCounts,
+
+        user_reactions: userReactions,
+
+        comments_count: postComments.length,
+      };
+    });
+
     return NextResponse.json({
-      posts: posts || [],
+      posts: enrichedPosts,
     });
   } catch (error) {
     console.error(
@@ -147,6 +373,14 @@ export async function POST(request: Request) {
         ? body.story_id.trim()
         : null;
 
+    /*
+     * A criação pode ter texto, imagem legada,
+     * ou ambos.
+     *
+     * As mídias novas de até 4 arquivos continuam
+     * sendo adicionadas posteriormente pela rota
+     * /api/nook-posts/media.
+     */
     if (!text && !imageUrl) {
       return NextResponse.json(
         {
@@ -176,13 +410,15 @@ export async function POST(request: Request) {
      * se ela pertence ao usuário.
      */
     if (storyId) {
-      const { data: story, error: storyError } =
-        await supabase
-          .from('stories')
-          .select('id')
-          .eq('id', storyId)
-          .eq('author_id', userId)
-          .maybeSingle();
+      const {
+        data: story,
+        error: storyError,
+      } = await supabase
+        .from('stories')
+        .select('id')
+        .eq('id', storyId)
+        .eq('author_id', userId)
+        .maybeSingle();
 
       if (storyError) {
         console.error(
@@ -215,7 +451,10 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data: post, error } = await supabase
+    const {
+      data: post,
+      error: postError,
+    } = await supabase
       .from('nook_posts')
       .insert({
         user_id: userId,
@@ -236,16 +475,16 @@ export async function POST(request: Request) {
       `)
       .single();
 
-    if (error) {
+    if (postError) {
       console.error(
         'ERRO AO CRIAR POST DO NOOK:',
-        error
+        postError
       );
 
       return NextResponse.json(
         {
           error: 'Não foi possível criar o post.',
-          details: error.message,
+          details: postError.message,
         },
         {
           status: 500,
@@ -253,9 +492,63 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+     * Retornamos também o autor para que o post
+     * recém-criado possa aparecer imediatamente
+     * com avatar e username.
+     */
+    const {
+      data: author,
+      error: authorError,
+    } = await supabase
+      .from('profiles')
+      .select(`
+        id,
+        username,
+        display_name,
+        avatar_url
+      `)
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (authorError) {
+      console.error(
+        'ERRO AO BUSCAR AUTOR DO NOVO POST:',
+        authorError
+      );
+    }
+
     return NextResponse.json(
       {
-        post,
+        post: {
+          ...post,
+
+          author: author
+            ? {
+                id: author.id,
+                username: author.username,
+                display_name:
+                  author.display_name,
+                avatar_url:
+                  author.avatar_url,
+              }
+            : null,
+
+          media: [],
+
+          reaction_counts: {
+            '❤️': 0,
+            '😂': 0,
+            '😭': 0,
+            '😱': 0,
+            '👀': 0,
+            '🔥': 0,
+          },
+
+          user_reactions: [],
+
+          comments_count: 0,
+        },
       },
       {
         status: 201,
@@ -263,7 +556,7 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error(
-      'ERRO GERAL AO CRIAR POST:',
+      'ERRO GERAL AO CRIAR POST DO NOOK:',
       error
     );
 
