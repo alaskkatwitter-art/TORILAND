@@ -31,6 +31,14 @@ type Story = {
   updated_at: string;
 };
 
+type PostMedia = {
+  id: string;
+  post_id: string;
+  media_url: string;
+  media_type: 'image' | 'gif';
+  created_at?: string;
+};
+
 type NookPost = {
   id: string;
   user_id: string;
@@ -41,15 +49,6 @@ type NookPost = {
   created_at: string;
   updated_at: string;
   media?: PostMedia[];
-};
-
-type PostMedia = {
-  id: string;
-  post_id: string;
-  media_url: string;
-  media_type: 'image' | 'gif';
-  position: number;
-  created_at?: string;
 };
 
 type NookComment = {
@@ -88,75 +87,47 @@ const REACTIONS = [
 const MAX_MEDIA = 4;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+const ACCEPTED_MEDIA_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+];
+
 export default function PerfilPage() {
   const router = useRouter();
 
-  const avatarInputRef =
-    useRef<HTMLInputElement | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaInputRef = useRef<HTMLInputElement | null>(null);
+  const tabsContainerRef = useRef<HTMLDivElement | null>(null);
+  const swipeStartX = useRef<number | null>(null);
 
-  const coverInputRef =
-    useRef<HTMLInputElement | null>(null);
-
-  const mediaInputRef =
-    useRef<HTMLInputElement | null>(null);
-
-  const tabsContainerRef =
-    useRef<HTMLDivElement | null>(null);
-
-  const swipeStartX =
-    useRef<number | null>(null);
-
-  const [user, setUser] =
-    useState<User | null>(null);
-
-  const [stories, setStories] =
-    useState<Story[]>([]);
-
-  const [nookPosts, setNookPosts] =
-    useState<NookPost[]>([]);
-
+  const [user, setUser] = useState<User | null>(null);
+  const [stories, setStories] = useState<Story[]>([]);
+  const [nookPosts, setNookPosts] = useState<NookPost[]>([]);
   const [activeTab, setActiveTab] =
     useState<ProfileTab>('stories');
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
+  const [loadingStories, setLoadingStories] = useState(true);
+  const [loadingNook, setLoadingNook] = useState(true);
 
-  const [loadingStories, setLoadingStories] =
-    useState(true);
-
-  const [loadingNook, setLoadingNook] =
-    useState(true);
-
-  const [editing, setEditing] =
-    useState(false);
-
-  const [editDisplayName, setEditDisplayName] =
-    useState('');
-
-  const [bio, setBio] =
-    useState('');
-
-  const [saving, setSaving] =
-    useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [bio, setBio] = useState('');
+  const [saving, setSaving] = useState(false);
 
   /* =========================
      NOVO POST
   ========================= */
 
-  const [newPost, setNewPost] =
-    useState('');
+  const [newPost, setNewPost] = useState('');
+  const [selectedStoryId, setSelectedStoryId] = useState('');
+  const [creatingPost, setCreatingPost] = useState(false);
 
-  const [selectedStoryId, setSelectedStoryId] =
-    useState('');
-
-  const [creatingPost, setCreatingPost] =
-    useState(false);
-
-  const [mediaFiles, setMediaFiles] =
-    useState<File[]>([]);
-
-  const [mediaPreviews, setMediaPreviews] =
-    useState<string[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
 
   /* =========================
      EDIÇÃO DE POST
@@ -165,14 +136,9 @@ export default function PerfilPage() {
   const [editingNookPostId, setEditingNookPostId] =
     useState<string | null>(null);
 
-  const [editNookBody, setEditNookBody] =
-    useState('');
-
-  const [editNookStoryId, setEditNookStoryId] =
-    useState('');
-
-  const [savingNookPost, setSavingNookPost] =
-    useState(false);
+  const [editNookBody, setEditNookBody] = useState('');
+  const [editNookStoryId, setEditNookStoryId] = useState('');
+  const [savingNookPost, setSavingNookPost] = useState(false);
 
   const [deletingNookPostId, setDeletingNookPostId] =
     useState<string | null>(null);
@@ -185,14 +151,10 @@ export default function PerfilPage() {
   ========================= */
 
   const [reactionData, setReactionData] =
-    useState<Record<string, ReactionSummary>>(
-      {}
-    );
+    useState<Record<string, ReactionSummary>>({});
 
   const [commentsByPost, setCommentsByPost] =
-    useState<Record<string, NookComment[]>>(
-      {}
-    );
+    useState<Record<string, NookComment[]>>({});
 
   const [commentsOpen, setCommentsOpen] =
     useState<Record<string, boolean>>({});
@@ -215,23 +177,16 @@ export default function PerfilPage() {
   const [editingCommentBody, setEditingCommentBody] =
     useState('');
 
-  const [savingComment, setSavingComment] =
-    useState(false);
+  const [savingComment, setSavingComment] = useState(false);
 
   const [deletingCommentId, setDeletingCommentId] =
     useState<string | null>(null);
 
-  const [uploadingAvatar, setUploadingAvatar] =
-    useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
-  const [uploadingCover, setUploadingCover] =
-    useState(false);
-
-  const [error, setError] =
-    useState('');
-
-  const [success, setSuccess] =
-    useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   /* =========================
      CARREGAR USUÁRIO
@@ -240,12 +195,9 @@ export default function PerfilPage() {
   useEffect(() => {
     async function loadUser() {
       try {
-        const response = await fetch(
-          '/api/auth/me',
-          {
-            cache: 'no-store',
-          }
-        );
+        const response = await fetch('/api/auth/me', {
+          cache: 'no-store',
+        });
 
         if (!response.ok) {
           router.push('/login');
@@ -254,10 +206,7 @@ export default function PerfilPage() {
 
         const data = await response.json();
 
-        if (
-          data.authenticated &&
-          data.user
-        ) {
+        if (data.authenticated && data.user) {
           setUser(data.user);
         } else {
           router.push('/login');
@@ -281,12 +230,9 @@ export default function PerfilPage() {
       setLoadingStories(true);
 
       try {
-        const response = await fetch(
-          '/api/profile/stories',
-          {
-            cache: 'no-store',
-          }
-        );
+        const response = await fetch('/api/profile/stories', {
+          cache: 'no-store',
+        });
 
         const data = await response.json();
 
@@ -296,22 +242,18 @@ export default function PerfilPage() {
             data.error,
             data.details
           );
-
           setStories([]);
           return;
         }
 
         setStories(
-          Array.isArray(data.stories)
-            ? data.stories
-            : []
+          Array.isArray(data.stories) ? data.stories : []
         );
       } catch (error) {
         console.error(
           'Erro ao carregar histórias:',
           error
         );
-
         setStories([]);
       } finally {
         setLoadingStories(false);
@@ -330,12 +272,9 @@ export default function PerfilPage() {
       setLoadingNook(true);
 
       try {
-        const response = await fetch(
-          '/api/nook-posts',
-          {
-            cache: 'no-store',
-          }
-        );
+        const response = await fetch('/api/nook-posts', {
+          cache: 'no-store',
+        });
 
         const data = await response.json();
 
@@ -345,19 +284,14 @@ export default function PerfilPage() {
             data.error,
             data.details
           );
-
           setNookPosts([]);
           return;
         }
 
         const posts: NookPost[] =
-          Array.isArray(data.posts)
-            ? data.posts
-            : [];
+          Array.isArray(data.posts) ? data.posts : [];
 
-        setNookPosts(
-          sortNookPosts(posts)
-        );
+        setNookPosts(sortNookPosts(posts));
 
         await loadReactionSummaries(posts);
       } catch (error) {
@@ -365,7 +299,6 @@ export default function PerfilPage() {
           'Erro ao carregar Mural:',
           error
         );
-
         setNookPosts([]);
       } finally {
         setLoadingNook(false);
@@ -379,9 +312,17 @@ export default function PerfilPage() {
      REAÇÕES
   ========================= */
 
-  async function loadReactionSummary(
-    postId: string
-  ) {
+  function emptyReactionCounts() {
+    return REACTIONS.reduce(
+      (result, emoji) => {
+        result[emoji] = 0;
+        return result;
+      },
+      {} as Record<string, number>
+    );
+  }
+
+  async function loadReactionSummary(postId: string) {
     try {
       const response = await fetch(
         `/api/nook-posts/reactions?post_id=${encodeURIComponent(
@@ -408,74 +349,53 @@ export default function PerfilPage() {
         },
       }));
     } catch {
-      // Silencioso para não quebrar o Mural.
+      // Não quebra o Mural.
     }
   }
 
-  async function loadReactionSummaries(
-    posts: NookPost[]
-  ) {
-    const results =
-      await Promise.all(
-        posts.map(async (post) => {
-          try {
-            const response = await fetch(
-              `/api/nook-posts/reactions?post_id=${encodeURIComponent(
-                post.id
-              )}`,
-              {
-                cache: 'no-store',
-              }
-            );
-
-            if (!response.ok) {
-              return null;
+  async function loadReactionSummaries(posts: NookPost[]) {
+    const results = await Promise.all(
+      posts.map(async (post) => {
+        try {
+          const response = await fetch(
+            `/api/nook-posts/reactions?post_id=${encodeURIComponent(
+              post.id
+            )}`,
+            {
+              cache: 'no-store',
             }
+          );
 
-            const data =
-              await response.json();
+          if (!response.ok) return null;
 
-            return {
-              postId: post.id,
-              summary: {
-                counts:
-                  data.counts ||
-                  emptyReactionCounts(),
-                user_reactions:
-                  data.user_reactions || [],
-                comments_count:
-                  data.comments_count || 0,
-              },
-            };
-          } catch {
-            return null;
-          }
-        })
-      );
+          const data = await response.json();
 
-    const summaries: Record<
-      string,
-      ReactionSummary
-    > = {};
+          return {
+            postId: post.id,
+            summary: {
+              counts:
+                data.counts || emptyReactionCounts(),
+              user_reactions:
+                data.user_reactions || [],
+              comments_count:
+                data.comments_count || 0,
+            },
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    const summaries: Record<string, ReactionSummary> = {};
 
     for (const result of results) {
       if (result) {
-        summaries[result.postId] =
-          result.summary;
+        summaries[result.postId] = result.summary;
       }
     }
 
     setReactionData(summaries);
-  }
-
-  function emptyReactionCounts() {
-    return REACTIONS.reduce(
-      (result, emoji) => {
-        result[emoji] = 0;
-        return result;
-      },
-      {} as Record<string, number>
-    );
   }
 
   async function handleReaction(
@@ -490,9 +410,7 @@ export default function PerfilPage() {
       };
 
     const reacted =
-      current.user_reactions.includes(
-        emoji
-      );
+      current.user_reactions.includes(emoji);
 
     setReactionData((previous) => ({
       ...previous,
@@ -510,10 +428,7 @@ export default function PerfilPage() {
           ? current.user_reactions.filter(
               (item) => item !== emoji
             )
-          : [
-              ...current.user_reactions,
-              emoji,
-            ],
+          : [...current.user_reactions, emoji],
       },
     }));
 
@@ -544,9 +459,7 @@ export default function PerfilPage() {
      COMENTÁRIOS
   ========================= */
 
-  async function loadComments(
-    postId: string
-  ) {
+  async function loadComments(postId: string) {
     setLoadingComments((current) => ({
       ...current,
       [postId]: true,
@@ -605,21 +518,15 @@ export default function PerfilPage() {
     }
   }
 
-  async function toggleComments(
-    postId: string
-  ) {
-    const isOpen =
-      commentsOpen[postId] || false;
+  async function toggleComments(postId: string) {
+    const isOpen = commentsOpen[postId] || false;
 
     setCommentsOpen((current) => ({
       ...current,
       [postId]: !isOpen,
     }));
 
-    if (
-      !isOpen &&
-      !commentsByPost[postId]
-    ) {
+    if (!isOpen && !commentsByPost[postId]) {
       await loadComments(postId);
     }
   }
@@ -629,12 +536,8 @@ export default function PerfilPage() {
     parentId?: string | null
   ) {
     const value = parentId
-      ? (
-          replyDrafts[parentId] || ''
-        ).trim()
-      : (
-          commentDrafts[postId] || ''
-        ).trim();
+      ? (replyDrafts[parentId] || '').trim()
+      : (commentDrafts[postId] || '').trim();
 
     if (!value) return;
 
@@ -659,8 +562,7 @@ export default function PerfilPage() {
           body: JSON.stringify({
             post_id: postId,
             content: value,
-            parent_id:
-              parentId || null,
+            parent_id: parentId || null,
           }),
         }
       );
@@ -699,13 +601,9 @@ export default function PerfilPage() {
     }
   }
 
-  function startEditComment(
-    comment: NookComment
-  ) {
+  function startEditComment(comment: NookComment) {
     setEditingCommentId(comment.id);
-    setEditingCommentBody(
-      comment.content
-    );
+    setEditingCommentBody(comment.content);
     setError('');
   }
 
@@ -719,8 +617,7 @@ export default function PerfilPage() {
   async function handleSaveComment() {
     if (!editingCommentId) return;
 
-    const content =
-      editingCommentBody.trim();
+    const content = editingCommentBody.trim();
 
     if (!content) {
       setError(
@@ -745,8 +642,7 @@ export default function PerfilPage() {
         {
           method: 'PATCH',
           headers: {
-            'Content-Type':
-              'application/json',
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             content,
@@ -764,20 +660,16 @@ export default function PerfilPage() {
         return;
       }
 
-      const comment =
-        data.comment;
+      const comment = data.comment;
 
       if (comment?.post_id) {
-        await loadComments(
-          comment.post_id
-        );
+        await loadComments(comment.post_id);
       } else {
         for (const post of nookPosts) {
           if (
             commentsByPost[post.id]?.some(
               (item) =>
-                item.id ===
-                editingCommentId
+                item.id === editingCommentId
             )
           ) {
             await loadComments(post.id);
@@ -821,9 +713,7 @@ export default function PerfilPage() {
         return;
       }
 
-      await loadComments(
-        comment.post_id
-      );
+      await loadComments(comment.post_id);
     } catch {
       setError(
         'Não foi possível excluir o comentário.'
@@ -837,39 +727,28 @@ export default function PerfilPage() {
      ORDENAÇÃO
   ========================= */
 
-  function sortNookPosts(
-    posts: NookPost[]
-  ) {
-    return [...posts].sort(
-      (a, b) => {
-        if (a.pinned !== b.pinned) {
-          return a.pinned ? -1 : 1;
-        }
-
-        return (
-          new Date(
-            b.created_at
-          ).getTime() -
-          new Date(
-            a.created_at
-          ).getTime()
-        );
+  function sortNookPosts(posts: NookPost[]) {
+    return [...posts].sort((a, b) => {
+      if (a.pinned !== b.pinned) {
+        return a.pinned ? -1 : 1;
       }
-    );
+
+      return (
+        new Date(b.created_at).getTime() -
+        new Date(a.created_at).getTime()
+      );
+    });
   }
 
   /* =========================
      ABAS
   ========================= */
 
-  function changeTab(
-    tab: ProfileTab
-  ) {
+  function changeTab(tab: ProfileTab) {
     setActiveTab(tab);
 
     requestAnimationFrame(() => {
-      const container =
-        tabsContainerRef.current;
+      const container = tabsContainerRef.current;
 
       if (!container) return;
 
@@ -887,22 +766,16 @@ export default function PerfilPage() {
     event: TouchEvent<HTMLDivElement>
   ) {
     swipeStartX.current =
-      event.touches[0]?.clientX ??
-      null;
+      event.touches[0]?.clientX ?? null;
   }
 
   function handleTabSwipeEnd(
     event: TouchEvent<HTMLDivElement>
   ) {
-    if (
-      swipeStartX.current === null
-    ) {
-      return;
-    }
+    if (swipeStartX.current === null) return;
 
     const endX =
-      event.changedTouches[0]
-        ?.clientX ?? null;
+      event.changedTouches[0]?.clientX ?? null;
 
     if (endX === null) {
       swipeStartX.current = null;
@@ -914,9 +787,7 @@ export default function PerfilPage() {
 
     swipeStartX.current = null;
 
-    if (Math.abs(distance) < 50) {
-      return;
-    }
+    if (Math.abs(distance) < 50) return;
 
     if (distance < 0) {
       changeTab('nook');
@@ -932,10 +803,7 @@ export default function PerfilPage() {
   function openEditor() {
     if (!user) return;
 
-    setEditDisplayName(
-      user.display_name || ''
-    );
-
+    setEditDisplayName(user.display_name || '');
     setBio(user.bio || '');
     setError('');
     setSuccess('');
@@ -960,19 +828,16 @@ export default function PerfilPage() {
         {
           method: 'PATCH',
           headers: {
-            'Content-Type':
-              'application/json',
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            display_name:
-              editDisplayName,
+            display_name: editDisplayName,
             bio,
           }),
         }
       );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         setError(
@@ -1017,8 +882,7 @@ export default function PerfilPage() {
   async function handleAvatarChange(
     event: ChangeEvent<HTMLInputElement>
   ) {
-    const file =
-      event.target.files?.[0];
+    const file = event.target.files?.[0];
 
     if (!file) return;
 
@@ -1027,25 +891,18 @@ export default function PerfilPage() {
     setSuccess('');
 
     try {
-      const formData =
-        new FormData();
+      const formData = new FormData();
+      formData.append('file', file);
 
-      formData.append(
-        'file',
-        file
+      const response = await fetch(
+        '/api/profile/avatar',
+        {
+          method: 'POST',
+          body: formData,
+        }
       );
 
-      const response =
-        await fetch(
-          '/api/profile/avatar',
-          {
-            method: 'POST',
-            body: formData,
-          }
-        );
-
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         setError(
@@ -1055,15 +912,13 @@ export default function PerfilPage() {
         return;
       }
 
-      setUser(
-        (currentUser) =>
-          currentUser
-            ? {
-                ...currentUser,
-                avatar_url:
-                  data.avatar_url,
-              }
-            : currentUser
+      setUser((currentUser) =>
+        currentUser
+          ? {
+              ...currentUser,
+              avatar_url: data.avatar_url,
+            }
+          : currentUser
       );
 
       setSuccess(
@@ -1080,11 +935,8 @@ export default function PerfilPage() {
     } finally {
       setUploadingAvatar(false);
 
-      if (
-        avatarInputRef.current
-      ) {
-        avatarInputRef.current.value =
-          '';
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
       }
     }
   }
@@ -1105,8 +957,7 @@ export default function PerfilPage() {
   async function handleCoverChange(
     event: ChangeEvent<HTMLInputElement>
   ) {
-    const file =
-      event.target.files?.[0];
+    const file = event.target.files?.[0];
 
     if (!file) return;
 
@@ -1115,25 +966,18 @@ export default function PerfilPage() {
     setSuccess('');
 
     try {
-      const formData =
-        new FormData();
+      const formData = new FormData();
+      formData.append('file', file);
 
-      formData.append(
-        'file',
-        file
+      const response = await fetch(
+        '/api/profile/cover',
+        {
+          method: 'POST',
+          body: formData,
+        }
       );
 
-      const response =
-        await fetch(
-          '/api/profile/cover',
-          {
-            method: 'POST',
-            body: formData,
-          }
-        );
-
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         setError(
@@ -1143,15 +987,13 @@ export default function PerfilPage() {
         return;
       }
 
-      setUser(
-        (currentUser) =>
-          currentUser
-            ? {
-                ...currentUser,
-                cover_url:
-                  data.cover_url,
-              }
-            : currentUser
+      setUser((currentUser) =>
+        currentUser
+          ? {
+              ...currentUser,
+              cover_url: data.cover_url,
+            }
+          : currentUser
       );
 
       setSuccess(
@@ -1168,11 +1010,8 @@ export default function PerfilPage() {
     } finally {
       setUploadingCover(false);
 
-      if (
-        coverInputRef.current
-      ) {
-        coverInputRef.current.value =
-          '';
+      if (coverInputRef.current) {
+        coverInputRef.current.value = '';
       }
     }
   }
@@ -1184,92 +1023,85 @@ export default function PerfilPage() {
   function handleMediaSelection(
     event: ChangeEvent<HTMLInputElement>
   ) {
-    const selected =
-      Array.from(
-        event.target.files || []
-      );
+    const selected = Array.from(
+      event.target.files || []
+    );
 
     if (!selected.length) return;
 
     setError('');
 
-    const validFiles: File[] = [];
+    setMediaFiles((current) => {
+      const availableSlots =
+        MAX_MEDIA - current.length;
 
-    for (const file of selected) {
-      if (
-        ![
-          'image/jpeg',
-          'image/png',
-          'image/webp',
-          'image/gif',
-        ].includes(file.type)
-      ) {
+      if (availableSlots <= 0) {
         setError(
-          'Use apenas JPG, PNG, WEBP ou GIF.'
+          'Você pode adicionar no máximo 4 imagens ou GIFs por post.'
         );
-        continue;
+        return current;
+      }
+
+      const validFiles: File[] = [];
+
+      for (const file of selected) {
+        if (
+          !ACCEPTED_MEDIA_TYPES.includes(
+            file.type
+          )
+        ) {
+          setError(
+            'Use apenas JPG, PNG, WEBP ou GIF.'
+          );
+          continue;
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+          setError(
+            'Cada imagem pode ter no máximo 10 MB.'
+          );
+          continue;
+        }
+
+        validFiles.push(file);
       }
 
       if (
-        file.size >
-        MAX_FILE_SIZE
+        validFiles.length >
+        availableSlots
       ) {
         setError(
-          'Cada imagem pode ter no máximo 10 MB.'
+          'Você pode adicionar no máximo 4 imagens ou GIFs por post.'
         );
-        continue;
       }
 
-      validFiles.push(file);
-    }
-
-    setMediaFiles(
-      (current) => {
-        const combined = [
-          ...current,
-          ...validFiles,
-        ];
-
-        return combined.slice(
+      return [
+        ...current,
+        ...validFiles.slice(
           0,
-          MAX_MEDIA
-        );
-      }
-    );
+          availableSlots
+        ),
+      ];
+    });
 
-    if (
-      mediaInputRef.current
-    ) {
-      mediaInputRef.current.value =
-        '';
+    if (mediaInputRef.current) {
+      mediaInputRef.current.value = '';
     }
   }
 
-  function removeMedia(
-    index: number
-  ) {
-    setMediaFiles(
-      (current) =>
-        current.filter(
-          (_, itemIndex) =>
-            itemIndex !== index
-        )
-    );
-
-    setMediaPreviews(
-      (current) =>
-        current.filter(
-          (_, itemIndex) =>
-            itemIndex !== index
-        )
+  function removeMedia(index: number) {
+    setMediaFiles((current) =>
+      current.filter(
+        (_, itemIndex) =>
+          itemIndex !== index
+      )
     );
   }
 
   useEffect(() => {
-    const urls =
-      mediaFiles.map((file) =>
-        URL.createObjectURL(file)
-      );
+    const urls = mediaFiles.map((file) =>
+      URL.createObjectURL(file)
+    );
 
     setMediaPreviews(urls);
 
@@ -1285,43 +1117,27 @@ export default function PerfilPage() {
   ) {
     const uploaded: PostMedia[] = [];
 
-    for (
-      let index = 0;
-      index < mediaFiles.length;
-      index++
-    ) {
-      const file =
-        mediaFiles[index];
+    for (const file of mediaFiles) {
+      const formData = new FormData();
 
-      const formData =
-        new FormData();
+      formData.append('file', file);
+      formData.append('post_id', postId);
 
-      formData.append(
-        'file',
-        file
+      /*
+       * Não enviamos mais "position".
+       * A tabela nook_post_media não possui essa coluna.
+       * A ordem será determinada por created_at.
+       */
+
+      const response = await fetch(
+        '/api/nook-posts/media',
+        {
+          method: 'POST',
+          body: formData,
+        }
       );
 
-      formData.append(
-        'post_id',
-        postId
-      );
-
-      formData.append(
-        'position',
-        String(index)
-      );
-
-      const response =
-        await fetch(
-          '/api/nook-posts/media',
-          {
-            method: 'POST',
-            body: formData,
-          }
-        );
-
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -1331,9 +1147,7 @@ export default function PerfilPage() {
       }
 
       if (data.media) {
-        uploaded.push(
-          data.media
-        );
+        uploaded.push(data.media);
       }
     }
 
@@ -1345,8 +1159,7 @@ export default function PerfilPage() {
   ========================= */
 
   async function handleCreateNookPost() {
-    const text =
-      newPost.trim();
+    const text = newPost.trim();
 
     if (
       !text &&
@@ -1370,27 +1183,23 @@ export default function PerfilPage() {
     setSuccess('');
 
     try {
-      const response =
-        await fetch(
-          '/api/nook-posts',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify({
-              body: text,
-              image_url: null,
-              story_id:
-                selectedStoryId ||
-                null,
-            }),
-          }
-        );
+      const response = await fetch(
+        '/api/nook-posts',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            body: text,
+            image_url: null,
+            story_id:
+              selectedStoryId || null,
+          }),
+        }
+      );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         setError(
@@ -1416,6 +1225,7 @@ export default function PerfilPage() {
           };
         } catch (mediaError) {
           console.error(
+            'Erro ao enviar mídias:',
             mediaError
           );
 
@@ -1425,25 +1235,22 @@ export default function PerfilPage() {
         }
       }
 
-      setNookPosts(
-        (currentPosts) =>
-          sortNookPosts([
-            createdPost,
-            ...currentPosts,
-          ])
+      setNookPosts((currentPosts) =>
+        sortNookPosts([
+          createdPost,
+          ...currentPosts,
+        ])
       );
 
-      setReactionData(
-        (current) => ({
-          ...current,
-          [createdPost.id]: {
-            counts:
-              emptyReactionCounts(),
-            user_reactions: [],
-            comments_count: 0,
-          },
-        })
-      );
+      setReactionData((current) => ({
+        ...current,
+        [createdPost.id]: {
+          counts:
+            emptyReactionCounts(),
+          user_reactions: [],
+          comments_count: 0,
+        },
+      }));
 
       setNewPost('');
       setSelectedStoryId('');
@@ -1478,11 +1285,9 @@ export default function PerfilPage() {
   ) {
     if (!storyId) return null;
 
-    const story =
-      stories.find(
-        (item) =>
-          item.id === storyId
-      );
+    const story = stories.find(
+      (item) => item.id === storyId
+    );
 
     return story?.title || null;
   }
@@ -1494,14 +1299,8 @@ export default function PerfilPage() {
   function startEditNookPost(
     post: NookPost
   ) {
-    setEditingNookPostId(
-      post.id
-    );
-
-    setEditNookBody(
-      post.body
-    );
-
+    setEditingNookPostId(post.id);
+    setEditNookBody(post.body);
     setEditNookStoryId(
       post.story_id || ''
     );
@@ -1520,19 +1319,15 @@ export default function PerfilPage() {
   }
 
   async function handleSaveNookPostEdit() {
-    if (!editingNookPostId) {
-      return;
-    }
+    if (!editingNookPostId) return;
 
-    const post =
-      nookPosts.find(
-        (item) =>
-          item.id ===
-          editingNookPostId
-      );
+    const post = nookPosts.find(
+      (item) =>
+        item.id ===
+        editingNookPostId
+    );
 
-    const text =
-      editNookBody.trim();
+    const text = editNookBody.trim();
 
     if (
       !text &&
@@ -1557,26 +1352,22 @@ export default function PerfilPage() {
     setSuccess('');
 
     try {
-      const response =
-        await fetch(
-          `/api/nook-posts/${editingNookPostId}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify({
-              body: text,
-              story_id:
-                editNookStoryId ||
-                null,
-            }),
-          }
-        );
+      const response = await fetch(
+        `/api/nook-posts/${editingNookPostId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            body: text,
+            story_id:
+              editNookStoryId || null,
+          }),
+        }
+      );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         setError(
@@ -1587,21 +1378,20 @@ export default function PerfilPage() {
       }
 
       if (data.post) {
-        setNookPosts(
-          (currentPosts) =>
-            sortNookPosts(
-              currentPosts.map(
-                (currentPost) =>
-                  currentPost.id ===
-                  data.post.id
-                    ? {
-                        ...data.post,
-                        media:
-                          currentPost.media,
-                      }
-                    : currentPost
-              )
+        setNookPosts((currentPosts) =>
+          sortNookPosts(
+            currentPosts.map(
+              (currentPost) =>
+                currentPost.id ===
+                data.post.id
+                  ? {
+                      ...data.post,
+                      media:
+                        currentPost.media,
+                    }
+                  : currentPost
             )
+          )
         );
       }
 
@@ -1637,24 +1427,20 @@ export default function PerfilPage() {
     setSuccess('');
 
     try {
-      const response =
-        await fetch(
-          `/api/nook-posts/${post.id}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify({
-              pinned:
-                !post.pinned,
-            }),
-          }
-        );
+      const response = await fetch(
+        `/api/nook-posts/${post.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            pinned: !post.pinned,
+          }),
+        }
+      );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         setError(
@@ -1665,21 +1451,20 @@ export default function PerfilPage() {
       }
 
       if (data.post) {
-        setNookPosts(
-          (currentPosts) =>
-            sortNookPosts(
-              currentPosts.map(
-                (currentPost) =>
-                  currentPost.id ===
-                  data.post.id
-                    ? {
-                        ...data.post,
-                        media:
-                          currentPost.media,
-                      }
-                    : currentPost
-              )
+        setNookPosts((currentPosts) =>
+          sortNookPosts(
+            currentPosts.map(
+              (currentPost) =>
+                currentPost.id ===
+                data.post.id
+                  ? {
+                      ...data.post,
+                      media:
+                        currentPost.media,
+                    }
+                  : currentPost
             )
+          )
         );
       }
 
@@ -1707,25 +1492,19 @@ export default function PerfilPage() {
     postId: string
   ) {
     setMenuOpenPostId(null);
-
-    setDeletingNookPostId(
-      postId
-    );
-
+    setDeletingNookPostId(postId);
     setError('');
     setSuccess('');
 
     try {
-      const response =
-        await fetch(
-          `/api/nook-posts/${postId}`,
-          {
-            method: 'DELETE',
-          }
-        );
+      const response = await fetch(
+        `/api/nook-posts/${postId}`,
+        {
+          method: 'DELETE',
+        }
+      );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         setError(
@@ -1735,37 +1514,24 @@ export default function PerfilPage() {
         return;
       }
 
-      setNookPosts(
-        (currentPosts) =>
-          currentPosts.filter(
-            (post) =>
-              post.id !== postId
-          )
+      setNookPosts((currentPosts) =>
+        currentPosts.filter(
+          (post) =>
+            post.id !== postId
+        )
       );
 
-      setReactionData(
-        (current) => {
-          const copy = {
-            ...current,
-          };
+      setReactionData((current) => {
+        const copy = { ...current };
+        delete copy[postId];
+        return copy;
+      });
 
-          delete copy[postId];
-
-          return copy;
-        }
-      );
-
-      setCommentsByPost(
-        (current) => {
-          const copy = {
-            ...current,
-          };
-
-          delete copy[postId];
-
-          return copy;
-        }
-      );
+      setCommentsByPost((current) => {
+        const copy = { ...current };
+        delete copy[postId];
+        return copy;
+      });
 
       setSuccess(
         'Post excluído com sucesso.'
@@ -1779,9 +1545,7 @@ export default function PerfilPage() {
         'Não foi possível excluir o post. Tente novamente.'
       );
     } finally {
-      setDeletingNookPostId(
-        null
-      );
+      setDeletingNookPostId(null);
     }
   }
 
@@ -1789,86 +1553,89 @@ export default function PerfilPage() {
      RENDER DE MÍDIAS
   ========================= */
 
+  function getPostMedia(post: NookPost) {
+    if (
+      post.media &&
+      post.media.length > 0
+    ) {
+      return [...post.media]
+        .sort((a, b) => {
+          if (
+            !a.created_at ||
+            !b.created_at
+          ) {
+            return 0;
+          }
+
+          return (
+            new Date(
+              a.created_at
+            ).getTime() -
+            new Date(
+              b.created_at
+            ).getTime()
+          );
+        })
+        .slice(0, MAX_MEDIA);
+    }
+
+    if (post.image_url) {
+      return [
+        {
+          id: `legacy-${post.id}`,
+          post_id: post.id,
+          media_url: post.image_url,
+          media_type: 'image' as const,
+        },
+      ];
+    }
+
+    return [];
+  }
+
   function renderPostMedia(
     post: NookPost
   ) {
-    const media =
-      post.media &&
-      post.media.length > 0
-        ? [...post.media].sort(
-            (a, b) =>
-              a.position -
-              b.position
-          )
-        : post.image_url
-        ? [
-            {
-              id: `legacy-${post.id}`,
-              post_id: post.id,
-              media_url:
-                post.image_url,
-              media_type:
-                'image' as const,
-              position: 0,
-            },
-          ]
-        : [];
+    const media = getPostMedia(post);
 
     if (!media.length) {
       return null;
     }
 
-    const count =
-      Math.min(
-        media.length,
-        4
-      );
+    const count = Math.min(
+      media.length,
+      MAX_MEDIA
+    );
 
     return (
       <div
         className={`mt-4 overflow-hidden rounded-2xl ${
           count === 1
             ? ''
-            : 'grid gap-1'
-        } ${
-          count === 2
-            ? 'grid-cols-2'
-            : ''
-        } ${
-          count === 3
-            ? 'grid-cols-2'
-            : ''
-        } ${
-          count === 4
-            ? 'grid-cols-2'
-            : ''
+            : 'grid grid-cols-2 gap-1'
         }`}
       >
-        {media
-          .slice(0, 4)
-          .map(
-            (item, index) => (
-              <div
-                key={item.id}
-                className={`relative overflow-hidden bg-[#191219] ${
-                  count === 1
-                    ? 'max-h-[600px]'
-                    : count === 3 &&
-                      index === 0
-                    ? 'row-span-2 aspect-square'
-                    : 'aspect-square'
-                }`}
-              >
-                <img
-                  src={
-                    item.media_url
-                  }
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            )
-          )}
+        {media.map(
+          (item, index) => (
+            <div
+              key={item.id}
+              className={`relative overflow-hidden bg-[#191219] ${
+                count === 1
+                  ? 'max-h-[600px]'
+                  : count === 3 &&
+                    index === 0
+                  ? 'row-span-2 aspect-square'
+                  : 'aspect-square'
+              }`}
+            >
+              <img
+                src={item.media_url}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )
+        )}
       </div>
     );
   }
@@ -1893,8 +1660,7 @@ export default function PerfilPage() {
       comment.author_id ===
       user?.id;
 
-    const author =
-      comment.author;
+    const author = comment.author;
 
     const authorName =
       author?.display_name ||
@@ -1908,19 +1674,17 @@ export default function PerfilPage() {
     return (
       <div
         key={comment.id}
-        className={`${
+        className={
           depth > 0
             ? 'ml-5 border-l border-white/5 pl-4 sm:ml-8'
             : ''
-        }`}
+        }
       >
         <div className="flex gap-3">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#ff78b9] text-xs font-black text-[#180d15]">
             {author?.avatar_url ? (
               <img
-                src={
-                  author.avatar_url
-                }
+                src={author.avatar_url}
                 alt=""
                 className="h-full w-full object-cover"
               />
@@ -1981,11 +1745,10 @@ export default function PerfilPage() {
                     value={
                       editingCommentBody
                     }
-                    onChange={(
-                      event
-                    ) =>
+                    onChange={(event) =>
                       setEditingCommentBody(
-                        event.target.value
+                        event.target
+                          .value
                       )
                     }
                     maxLength={2000}
@@ -2111,8 +1874,7 @@ export default function PerfilPage() {
               </div>
             )}
 
-            {replies.length >
-              0 && (
+            {replies.length > 0 && (
               <div className="mt-3 space-y-3">
                 {replies.map(
                   (reply) =>
@@ -2160,9 +1922,7 @@ export default function PerfilPage() {
       className="min-h-screen bg-[#100b12] text-white"
       onClick={() => {
         if (menuOpenPostId) {
-          setMenuOpenPostId(
-            null
-          );
+          setMenuOpenPostId(null);
         }
       }}
     >
@@ -2206,19 +1966,13 @@ export default function PerfilPage() {
 
           <button
             type="button"
-            onClick={
-              openCoverPicker
-            }
-            disabled={
-              uploadingCover
-            }
+            onClick={openCoverPicker}
+            disabled={uploadingCover}
             className="group relative block h-36 w-full overflow-hidden bg-gradient-to-r from-[#3b1b30] via-[#572544] to-[#241322] sm:h-44 md:h-48"
           >
             {user.cover_url && (
               <img
-                src={
-                  user.cover_url
-                }
+                src={user.cover_url}
                 alt="Capa do perfil"
                 className="absolute inset-0 h-full w-full object-cover"
               />
@@ -2236,14 +1990,10 @@ export default function PerfilPage() {
           </button>
 
           <input
-            ref={
-              coverInputRef
-            }
+            ref={coverInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            onChange={
-              handleCoverChange
-            }
+            onChange={handleCoverChange}
             className="hidden"
           />
 
@@ -2253,19 +2003,13 @@ export default function PerfilPage() {
             <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 md:flex-row md:items-end">
               <button
                 type="button"
-                onClick={
-                  openAvatarPicker
-                }
-                disabled={
-                  uploadingAvatar
-                }
+                onClick={openAvatarPicker}
+                disabled={uploadingAvatar}
                 className="group relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-[#191219] bg-[#ff78b9] text-3xl font-black text-[#180d15] sm:h-28 sm:w-28 sm:text-4xl"
               >
                 {user.avatar_url ? (
                   <img
-                    src={
-                      user.avatar_url
-                    }
+                    src={user.avatar_url}
                     alt={`Foto de perfil de ${displayName}`}
                     className="h-full w-full object-cover"
                   />
@@ -2283,14 +2027,10 @@ export default function PerfilPage() {
               </button>
 
               <input
-                ref={
-                  avatarInputRef
-                }
+                ref={avatarInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
-                onChange={
-                  handleAvatarChange
-                }
+                onChange={handleAvatarChange}
                 className="hidden"
               />
 
@@ -2306,9 +2046,7 @@ export default function PerfilPage() {
 
               <button
                 type="button"
-                onClick={
-                  openEditor
-                }
+                onClick={openEditor}
                 className="rounded-full bg-[#ff78b9] px-6 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110 md:ml-auto md:shrink-0"
               >
                 Editar perfil
@@ -2375,13 +2113,10 @@ export default function PerfilPage() {
             <button
               type="button"
               onClick={() =>
-                changeTab(
-                  'stories'
-                )
+                changeTab('stories')
               }
               className={`relative flex-1 py-4 text-sm font-bold transition sm:flex-none sm:px-10 ${
-                activeTab ===
-                'stories'
+                activeTab === 'stories'
                   ? 'text-[#ff78b9]'
                   : 'text-white/35 hover:text-white/70'
               }`}
@@ -2400,8 +2135,7 @@ export default function PerfilPage() {
                 changeTab('nook')
               }
               className={`relative flex-1 py-4 text-sm font-bold transition sm:flex-none sm:px-10 ${
-                activeTab ===
-                'nook'
+                activeTab === 'nook'
                   ? 'text-[#ff78b9]'
                   : 'text-white/35 hover:text-white/70'
               }`}
@@ -2418,23 +2152,16 @@ export default function PerfilPage() {
           {/* CONTEÚDO */}
 
           <div
-            ref={
-              tabsContainerRef
-            }
+            ref={tabsContainerRef}
             className="mt-6 flex w-full snap-x snap-mandatory overflow-x-hidden"
-            onTouchStart={
-              handleTabSwipeStart
-            }
-            onTouchEnd={
-              handleTabSwipeEnd
-            }
+            onTouchStart={handleTabSwipeStart}
+            onTouchEnd={handleTabSwipeEnd}
           >
             {/* HISTÓRIAS */}
 
             <div
               className={`w-full shrink-0 snap-start transition-opacity duration-200 ${
-                activeTab ===
-                'stories'
+                activeTab === 'stories'
                   ? 'opacity-100'
                   : 'opacity-0'
               }`}
@@ -2456,8 +2183,7 @@ export default function PerfilPage() {
                     Carregando histórias...
                   </p>
                 </div>
-              ) : stories.length ===
-                0 ? (
+              ) : stories.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-white/10 bg-[#191219] px-6 py-14 text-center">
                   <p className="text-sm text-white/35">
                     Este autor ainda não criou nenhuma história.
@@ -2466,9 +2192,7 @@ export default function PerfilPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      router.push(
-                        '/'
-                      )
+                      router.push('/')
                     }
                     className="mt-5 rounded-full border border-[#ff78b9]/30 px-5 py-2.5 text-sm font-semibold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
                   >
@@ -2480,9 +2204,7 @@ export default function PerfilPage() {
                   {stories.map(
                     (story) => (
                       <button
-                        key={
-                          story.id
-                        }
+                        key={story.id}
                         type="button"
                         onClick={() =>
                           router.push(
@@ -2552,8 +2274,7 @@ export default function PerfilPage() {
 
             <div
               className={`w-full shrink-0 snap-start transition-opacity duration-200 ${
-                activeTab ===
-                'nook'
+                activeTab === 'nook'
                   ? 'opacity-100'
                   : 'opacity-0'
               }`}
@@ -2575,9 +2296,7 @@ export default function PerfilPage() {
                   <div className="rounded-3xl border border-white/10 bg-[#100b12] p-4 sm:p-5">
                     <textarea
                       value={newPost}
-                      onChange={(
-                        event
-                      ) =>
+                      onChange={(event) =>
                         setNewPost(
                           event.target
                             .value
@@ -2616,7 +2335,9 @@ export default function PerfilPage() {
                                 src={
                                   preview
                                 }
-                                alt={`Prévia ${index + 1}`}
+                                alt={`Prévia ${
+                                  index + 1
+                                }`}
                                 className="h-full w-full object-cover"
                               />
 
@@ -2633,9 +2354,7 @@ export default function PerfilPage() {
                               </button>
 
                               <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white">
-                                {index +
-                                  1}{' '}
-                                / 4
+                                {index + 1} / 4
                               </span>
                             </div>
                           )
@@ -2679,9 +2398,7 @@ export default function PerfilPage() {
                           value={
                             selectedStoryId
                           }
-                          onChange={(
-                            event
-                          ) =>
+                          onChange={(event) =>
                             setSelectedStoryId(
                               event.target
                                 .value
@@ -2694,9 +2411,7 @@ export default function PerfilPage() {
                           </option>
 
                           {stories.map(
-                            (
-                              story
-                            ) => (
+                            (story) => (
                               <option
                                 key={
                                   story.id
@@ -2714,10 +2429,7 @@ export default function PerfilPage() {
                         </select>
 
                         <span className="hidden shrink-0 text-xs text-white/25 sm:block">
-                          {
-                            newPost.length
-                          }
-                          /5000
+                          {newPost.length}/5000
                         </span>
                       </div>
 
@@ -2728,11 +2440,9 @@ export default function PerfilPage() {
                         }
                         disabled={
                           creatingPost ||
-                          (
-                            !newPost.trim() &&
+                          (!newPost.trim() &&
                             mediaFiles.length ===
-                              0
-                          )
+                              0)
                         }
                         className="rounded-full bg-[#ff78b9] px-6 py-2.5 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                       >
@@ -2752,8 +2462,7 @@ export default function PerfilPage() {
                           Carregando seu Mural...
                         </p>
                       </div>
-                    ) : nookPosts.length ===
-                      0 ? (
+                    ) : nookPosts.length === 0 ? (
                       <div className="rounded-3xl border border-dashed border-white/10 bg-[#100b12] px-6 py-12 text-center">
                         <p className="text-sm font-semibold text-white/50">
                           Seu Mural ainda está vazio.
@@ -2788,7 +2497,8 @@ export default function PerfilPage() {
                                   emptyReactionCounts(),
                                 user_reactions:
                                   [],
-                                comments_count: 0,
+                                comments_count:
+                                  0,
                               };
 
                             const comments =
@@ -2798,9 +2508,7 @@ export default function PerfilPage() {
 
                             const topLevelComments =
                               comments.filter(
-                                (
-                                  comment
-                                ) =>
+                                (comment) =>
                                   !comment.parent_id
                               );
 
@@ -2894,7 +2602,7 @@ export default function PerfilPage() {
                                 )}
 
                                 {isEditing ? (
-                                  <div className="pr-0">
+                                  <div>
                                     <textarea
                                       value={
                                         editNookBody
@@ -2932,9 +2640,7 @@ export default function PerfilPage() {
                                         </option>
 
                                         {stories.map(
-                                          (
-                                            story
-                                          ) => (
+                                          (story) => (
                                             <option
                                               key={
                                                 story.id
@@ -3034,14 +2740,11 @@ export default function PerfilPage() {
 
                                     <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-white/5 pt-3">
                                       {REACTIONS.map(
-                                        (
-                                          emoji
-                                        ) => {
+                                        (emoji) => {
                                           const count =
                                             social.counts[
                                               emoji
-                                            ] ||
-                                            0;
+                                            ] || 0;
 
                                           const active =
                                             social.user_reactions.includes(
@@ -3245,9 +2948,7 @@ export default function PerfilPage() {
 
               <button
                 type="button"
-                onClick={
-                  closeEditor
-                }
+                onClick={closeEditor}
                 disabled={saving}
                 className="text-2xl leading-none text-white/40 transition hover:text-white disabled:opacity-40"
               >
@@ -3275,12 +2976,9 @@ export default function PerfilPage() {
                   value={
                     editDisplayName
                   }
-                  onChange={(
-                    event
-                  ) =>
+                  onChange={(event) =>
                     setEditDisplayName(
-                      event.target
-                        .value
+                      event.target.value
                     )
                   }
                   maxLength={50}
@@ -3302,12 +3000,9 @@ export default function PerfilPage() {
 
                 <textarea
                   value={bio}
-                  onChange={(
-                    event
-                  ) =>
+                  onChange={(event) =>
                     setBio(
-                      event.target
-                        .value
+                      event.target.value
                     )
                   }
                   maxLength={500}
@@ -3332,12 +3027,8 @@ export default function PerfilPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={
-                    closeEditor
-                  }
-                  disabled={
-                    saving
-                  }
+                  onClick={closeEditor}
+                  disabled={saving}
                   className="flex-1 rounded-full border border-white/10 px-5 py-3 text-sm font-semibold text-white/60 transition hover:border-white/20 hover:text-white disabled:opacity-40"
                 >
                   Cancelar
@@ -3345,12 +3036,8 @@ export default function PerfilPage() {
 
                 <button
                   type="button"
-                  onClick={
-                    handleSave
-                  }
-                  disabled={
-                    saving
-                  }
+                  onClick={handleSave}
+                  disabled={saving}
                   className="flex-1 rounded-full bg-[#ff78b9] px-5 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-50"
                 >
                   {saving
@@ -3370,12 +3057,8 @@ export default function PerfilPage() {
    HELPERS
 ========================= */
 
-function formatDate(
-  date: string
-) {
-  return new Date(
-    date
-  ).toLocaleDateString(
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString(
     'pt-BR',
     {
       day: '2-digit',
