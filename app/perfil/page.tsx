@@ -32,6 +32,7 @@ export default function PerfilPage() {
 
   const [user, setUser] = useState<User | null>(null);
   const [stories, setStories] = useState<Story[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [loadingStories, setLoadingStories] = useState(true);
 
@@ -75,33 +76,40 @@ export default function PerfilPage() {
     loadUser();
   }, [router]);
 
+  /*
+   * A API /api/profile/stories já identifica o usuário
+   * através da sessão. Portanto, não precisamos esperar
+   * o estado "user" para carregar as histórias.
+   */
   useEffect(() => {
-    if (!user) return;
-
     async function loadStories() {
       setLoadingStories(true);
 
       try {
-        const response = await fetch(
-          '/api/profile/stories',
-          {
-            cache: 'no-store',
-          }
-        );
+        const response = await fetch('/api/profile/stories', {
+          cache: 'no-store',
+        });
 
         const data = await response.json();
+
+        console.log('RESPOSTA DAS HISTÓRIAS:', data);
 
         if (!response.ok) {
           console.error(
             'Erro ao carregar histórias:',
-            data.error
+            data.error,
+            data.details
           );
 
           setStories([]);
           return;
         }
 
-        setStories(data.stories || []);
+        setStories(
+          Array.isArray(data.stories)
+            ? data.stories
+            : []
+        );
       } catch (error) {
         console.error(
           'Erro ao carregar histórias:',
@@ -115,7 +123,7 @@ export default function PerfilPage() {
     }
 
     loadStories();
-  }, [user]);
+  }, []);
 
   function openEditor() {
     if (!user) return;
