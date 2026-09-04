@@ -8,7 +8,6 @@ const supabase = createClient(
 );
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const MAX_MEDIA_PER_POST = 4;
 
 const ALLOWED_TYPES = [
   'image/jpeg',
@@ -20,8 +19,9 @@ const ALLOWED_TYPES = [
 async function getCurrentUserId(request: NextRequest) {
   try {
     const response = await fetch(
-      new URL('/api/auth/me', request.url),
+      `${request.nextUrl.origin}/api/auth/me`,
       {
+        method: 'GET',
         headers: {
           cookie: request.headers.get('cookie') || '',
         },
@@ -33,26 +33,13 @@ async function getCurrentUserId(request: NextRequest) {
 
     const data = await response.json();
 
-    return data?.authenticated && data?.user?.id
-      ? data.user.id
-      : null;
+    if (!data.authenticated || !data.user?.id) {
+      return null;
+    }
+
+    return data.user.id as string;
   } catch {
     return null;
-  }
-}
-
-function getExtension(type: string) {
-  switch (type) {
-    case 'image/jpeg':
-      return 'jpg';
-    case 'image/png':
-      return 'png';
-    case 'image/webp':
-      return 'webp';
-    case 'image/gif':
-      return 'gif';
-    default:
-      return 'bin';
   }
 }
 
@@ -62,91 +49,86 @@ export async function POST(request: NextRequest) {
 
     if (!userId) {
       return NextResponse.json(
-        { error: 'Não autenticado.' },
+        {
+          error: 'Você precisa estar logado.',
+        },
         { status: 401 }
       );
     }
 
     const formData = await request.formData();
 
-    const file = formData.get('file');
     const postId = formData.get('post_id');
-    const positionValue = formData.get('position');
 
-    if (!(file instanceof File)) {
-      return NextResponse.json(
-        { error: 'Arquivo não enviado.' },
-        { status: 400 }
+    const files = formData
+      .getAll('files')
+      .filter(
+        (item): item is File =>
+          item instanceof File
       );
-    }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (files.length === 0) {
       return NextResponse.json(
         {
-          error:
-            'Formato não permitido. Use JPG, PNG, WEBP ou GIF.',
+          error: 'Nenhuma imagem foi enviada.',
         },
         { status: 400 }
       );
     }
 
-    if (file.size > MAX_FILE_SIZE) {
+    if (files.length > 4) {
       return NextResponse.json(
-        { error: 'Cada arquivo pode ter no máximo 10 MB.' },
+        {
+          error:
+            'Você pode adicionar no máximo 4 imagens ou GIFs por postagem.',
+        },
         { status: 400 }
       );
     }
 
-    let position = Number(positionValue);
-
-    if (!Number.isInteger(position) || position < 0 || position > 3) {
-      position = 0;
+    if (postId && typeof postId !== 'string') {
+      return NextResponse.json(
+        {
+          error: 'Postagem inválida.',
+        },
+        { status: 400 }
+      );
     }
 
     /*
-     * Se a mídia pertence a uma postagem, verificamos:
-     * 1. A postagem existe.
-     * 2. A postagem pertence ao usuário.
-     * 3. A postagem ainda não possui 4 mídias.
+     * Se estamos anexando mídia a um post existente,
+     * verificamos se o post pertence ao usuário.
      */
     if (postId) {
-      if (typeof postId !== 'string') {
-        return NextResponse.json(
-          { error: 'Postagem inválida.' },
-          { status: 400 }
-        );
-      }
-
-      const { data: post, error: postError } = await supabase
-        .from('nook_posts')
-        .select('id,user_id')
-        .eq('id', postId)
-        .maybeSingle();
+      const { data: post, error: postError } =
+        await supabase
+          .from('nook_posts')
+          .select('id,user_id')
+          .eq('id', postId)
+          .maybeSingle();
 
       if (postError) {
-        console.error(postError);
-
         return NextResponse.json(
-          { error: 'Erro ao verificar a postagem.' },
+          {
+            error:
+              'Não foi possível verificar a postagem.',
+            details: postError.message,
+          },
           { status: 500 }
         );
       }
 
-      if (!post) {
+      if (!post || post.user_id !== userId) {
         return NextResponse.json(
-          { error: 'Postagem não encontrada.' },
-          { status: 404 }
-        );
-      }
-
-      if (post.user_id !== userId) {
-        return NextResponse.json(
-          { error: 'Você não pode adicionar mídia a esta postagem.' },
+          {
+            error:
+              'Você não pode adicionar mídia a esta postagem.',
+          },
           { status: 403 }
         );
       }
 
-      const { count, error: countError } = await supabase
+      const { count } = await supabase
         .from('nook_post_media')
         .select('id', {
           count: 'exact',
@@ -154,115 +136,158 @@ export async function POST(request: NextRequest) {
         })
         .eq('post_id', postId);
 
-      if (countError) {
-        console.error(countError);
+      const currentCount = count || 0;
 
-        return NextResponse.json(
-          { error: 'Erro ao verificar as mídias da postagem.' },
-          { status: 500 }
-        );
-      }
-
-      if ((count ?? 0) >= MAX_MEDIA_PER_POST) {
+      if (currentCount + files.length > 4) {
         return NextResponse.json(
           {
             error:
-              'Cada postagem pode ter no máximo 4 imagens ou GIFs.',
+              'Esta postagem já possui mídias suficientes. O limite é 4.',
           },
           { status: 400 }
         );
       }
     }
 
-    const extension = getExtension(file.type);
+    const uploadedMedia: {
+      url: string;
+      media_type: 'image' | 'gif';
+    }[] = [];
 
-    const randomName = crypto.randomBytes(8).toString('hex');
+    for (const file of files) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        return NextResponse.json(
+          {
+            error: `O arquivo "${file.name}" não é um formato permitido.`,
+          },
+          { status: 400 }
+        );
+      }
 
-    const path = `${userId}/nook-${Date.now()}-${randomName}.${extension}`;
+      if (file.size > MAX_FILE_SIZE) {
+        return NextResponse.json(
+          {
+            error: `O arquivo "${file.name}" ultrapassa o limite de 10 MB.`,
+          },
+          { status: 400 }
+        );
+      }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+      const extension =
+        file.name.split('.').pop()?.toLowerCase() ||
+        'jpg';
 
-    const { error: uploadError } = await supabase.storage
-      .from('nook-media')
-      .upload(path, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
+      const randomName = crypto
+        .randomBytes(8)
+        .toString('hex');
 
-    if (uploadError) {
-      console.error(uploadError);
+      const fileName = `${userId}/nook-${Date.now()}-${randomName}.${extension}`;
 
-      return NextResponse.json(
-        { error: 'Não foi possível enviar a mídia.' },
-        { status: 500 }
+      const buffer = Buffer.from(
+        await file.arrayBuffer()
       );
-    }
 
-    const {
-      data: publicUrlData,
-    } = supabase.storage
-      .from('nook-media')
-      .getPublicUrl(path);
-
-    const url = publicUrlData.publicUrl;
-
-    const mediaType =
-      file.type === 'image/gif'
-        ? 'gif'
-        : 'image';
-
-    /*
-     * Quando post_id foi enviado, já vinculamos
-     * automaticamente a mídia à postagem.
-     */
-    if (postId) {
-      const { data: media, error: mediaError } = await supabase
-        .from('nook_post_media')
-        .insert({
-          post_id: postId,
-          media_url: url,
-          media_type: mediaType,
-          position,
-        })
-        .select('id,post_id,media_url,media_type,position,created_at')
-        .single();
-
-      if (mediaError) {
-        console.error(mediaError);
-
-        /*
-         * Se falhar ao criar o registro no banco,
-         * tentamos remover o arquivo que acabou de subir.
-         */
+      const { error: uploadError } =
         await supabase.storage
           .from('nook-media')
-          .remove([path]);
+          .upload(fileName, buffer, {
+            contentType: file.type,
+            upsert: false,
+          });
+
+      if (uploadError) {
+        console.error(
+          'Erro no upload da mídia:',
+          uploadError
+        );
 
         return NextResponse.json(
-          { error: 'Não foi possível vincular a mídia à postagem.' },
+          {
+            error:
+              'Não foi possível enviar uma das imagens.',
+            details: uploadError.message,
+          },
+          { status: 500 }
+        );
+      }
+
+      const { data: publicUrlData } =
+        supabase.storage
+          .from('nook-media')
+          .getPublicUrl(fileName);
+
+      uploadedMedia.push({
+        url: publicUrlData.publicUrl,
+        media_type:
+          file.type === 'image/gif'
+            ? 'gif'
+            : 'image',
+      });
+    }
+
+    /*
+     * Quando existe post_id, já registramos as mídias
+     * na tabela nook_post_media.
+     */
+    if (postId) {
+      const rows = uploadedMedia.map(
+        (media) => ({
+          post_id: postId,
+          media_url: media.url,
+          media_type: media.media_type,
+        })
+      );
+
+      const { data: insertedMedia, error: insertError } =
+        await supabase
+          .from('nook_post_media')
+          .insert(rows)
+          .select(
+            'id,post_id,media_url,media_type,created_at'
+          );
+
+      if (insertError) {
+        console.error(
+          'Erro ao registrar mídia:',
+          insertError
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              'As imagens foram enviadas, mas não foi possível vinculá-las à postagem.',
+            details: insertError.message,
+          },
           { status: 500 }
         );
       }
 
       return NextResponse.json({
         success: true,
-        media,
+        media: insertedMedia || [],
       });
     }
 
     /*
-     * Mantemos o comportamento sem post_id para compatibilidade.
+     * Sem post_id, apenas fazemos o upload.
+     * A página criará o post e depois vinculará
+     * as mídias usando o ID criado.
      */
     return NextResponse.json({
       success: true,
-      url,
-      media_type: mediaType,
+      media: uploadedMedia,
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      'Erro inesperado no upload:',
+      error
+    );
 
     return NextResponse.json(
-      { error: 'Erro interno ao enviar mídia.' },
+      {
+        error:
+          'Ocorreu um erro ao enviar as imagens.',
+      },
       { status: 500 }
     );
   }
