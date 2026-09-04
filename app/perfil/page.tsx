@@ -76,38 +76,20 @@ export default function PerfilPage() {
   }, [router]);
 
   useEffect(() => {
-  const userId = user?.id;
+    const userId = user?.id;
 
-  if (!userId) return;
+    if (!userId) return;
 
-  async function loadStories() {
-    setLoadingStories(true);
+    async function loadStories() {
+      setLoadingStories(true);
 
-    try {
-      const response = await fetch(
-        `/api/stories/author/${userId}`,
-        {
-          cache: 'no-store',
-        }
-      );
-
-      if (!response.ok) {
-        setStories([]);
-        return;
-      }
-
-      const data = await response.json();
-
-      setStories(data.stories || []);
-    } catch {
-      setStories([]);
-    } finally {
-      setLoadingStories(false);
-    }
-  }
-
-  loadStories();
-}, [user?.id]);
+      try {
+        const response = await fetch(
+          `/api/stories/author/${userId}`,
+          {
+            cache: 'no-store',
+          }
+        );
 
         if (!response.ok) {
           setStories([]);
@@ -165,7 +147,8 @@ export default function PerfilPage() {
 
       if (!response.ok) {
         setError(
-          data.error || 'Não foi possível salvar as alterações.'
+          data.error ||
+            'Não foi possível salvar as alterações.'
         );
         return;
       }
@@ -503,7 +486,7 @@ export default function PerfilPage() {
             </h2>
 
             <p className="mt-1 text-sm text-white/40">
-              As histórias publicadas por este autor aparecerão aqui.
+              As histórias criadas por este autor aparecerão aqui.
             </p>
           </div>
 
@@ -516,7 +499,7 @@ export default function PerfilPage() {
           ) : stories.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-white/10 bg-[#191219] px-6 py-14 text-center">
               <p className="text-sm text-white/35">
-                Este autor ainda não publicou nenhuma história.
+                Este autor ainda não criou nenhuma história.
               </p>
 
               <button
