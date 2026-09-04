@@ -19,21 +19,24 @@ export async function GET() {
       );
     }
 
-    const { data: session, error: sessionError } =
-      await supabase
-        .from('auth_sessions')
-        .select('user_id, expires_at')
-        .eq('token', token)
-        .maybeSingle();
+    /*
+     * Usa a mesma sessão que já funciona no /api/auth/me.
+     * Primeiro encontramos a sessão pelo token.
+     */
+    const { data: session, error: sessionError } = await supabase
+      .from('auth_sessions')
+      .select('*')
+      .eq('token', token)
+      .maybeSingle();
 
     if (sessionError) {
-      console.error(
-        'Erro ao buscar sessão:',
-        sessionError
-      );
+      console.error('ERRO AUTH_SESSIONS:', sessionError);
 
       return NextResponse.json(
-        { error: 'Não foi possível verificar sua sessão.' },
+        {
+          error: 'Erro ao verificar sessão.',
+          details: sessionError.message,
+        },
         { status: 500 }
       );
     }
@@ -45,60 +48,56 @@ export async function GET() {
       );
     }
 
-    if (
-      session.expires_at &&
-      new Date(session.expires_at).getTime() <= Date.now()
-    ) {
-      return NextResponse.json(
-        { error: 'Sessão expirada.' },
-        { status: 401 }
-      );
-    }
+    const userId = session.user_id;
 
-    const { data: stories, error: storiesError } =
-      await supabase
-        .from('stories')
-        .select(
-          `
-          id,
-          author_id,
-          title,
-          description,
-          cover_url,
-          status,
-          rating,
-          created_at,
-          updated_at
-          `
-        )
-        .eq('author_id', session.user_id)
-        .order('updated_at', {
-          ascending: false,
-        });
+    console.log('USER ID DA SESSÃO:', userId);
+
+    /*
+     * Agora buscamos TODAS as histórias desse usuário.
+     * Não importa se possuem capítulos publicados ou não.
+     */
+    const { data: stories, error: storiesError } = await supabase
+      .from('stories')
+      .select(`
+        id,
+        author_id,
+        title,
+        description,
+        cover_url,
+        status,
+        rating,
+        created_at,
+        updated_at
+      `)
+      .eq('author_id', userId)
+      .order('updated_at', {
+        ascending: false,
+      });
 
     if (storiesError) {
-      console.error(
-        'Erro ao buscar histórias:',
-        storiesError
-      );
+      console.error('ERRO STORIES:', storiesError);
 
       return NextResponse.json(
-        { error: 'Não foi possível carregar suas histórias.' },
+        {
+          error: 'Erro ao buscar histórias.',
+          details: storiesError.message,
+        },
         { status: 500 }
       );
     }
+
+    console.log('HISTÓRIAS ENCONTRADAS:', stories);
 
     return NextResponse.json({
       stories: stories || [],
     });
   } catch (error) {
-    console.error(
-      'Erro inesperado na API de histórias do perfil:',
-      error
-    );
+    console.error('ERRO GERAL:', error);
 
     return NextResponse.json(
-      { error: 'Erro interno do servidor.' },
+      {
+        error: 'Erro interno do servidor.',
+      },
       { status: 500 }
     );
   }
