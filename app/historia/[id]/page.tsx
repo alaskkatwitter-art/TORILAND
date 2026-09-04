@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 
 type Author = {
   id: string;
@@ -48,43 +48,14 @@ export default function HistoriaPage() {
   const params = useParams();
   const router = useRouter();
 
-  const id = params?.id as string;
+  const id = params.id as string;
 
   const [story, setStory] = useState<Story | null>(null);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [liked, setLiked] = useState(false);
-  const [likes, setLikes] = useState(0);
+  const [error, setError] = useState("");
   const [liking, setLiking] = useState(false);
-
-  const [currentUserId, setCurrentUserId] = useState<string | null>(
-    null
-  );
-
-  useEffect(() => {
-    async function loadCurrentUser() {
-      try {
-        const response = await fetch('/api/auth/me', {
-          cache: 'no-store',
-        });
-
-        if (!response.ok) {
-          setCurrentUserId(null);
-          return;
-        }
-
-        const data = await response.json();
-
-        setCurrentUserId(data?.user?.id || data?.id || null);
-      } catch (err) {
-        console.error('Erro ao carregar usuário:', err);
-        setCurrentUserId(null);
-      }
-    }
-
-    loadCurrentUser();
-  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -92,39 +63,26 @@ export default function HistoriaPage() {
     async function loadStory() {
       try {
         setLoading(true);
-        setError('');
+        setError("");
 
         const response = await fetch(`/api/stories/${id}`, {
-          cache: 'no-store',
+          cache: "no-store",
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(
-            data?.error ||
-              'Não foi possível carregar a história.'
-          );
+          throw new Error(data?.error || "Não foi possível carregar a história.");
         }
 
-        const loadedStory = data.story;
-
-        setStory(loadedStory);
-
-        setChapters(
-          data.chapters ||
-            loadedStory?.chapters ||
-            []
-        );
-
-        setLiked(Boolean(loadedStory?.liked));
-        setLikes(Number(loadedStory?.likes || 0));
-      } catch (err: any) {
-        console.error(err);
+        setStory(data.story || data);
+      } catch (err) {
+        console.error("Erro ao carregar história:", err);
 
         setError(
-          err?.message ||
-            'Não foi possível carregar a história.'
+          err instanceof Error
+            ? err.message
+            : "Não foi possível carregar a história."
         );
       } finally {
         setLoading(false);
@@ -134,77 +92,85 @@ export default function HistoriaPage() {
     loadStory();
   }, [id]);
 
-  async function toggleLike() {
-    if (liking) return;
+  useEffect(() => {
+    async function loadCurrentUser() {
+      try {
+        const response = await fetch("/api/auth/me", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          setCurrentUserId(null);
+          return;
+        }
+
+        const data = await response.json();
+
+        setCurrentUserId(
+          data?.user?.id ||
+            data?.user_id ||
+            data?.id ||
+            null
+        );
+      } catch (err) {
+        console.error("Erro ao carregar usuário:", err);
+        setCurrentUserId(null);
+      }
+    }
+
+    loadCurrentUser();
+  }, []);
+
+  async function handleLike() {
+    if (!story || liking) return;
 
     try {
       setLiking(true);
 
-      const response = await fetch(
-        `/api/stories/${id}/like`,
-        {
-          method: 'POST',
-        }
-      );
+      const response = await fetch(`/api/stories/${story.id}/like`, {
+        method: "POST",
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data?.error ||
-            'Não foi possível atualizar a curtida.'
-        );
+        throw new Error(data?.error || "Não foi possível curtir a história.");
       }
 
-      setLiked(Boolean(data.liked));
-      setLikes(Number(data.likes || 0));
+      setStory((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          liked:
+            typeof data.liked === "boolean"
+              ? data.liked
+              : !previous.liked,
+          likes:
+            typeof data.likes === "number"
+              ? data.likes
+              : previous.liked
+                ? Math.max(0, previous.likes - 1)
+                : previous.likes + 1,
+        };
+      });
     } catch (err) {
-      console.error(err);
+      console.error("Erro ao curtir história:", err);
     } finally {
       setLiking(false);
     }
   }
 
-  function getCategoryTags(categorySlug: string) {
-    if (!story?.tags) return [];
-
-    return story.tags.filter(
-      (tag) =>
-        tag.category_slug === categorySlug
-    );
-  }
-
-  function getFreeformTags() {
-    if (!story?.tags) return [];
-
-    return story.tags.filter(
-      (tag) =>
-        tag.category_slug === 'freeform' ||
-        !tag.category_slug
-    );
-  }
-
-  const genreTags = getCategoryTags('genre');
-  const fandomTags = getCategoryTags('fandom');
-  const characterTags =
-    getCategoryTags('characters');
-  const relationshipTags =
-    getCategoryTags('relationships');
-  const tropeTags = getCategoryTags('tropes');
-  const warningTags =
-    getCategoryTags('content-warning');
-  const freeformTags = getFreeformTags();
-
-  const isOwner =
-    Boolean(currentUserId) &&
-    Boolean(story) &&
-    currentUserId === story.author_id;
-
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#09070a] text-white flex items-center justify-center">
-        <div className="text-sm text-gray-400">
-          Carregando história...
+      <main className="min-h-screen bg-[#0b0710] text-white">
+        <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-6">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-pink-400/20 border-t-pink-400" />
+            <p className="text-sm text-white/50">
+              Carregando história...
+            </p>
+          </div>
         </div>
       </main>
     );
@@ -212,58 +178,68 @@ export default function HistoriaPage() {
 
   if (error || !story) {
     return (
-      <main className="min-h-screen bg-[#09070a] text-white flex items-center justify-center px-6">
-        <div className="max-w-md text-center">
-          <h1 className="text-xl font-semibold mb-3">
-            História não encontrada
-          </h1>
+      <main className="min-h-screen bg-[#0b0710] text-white">
+        <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-6">
+          <div className="text-center">
+            <div className="mb-4 text-5xl">☁️</div>
 
-          <p className="text-sm text-gray-400 mb-6">
-            {error ||
-              'Essa história não existe ou não está disponível.'}
-          </p>
+            <h1 className="mb-2 text-2xl font-semibold">
+              História não encontrada
+            </h1>
 
-          <button
-            type="button"
-            onClick={() => router.push('/')}
-            className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium hover:bg-pink-400 transition"
-          >
-            Voltar para o início
-          </button>
+            <p className="mb-6 text-sm text-white/50">
+              {error || "Essa história não existe ou não está disponível."}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-pink-400"
+            >
+              Voltar para o início
+            </button>
+          </div>
         </div>
       </main>
     );
   }
 
+  const isOwner =
+    Boolean(currentUserId) &&
+    currentUserId === story.author_id;
+
+  const publishedChapters = story.chapters?.filter(
+    (chapter) => chapter.published
+  ) || [];
+
+  const firstChapter = publishedChapters[0];
+
   return (
-    <main className="min-h-screen bg-[#09070a] text-white">
-      {/* HEADER */}
-      <header className="border-b border-white/10 bg-[#0b090c]/95 backdrop-blur">
-        <div className="mx-auto max-w-6xl px-5 py-4 flex items-center justify-between gap-4">
+    <main className="min-h-screen bg-[#0b0710] text-white">
+      <header className="border-b border-white/5 bg-[#0b0710]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
           <button
             type="button"
-            onClick={() => router.push('/')}
-            className="text-xl font-semibold tracking-tight hover:text-pink-300 transition"
+            onClick={() => router.push("/")}
+            className="text-xl font-bold tracking-tight text-white transition hover:text-pink-300"
           >
-            Nooklie
+            NOOKLIE
           </button>
 
           <button
             type="button"
             onClick={() => router.back()}
-            className="text-sm text-gray-400 hover:text-white transition"
+            className="rounded-xl border border-white/10 px-4 py-2 text-sm text-white/70 transition hover:border-pink-400/30 hover:text-white"
           >
             Voltar
           </button>
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-5 py-8">
-        {/* FICHA */}
-        <section className="grid grid-cols-1 md:grid-cols-[230px_1fr] gap-7">
-          {/* CAPA */}
+      <section className="mx-auto max-w-6xl px-6 py-10">
+        <div className="grid gap-10 lg:grid-cols-[320px_1fr]">
           <div>
-            <div className="aspect-[2/3] w-full max-w-[230px] overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-2xl">
+            <div className="aspect-[2/3] overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-pink-500/20 via-purple-500/10 to-[#120b16] shadow-2xl">
               {story.cover_url ? (
                 <img
                   src={story.cover_url}
@@ -271,32 +247,36 @@ export default function HistoriaPage() {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="h-full w-full flex items-center justify-center text-gray-600 text-sm">
-                  Sem capa
+                <div className="flex h-full items-center justify-center">
+                  <div className="text-center">
+                    <div className="mb-3 text-6xl">☁️</div>
+                    <p className="px-8 text-sm text-white/30">
+                      Esta história ainda não possui uma capa.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* INFORMAÇÕES */}
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
+          <div className="flex flex-col justify-center">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
               {story.status && (
-                <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-gray-300">
+                <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
                   {story.status}
                 </span>
               )}
 
               {story.rating && (
-                <span className="rounded-full border border-pink-400/30 bg-pink-500/10 px-3 py-1 text-xs font-medium text-pink-300">
-                  {story.rating === 'Livre'
-                    ? 'Livre'
-                    : `+${story.rating}`}
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/60">
+                  {story.rating === "Livre"
+                    ? "Livre"
+                    : `${story.rating}+`}
                 </span>
               )}
             </div>
 
-            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight break-words">
+            <h1 className="mb-5 text-4xl font-bold tracking-tight sm:text-5xl">
               {story.title}
             </h1>
 
@@ -304,123 +284,66 @@ export default function HistoriaPage() {
               <button
                 type="button"
                 onClick={() =>
-                  router.push(
-                    `/perfil/${story.author?.username}`
-                  )
+                  router.push(`/perfil/${story.author?.id}`)
                 }
-                className="mt-3 text-sm text-gray-400 hover:text-pink-300 transition"
+                className="mb-6 flex w-fit items-center gap-3 text-left"
               >
-                por{' '}
-                <span className="text-gray-200">
-                  {story.author.display_name ||
-                    story.author.username}
-                </span>
+                {story.author.avatar_url ? (
+                  <img
+                    src={story.author.avatar_url}
+                    alt={story.author.username}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-500/20 text-sm font-semibold text-pink-300">
+                    {story.author.username
+                      ?.charAt(0)
+                      .toUpperCase() || "?"}
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-xs text-white/40">
+                    Escrito por
+                  </p>
+
+                  <p className="font-medium text-white/80 transition hover:text-pink-300">
+                    {story.author.display_name ||
+                      story.author.username}
+                  </p>
+                </div>
               </button>
             )}
 
             {story.description && (
-              <p className="mt-6 max-w-3xl whitespace-pre-wrap text-[15px] leading-7 text-gray-300">
+              <p className="mb-7 max-w-3xl whitespace-pre-wrap text-base leading-7 text-white/60">
                 {story.description}
               </p>
             )}
 
-            {/* GÊNERO */}
-            {genreTags.length > 0 && (
-              <div className="mt-6">
-                <div className="mb-2 text-xs uppercase tracking-wider text-gray-500">
-                  Gênero
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {genreTags.map((tag) => (
-                    <TagButton
-                      key={tag.id}
-                      tag={tag}
-                      variant="genre"
-                      onClick={() =>
-                        router.push(`/tag/${tag.slug}`)
-                      }
-                    />
-                  ))}
-                </div>
+            {story.tags && story.tags.length > 0 && (
+              <div className="mb-8 flex flex-wrap gap-2">
+                {story.tags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="rounded-full border border-pink-400/10 bg-pink-500/5 px-3 py-1.5 text-xs text-pink-200/70"
+                  >
+                    #{tag.name}
+                  </span>
+                ))}
               </div>
             )}
 
-            {/* TAGS */}
-            <div className="mt-6 space-y-5">
-              {fandomTags.length > 0 && (
-                <TagGroup
-                  title="Fandom"
-                  tags={fandomTags}
-                  onTagClick={(tag) =>
-                    router.push(`/tag/${tag.slug}`)
-                  }
-                />
-              )}
-
-              {characterTags.length > 0 && (
-                <TagGroup
-                  title="Personagens"
-                  tags={characterTags}
-                  onTagClick={(tag) =>
-                    router.push(`/tag/${tag.slug}`)
-                  }
-                />
-              )}
-
-              {relationshipTags.length > 0 && (
-                <TagGroup
-                  title="Relacionamentos"
-                  tags={relationshipTags}
-                  onTagClick={(tag) =>
-                    router.push(`/tag/${tag.slug}`)
-                  }
-                />
-              )}
-
-              {tropeTags.length > 0 && (
-                <TagGroup
-                  title="Tropes"
-                  tags={tropeTags}
-                  onTagClick={(tag) =>
-                    router.push(`/tag/${tag.slug}`)
-                  }
-                />
-              )}
-
-              {warningTags.length > 0 && (
-                <TagGroup
-                  title="Avisos de conteúdo"
-                  tags={warningTags}
-                  warning
-                  onTagClick={(tag) =>
-                    router.push(`/tag/${tag.slug}`)
-                  }
-                />
-              )}
-
-              {freeformTags.length > 0 && (
-                <TagGroup
-                  title="Tags"
-                  tags={freeformTags}
-                  onTagClick={(tag) =>
-                    router.push(`/tag/${tag.slug}`)
-                  }
-                />
-              )}
-            </div>
-
-            {/* AÇÕES */}
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              {chapters.length > 0 && (
+            <div className="flex flex-wrap gap-3">
+              {firstChapter && (
                 <button
                   type="button"
                   onClick={() =>
                     router.push(
-                      `/capitulo/${chapters[0].id}`
+                      `/historia/${story.id}/capitulo/${firstChapter.id}`
                     )
                   }
-                  className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium text-white hover:bg-pink-400 transition"
+                  className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-pink-500/10 transition hover:bg-pink-400"
                 >
                   Começar a ler
                 </button>
@@ -428,182 +351,137 @@ export default function HistoriaPage() {
 
               <button
                 type="button"
-                onClick={toggleLike}
+                onClick={handleLike}
                 disabled={liking}
-                className={`rounded-xl border px-5 py-3 text-sm transition ${
-                  liked
-                    ? 'border-pink-400/40 bg-pink-500/10 text-pink-300'
-                    : 'border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.06] hover:text-white'
+                className={`rounded-xl border px-5 py-3 text-sm font-medium transition ${
+                  story.liked
+                    ? "border-pink-400/40 bg-pink-500/15 text-pink-300"
+                    : "border-white/10 bg-white/5 text-white/70 hover:border-pink-400/30 hover:text-white"
                 }`}
               >
-                {liked ? 'Curtida' : 'Curtir'}
-                {' · '}
-                {likes}
+                {story.liked ? "♥ Curtido" : "♡ Curtir"}{" "}
+                <span className="ml-1 text-white/40">
+                  {story.likes || 0}
+                </span>
               </button>
 
-              {/* EDITAR OBRA */}
               {isOwner && (
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    if (!story) return;
+
                     router.push(
                       `/escrever?id=${story.id}`
-                    )
-                  }
-                  className="rounded-xl border border-pink-400/30 bg-pink-500/10 px-5 py-3 text-sm font-medium text-pink-300 hover:bg-pink-500/20 hover:border-pink-400/50 transition"
+                    );
+                  }}
+                  className="rounded-xl border border-pink-400/30 bg-pink-500/10 px-5 py-3 text-sm font-medium text-pink-300 transition hover:border-pink-400/50 hover:bg-pink-500/20"
                 >
                   Editar obra
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    `/novo-capitulo/${story.id}`
-                  )
-                }
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm text-gray-300 hover:bg-white/[0.06] hover:text-white transition"
-              >
-                Novo capítulo
-              </button>
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/novo-capitulo/${story.id}`
+                    )
+                  }
+                  className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-white/70 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+                >
+                  Novo capítulo
+                </button>
+              )}
             </div>
           </div>
-        </section>
+        </div>
 
-        <div className="my-10 h-px bg-white/10" />
-
-        {/* CAPÍTULOS */}
-        <section>
-          <div className="flex items-end justify-between gap-4 mb-5">
+        <section className="mt-16">
+          <div className="mb-6 flex items-end justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold">
+              <p className="mb-1 text-xs font-medium uppercase tracking-[0.2em] text-pink-300/60">
+                História
+              </p>
+
+              <h2 className="text-2xl font-semibold">
                 Capítulos
               </h2>
-
-              <p className="mt-1 text-sm text-gray-500">
-                {chapters.length === 0
-                  ? 'Nenhum capítulo publicado ainda.'
-                  : `${chapters.length} ${
-                      chapters.length === 1
-                        ? 'capítulo'
-                        : 'capítulos'
-                    } publicado${
-                      chapters.length === 1 ? '' : 's'
-                    }`}
-              </p>
             </div>
+
+            <span className="text-sm text-white/30">
+              {publishedChapters.length}{" "}
+              {publishedChapters.length === 1
+                ? "capítulo"
+                : "capítulos"}
+            </span>
           </div>
 
-          {chapters.length > 0 ? (
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
-              {chapters.map((chapter, index) => (
+          {publishedChapters.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center">
+              <div className="mb-3 text-4xl">📖</div>
+
+              <h3 className="mb-2 font-medium text-white/70">
+                Ainda não existem capítulos
+              </h3>
+
+              <p className="text-sm text-white/30">
+                Essa história ainda não possui capítulos publicados.
+              </p>
+
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/novo-capitulo/${story.id}`
+                    )
+                  }
+                  className="mt-5 rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-pink-400"
+                >
+                  Criar primeiro capítulo
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {publishedChapters.map((chapter) => (
                 <button
                   key={chapter.id}
                   type="button"
                   onClick={() =>
                     router.push(
-                      `/capitulo/${chapter.id}`
+                      `/historia/${story.id}/capitulo/${chapter.id}`
                     )
                   }
-                  className={`group w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-white/[0.04] transition ${
-                    index !== chapters.length - 1
-                      ? 'border-b border-white/10'
-                      : ''
-                  }`}
+                  className="group flex w-full items-center justify-between gap-5 rounded-2xl border border-white/5 bg-white/[0.025] px-5 py-5 text-left transition hover:border-pink-400/20 hover:bg-pink-500/[0.04]"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-pink-500/10 text-sm font-medium text-pink-300">
-                    {chapter.chapter_number}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-gray-200 group-hover:text-pink-200 transition">
-                      {chapter.title ||
-                        `Capítulo ${chapter.chapter_number}`}
+                  <div className="flex min-w-0 items-center gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pink-500/10 text-sm font-semibold text-pink-300">
+                      {chapter.chapter_number}
                     </div>
 
-                    <div className="mt-1 text-xs text-gray-500">
-                      Capítulo {chapter.chapter_number}
+                    <div className="min-w-0">
+                      <p className="mb-1 text-xs text-white/30">
+                        Capítulo {chapter.chapter_number}
+                      </p>
+
+                      <h3 className="truncate font-medium text-white/80 transition group-hover:text-pink-300">
+                        {chapter.title}
+                      </h3>
                     </div>
                   </div>
 
-                  <div className="text-gray-600 group-hover:text-pink-300 transition">
+                  <span className="shrink-0 text-xl text-white/20 transition group-hover:translate-x-1 group-hover:text-pink-300">
                     →
-                  </div>
+                  </span>
                 </button>
               ))}
             </div>
-          ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-6 py-10 text-center">
-              <p className="text-sm text-gray-500">
-                Essa história ainda não possui capítulos publicados.
-              </p>
-            </div>
           )}
         </section>
-      </div>
+      </section>
     </main>
-  );
-}
-
-function TagGroup({
-  title,
-  tags,
-  warning = false,
-  onTagClick,
-}: {
-  title: string;
-  tags: Tag[];
-  warning?: boolean;
-  onTagClick: (tag: Tag) => void;
-}) {
-  return (
-    <div>
-      <div className="mb-2 text-xs uppercase tracking-wider text-gray-500">
-        {title}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {tags.map((tag) => (
-          <TagButton
-            key={tag.id}
-            tag={tag}
-            warning={warning}
-            onClick={() => onTagClick(tag)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TagButton({
-  tag,
-  onClick,
-  warning = false,
-  variant,
-}: {
-  tag: Tag;
-  onClick: () => void;
-  warning?: boolean;
-  variant?: 'genre';
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-      className={`rounded-lg border px-3 py-1.5 text-sm transition ${
-        variant === 'genre'
-          ? 'border-pink-400/20 bg-pink-500/10 text-pink-200 hover:border-pink-400/40 hover:bg-pink-500/15'
-          : warning
-          ? 'border-red-400/20 bg-red-500/[0.07] text-red-200 hover:border-red-400/40 hover:bg-red-500/10'
-          : 'border-white/10 bg-white/[0.04] text-gray-300 hover:border-pink-400/30 hover:bg-pink-500/10 hover:text-pink-200'
-      }`}
-    >
-      {tag.name}
-    </button>
   );
 }
