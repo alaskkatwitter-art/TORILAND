@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type StoryTag = {
@@ -34,7 +38,7 @@ const genres = [
 
 const ratings = ["Livre", "12+", "14+", "16+", "18+"];
 
-export default function EscreverPage() {
+function EscreverForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -67,26 +71,32 @@ export default function EscreverPage() {
         setError("");
 
         const response = await fetch(`/api/stories/${storyId}`);
-
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || "Não foi possível carregar a história.");
+          throw new Error(
+            data.error || "Não foi possível carregar a história."
+          );
         }
 
         const story: Story = data.story;
 
         setTitle(story.title || "");
         setDescription(story.description || "");
-        setRating(
-          story.rating && story.rating !== ""
-            ? `${story.rating}`.endsWith("+")
-              ? `${story.rating}`
-              : `${story.rating}+`
-            : "Livre"
-        );
 
-        const storyTags = Array.isArray(story.tags) ? story.tags : [];
+        if (story.rating) {
+          if (story.rating === "Livre") {
+            setRating("Livre");
+          } else {
+            setRating(`${story.rating}`.replace("+", "") + "+");
+          }
+        } else {
+          setRating("Livre");
+        }
+
+        const storyTags = Array.isArray(story.tags)
+          ? story.tags
+          : [];
 
         const genreTag = storyTags.find(
           (tag) =>
@@ -147,7 +157,9 @@ export default function EscreverPage() {
     ];
 
     if (!allowedTypes.includes(file.type)) {
-      setError("A capa precisa estar em JPG, PNG, WEBP ou GIF.");
+      setError(
+        "A capa precisa estar em JPG, PNG, WEBP ou GIF."
+      );
       return;
     }
 
@@ -170,7 +182,9 @@ export default function EscreverPage() {
     }
 
     if (description.length > 5000) {
-      setError("A descrição pode ter no máximo 5000 caracteres.");
+      setError(
+        "A descrição pode ter no máximo 5000 caracteres."
+      );
       return;
     }
 
@@ -183,11 +197,9 @@ export default function EscreverPage() {
 
       formData.append("title", title.trim());
       formData.append("description", description.trim());
-
       formData.append("status", "Em andamento");
 
-      formData.append(
-        "rating",
+      const normalizedRating =
         rating === "12+"
           ? "12"
           : rating === "14+"
@@ -198,9 +210,9 @@ export default function EscreverPage() {
           ? "18"
           : rating === "Livre"
           ? "Livre"
-          : ""
-      );
+          : "";
 
+      formData.append("rating", normalizedRating);
       formData.append("genre", genre);
 
       const cleanedTags = tags
@@ -279,7 +291,9 @@ export default function EscreverPage() {
           fontFamily: "Arial, sans-serif",
         }}
       >
-        <p style={{ color: "#c9bfc9" }}>Carregando história...</p>
+        <p style={{ color: "#c9bfc9" }}>
+          Carregando história...
+        </p>
       </main>
     );
   }
@@ -363,7 +377,9 @@ export default function EscreverPage() {
               lineHeight: 1.1,
             }}
           >
-            {isEditing ? "Edite sua história" : "Conte uma história"}
+            {isEditing
+              ? "Edite sua história"
+              : "Conte uma história"}
           </h1>
 
           <p
@@ -415,7 +431,9 @@ export default function EscreverPage() {
               type="text"
               value={title}
               maxLength={150}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={(event) =>
+                setTitle(event.target.value)
+              }
               placeholder="O nome da sua história"
               style={{
                 width: "100%",
@@ -456,7 +474,9 @@ export default function EscreverPage() {
             <textarea
               value={description}
               maxLength={5000}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={(event) =>
+                setDescription(event.target.value)
+              }
               placeholder="Sobre o que é sua história?"
               rows={7}
               style={{
@@ -507,7 +527,9 @@ export default function EscreverPage() {
 
               <select
                 value={genre}
-                onChange={(event) => setGenre(event.target.value)}
+                onChange={(event) =>
+                  setGenre(event.target.value)
+                }
                 style={{
                   width: "100%",
                   boxSizing: "border-box",
@@ -520,7 +542,9 @@ export default function EscreverPage() {
                   outline: "none",
                 }}
               >
-                <option value="">Selecione um gênero</option>
+                <option value="">
+                  Selecione um gênero
+                </option>
 
                 {genres.map((item) => (
                   <option key={item} value={item}>
@@ -543,7 +567,9 @@ export default function EscreverPage() {
 
               <select
                 value={rating}
-                onChange={(event) => setRating(event.target.value)}
+                onChange={(event) =>
+                  setRating(event.target.value)
+                }
                 style={{
                   width: "100%",
                   boxSizing: "border-box",
@@ -579,7 +605,9 @@ export default function EscreverPage() {
             <input
               type="text"
               value={tags}
-              onChange={(event) => setTags(event.target.value)}
+              onChange={(event) =>
+                setTags(event.target.value)
+              }
               placeholder="ex: enemies to lovers, fantasia, slow burn"
               style={{
                 width: "100%",
@@ -729,7 +757,9 @@ export default function EscreverPage() {
                 color: "#d8ccd9",
                 borderRadius: "10px",
                 padding: "14px 22px",
-                cursor: saving ? "not-allowed" : "pointer",
+                cursor: saving
+                  ? "not-allowed"
+                  : "pointer",
                 opacity: saving ? 0.6 : 1,
               }}
             >
@@ -742,14 +772,18 @@ export default function EscreverPage() {
               disabled={saving}
               style={{
                 border: "none",
-                background: "linear-gradient(135deg, #d95fd4, #a94dbb)",
+                background:
+                  "linear-gradient(135deg, #d95fd4, #a94dbb)",
                 color: "#fff",
                 borderRadius: "10px",
                 padding: "14px 26px",
                 fontWeight: 800,
-                cursor: saving ? "not-allowed" : "pointer",
+                cursor: saving
+                  ? "not-allowed"
+                  : "pointer",
                 opacity: saving ? 0.7 : 1,
-                boxShadow: "0 8px 25px rgba(180, 75, 190, 0.2)",
+                boxShadow:
+                  "0 8px 25px rgba(180, 75, 190, 0.2)",
               }}
             >
               {saving
@@ -788,5 +822,31 @@ export default function EscreverPage() {
         feito por escritores nooklie! para escritores
       </footer>
     </main>
+  );
+}
+
+export default function EscreverPage() {
+  return (
+    <Suspense
+      fallback={
+        <main
+          style={{
+            minHeight: "100vh",
+            background: "#0d0910",
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: "Arial, sans-serif",
+          }}
+        >
+          <p style={{ color: "#c9bfc9" }}>
+            Carregando...
+          </p>
+        </main>
+      }
+    >
+      <EscreverForm />
+    </Suspense>
   );
 }
