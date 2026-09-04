@@ -58,6 +58,21 @@ export default function PerfilPage() {
   const [selectedStoryId, setSelectedStoryId] = useState('');
   const [creatingPost, setCreatingPost] = useState(false);
 
+  const [editingNookPost, setEditingNookPost] =
+    useState<NookPost | null>(null);
+  const [editNookBody, setEditNookBody] = useState('');
+  const [editNookStoryId, setEditNookStoryId] =
+    useState('');
+  const [savingNookPost, setSavingNookPost] =
+    useState(false);
+
+  const [openPostMenu, setOpenPostMenu] =
+    useState<string | null>(null);
+  const [deletingPostId, setDeletingPostId] =
+    useState<string | null>(null);
+  const [updatingPostId, setUpdatingPostId] =
+    useState<string | null>(null);
+
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
 
@@ -176,6 +191,19 @@ export default function PerfilPage() {
 
     loadNookPosts();
   }, []);
+
+  function sortNookPosts(posts: NookPost[]) {
+    return [...posts].sort((a, b) => {
+      if (a.pinned !== b.pinned) {
+        return a.pinned ? -1 : 1;
+      }
+
+      return (
+        new Date(b.created_at).getTime() -
+        new Date(a.created_at).getTime()
+      );
+    });
+  }
 
   function openEditor() {
     if (!user) return;
@@ -414,10 +442,12 @@ export default function PerfilPage() {
       }
 
       if (data.post) {
-        setNookPosts((currentPosts) => [
-          data.post,
-          ...currentPosts,
-        ]);
+        setNookPosts((currentPosts) =>
+          sortNookPosts([
+            data.post,
+            ...currentPosts,
+          ])
+        );
       }
 
       setNewPost('');
@@ -434,6 +464,212 @@ export default function PerfilPage() {
       );
     } finally {
       setCreatingPost(false);
+    }
+  }
+
+  function openNookPostEditor(post: NookPost) {
+    setEditingNookPost(post);
+    setEditNookBody(post.body);
+    setEditNookStoryId(post.story_id || '');
+    setOpenPostMenu(null);
+    setError('');
+  }
+
+  function closeNookPostEditor() {
+    if (savingNookPost) return;
+
+    setEditingNookPost(null);
+    setEditNookBody('');
+    setEditNookStoryId('');
+  }
+
+  async function handleSaveNookPost() {
+    if (!editingNookPost) return;
+
+    const text = editNookBody.trim();
+
+    if (!text) {
+      setError(
+        'O post precisa ter algum conteúdo.'
+      );
+      return;
+    }
+
+    if (text.length > 5000) {
+      setError(
+        'O post pode ter no máximo 5000 caracteres.'
+      );
+      return;
+    }
+
+    setSavingNookPost(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(
+        `/api/nook-posts/${editingNookPost.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            body: text,
+            story_id: editNookStoryId || null,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error ||
+            'Não foi possível editar o post.'
+        );
+        return;
+      }
+
+      if (data.post) {
+        setNookPosts((currentPosts) =>
+          sortNookPosts(
+            currentPosts.map((post) =>
+              post.id === data.post.id
+                ? data.post
+                : post
+            )
+          )
+        );
+      }
+
+      setEditingNookPost(null);
+      setEditNookBody('');
+      setEditNookStoryId('');
+
+      setSuccess('Post atualizado.');
+
+      setTimeout(() => {
+        setSuccess('');
+      }, 2000);
+    } catch {
+      setError(
+        'Não foi possível editar o post. Tente novamente.'
+      );
+    } finally {
+      setSavingNookPost(false);
+    }
+  }
+
+  async function handleTogglePin(post: NookPost) {
+    setOpenPostMenu(null);
+    setUpdatingPostId(post.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(
+        `/api/nook-posts/${post.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            pinned: !post.pinned,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error ||
+            'Não foi possível alterar o destaque do post.'
+        );
+        return;
+      }
+
+      if (data.post) {
+        setNookPosts((currentPosts) =>
+          sortNookPosts(
+            currentPosts.map((currentPost) =>
+              currentPost.id === data.post.id
+                ? data.post
+                : currentPost
+            )
+          )
+        );
+      }
+
+      setSuccess(
+        post.pinned
+          ? 'Post desafixado.'
+          : 'Post fixado no seu Nook.'
+      );
+
+      setTimeout(() => {
+        setSuccess('');
+      }, 2000);
+    } catch {
+      setError(
+        'Não foi possível alterar o post. Tente novamente.'
+      );
+    } finally {
+      setUpdatingPostId(null);
+    }
+  }
+
+  async function handleDeleteNookPost(post: NookPost) {
+    setOpenPostMenu(null);
+
+    const confirmed = window.confirm(
+      'Tem certeza que deseja excluir este post? Essa ação não pode ser desfeita.'
+    );
+
+    if (!confirmed) return;
+
+    setDeletingPostId(post.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(
+        `/api/nook-posts/${post.id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error ||
+            'Não foi possível excluir o post.'
+        );
+        return;
+      }
+
+      setNookPosts((currentPosts) =>
+        currentPosts.filter(
+          (currentPost) =>
+            currentPost.id !== post.id
+        )
+      );
+
+      setSuccess('Post excluído.');
+
+      setTimeout(() => {
+        setSuccess('');
+      }, 2000);
+    } catch {
+      setError(
+        'Não foi possível excluir o post. Tente novamente.'
+      );
+    } finally {
+      setDeletingPostId(null);
     }
   }
 
@@ -630,7 +866,6 @@ export default function PerfilPage() {
 
         {/* MEU NOOK */}
         <section className="relative mt-10 overflow-hidden rounded-3xl border border-[#ff78b9]/15 bg-[#191219]">
-          {/* Decoração */}
           <div className="pointer-events-none absolute -right-8 -top-10 text-8xl opacity-[0.06]">
             ☁
           </div>
@@ -743,20 +978,116 @@ export default function PerfilPage() {
                     const storyTitle =
                       getStoryTitle(post.story_id);
 
+                    const isDeleting =
+                      deletingPostId === post.id;
+
+                    const isUpdating =
+                      updatingPostId === post.id;
+
                     return (
                       <article
                         key={post.id}
-                        className="rounded-3xl border border-white/5 bg-[#100b12] p-5 transition hover:border-[#ff78b9]/15"
+                        className="relative rounded-3xl border border-white/5 bg-[#100b12] p-5 transition hover:border-[#ff78b9]/15"
                       >
-                        {post.pinned && (
-                          <div className="mb-3 flex items-center gap-2 text-xs font-bold text-[#ff78b9]">
-                            <span>📌</span>
-                            <span>
-                              Post fixado
-                            </span>
-                          </div>
-                        )}
+                        {/* CABEÇALHO DO POST */}
+                        <div className="mb-3 flex items-start justify-between gap-4">
+                          <div>
+                            {post.pinned && (
+                              <div className="flex items-center gap-2 text-xs font-bold text-[#ff78b9]">
+                                <span>📌</span>
 
+                                <span>
+                                  Post fixado
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* MENU */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenPostMenu(
+                                  openPostMenu ===
+                                    post.id
+                                    ? null
+                                    : post.id
+                                )
+                              }
+                              disabled={
+                                isDeleting ||
+                                isUpdating
+                              }
+                              className="flex h-9 w-9 items-center justify-center rounded-full text-xl font-bold text-white/30 transition hover:bg-white/5 hover:text-white disabled:opacity-30"
+                              aria-label="Opções do post"
+                            >
+                              ⋯
+                            </button>
+
+                            {openPostMenu ===
+                              post.id && (
+                              <div className="absolute right-0 top-10 z-20 w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#191219] p-1.5 shadow-2xl">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openNookPostEditor(
+                                      post
+                                    )
+                                  }
+                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-white/70 transition hover:bg-white/5 hover:text-white"
+                                >
+                                  <span>✏️</span>
+                                  <span>
+                                    Editar
+                                  </span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleTogglePin(
+                                      post
+                                    )
+                                  }
+                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-white/70 transition hover:bg-white/5 hover:text-white"
+                                >
+                                  <span>
+                                    {post.pinned
+                                      ? '📍'
+                                      : '📌'}
+                                  </span>
+
+                                  <span>
+                                    {post.pinned
+                                      ? 'Desafixar'
+                                      : 'Fixar no Nook'}
+                                  </span>
+                                </button>
+
+                                <div className="my-1 border-t border-white/5" />
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteNookPost(
+                                      post
+                                    )
+                                  }
+                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-red-300 transition hover:bg-red-400/10"
+                                >
+                                  <span>🗑️</span>
+
+                                  <span>
+                                    Excluir
+                                  </span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* CONTEÚDO */}
                         <p className="whitespace-pre-wrap text-sm leading-7 text-white/75">
                           {post.body}
                         </p>
@@ -782,22 +1113,38 @@ export default function PerfilPage() {
                             className="mt-4 flex items-center gap-2 rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/5 px-4 py-2 text-xs font-semibold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
                           >
                             <span>📖</span>
+
                             <span>
                               {storyTitle}
                             </span>
                           </button>
                         )}
 
-                        <div className="mt-4 border-t border-white/5 pt-3">
+                        <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
                           <span className="text-xs text-white/25">
                             {new Date(
                               post.created_at
-                            ).toLocaleDateString('pt-BR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                            })}
+                            ).toLocaleDateString(
+                              'pt-BR',
+                              {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }
+                            )}
                           </span>
+
+                          {isDeleting && (
+                            <span className="text-xs text-white/30">
+                              Excluindo...
+                            </span>
+                          )}
+
+                          {isUpdating && (
+                            <span className="text-xs text-white/30">
+                              Atualizando...
+                            </span>
+                          )}
                         </div>
                       </article>
                     );
@@ -997,6 +1344,116 @@ export default function PerfilPage() {
                   {saving
                     ? 'Salvando...'
                     : 'Salvar alterações'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDITOR DO POST DO NOOK */}
+      {editingNookPost && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#191219] p-6 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-black">
+                  Editar post
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  Altere o que você compartilhou no seu Nook.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeNookPostEditor}
+                disabled={savingNookPost}
+                className="text-2xl leading-none text-white/40 transition hover:text-white disabled:opacity-40"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold text-white/80">
+                    Conteúdo
+                  </label>
+
+                  <span className="text-xs text-white/30">
+                    {editNookBody.length}/5000
+                  </span>
+                </div>
+
+                <textarea
+                  value={editNookBody}
+                  onChange={(event) =>
+                    setEditNookBody(event.target.value)
+                  }
+                  maxLength={5000}
+                  rows={7}
+                  className="w-full resize-none rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm leading-7 text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-white/80">
+                  História vinculada
+                </label>
+
+                <select
+                  value={editNookStoryId}
+                  onChange={(event) =>
+                    setEditNookStoryId(event.target.value)
+                  }
+                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm text-white/60 outline-none transition focus:border-[#ff78b9]/60"
+                >
+                  <option value="">
+                    Nenhuma história
+                  </option>
+
+                  {stories.map((story) => (
+                    <option
+                      key={story.id}
+                      value={story.id}
+                    >
+                      {story.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {error && (
+                <div className="rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeNookPostEditor}
+                  disabled={savingNookPost}
+                  className="flex-1 rounded-full border border-white/10 px-5 py-3 text-sm font-semibold text-white/60 transition hover:border-white/20 hover:text-white disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveNookPost}
+                  disabled={
+                    savingNookPost ||
+                    !editNookBody.trim()
+                  }
+                  className="flex-1 rounded-full bg-[#ff78b9] px-5 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-50"
+                >
+                  {savingNookPost
+                    ? 'Salvando...'
+                    : 'Salvar post'}
                 </button>
               </div>
             </div>
