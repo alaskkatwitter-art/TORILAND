@@ -1,73 +1,59 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 
 type Chapter = {
   id: string;
-  story_id: string;
   chapter_number: number;
   title: string;
   published: boolean;
-  created_at: string;
+};
+
+type Tag = {
+  id: string;
+  name: string;
+  slug: string;
+  category: string | null;
+  category_slug: string | null;
 };
 
 type Story = {
   id: string;
   author_id: string;
   title: string;
-  description: string;
+  description: string | null;
   cover_url: string | null;
   status: string;
+  rating: string | null;
   created_at: string;
   updated_at: string;
-  profiles?: {
-    id: string;
+  author?: {
     username: string;
     display_name: string | null;
     avatar_url: string | null;
-  } | null;
+  };
+  chapters?: Chapter[];
+  tags?: Tag[];
 };
-
-function CloudIcon({ filled = false }: { filled?: boolean }) {
-  return (
-    <svg
-      width="25"
-      height="25"
-      viewBox="0 0 32 32"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="shrink-0"
-    >
-      <path
-        d="M10.5 25.5H23C27.1421 25.5 30.5 22.1421 30.5 18C30.5 13.8579 27.1421 10.5 23 10.5C22.3634 10.5 21.7417 10.5793 21.1478 10.7308C19.6431 7.64767 16.4859 5.5 12.8284 5.5C7.86587 5.5 3.8421 9.52373 3.8421 14.4863C3.8421 15.0949 3.90266 15.6893 4.0178 16.2637C1.93835 17.4027 0.5 19.5991 0.5 22.133C0.5 25.8418 3.50821 28.85 7.21702 28.85H10.5"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill={filled ? 'currentColor' : 'none'}
-      />
-    </svg>
-  );
-}
 
 export default function HistoriaPage() {
   const params = useParams();
-  const router = useRouter();
-
-  const id = params.id as string;
+  const id = params?.id as string;
 
   const [story, setStory] = useState<Story | null>(null);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-
-  const [likes, setLikes] = useState(0);
-  const [liked, setLiked] = useState(false);
-  const [liking, setLiking] = useState(false);
-
+  const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const [likes, setLikes] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [likeLoading, setLikeLoading] = useState(false);
+
   useEffect(() => {
+    if (!id) return;
+
     async function loadStory() {
       try {
         setLoading(true);
@@ -81,25 +67,31 @@ export default function HistoriaPage() {
 
         if (!response.ok) {
           throw new Error(
-            data.error || 'Não foi possível carregar a história.'
+            data?.error ||
+              'Não foi possível carregar a história.'
           );
         }
 
-        setStory(data.story);
-        setChapters(data.chapters || []);
+        setStory(data.story || null);
 
-        const likesResponse = await fetch(
-          `/api/stories/${id}/like`,
-          {
-            cache: 'no-store',
+        if (data.story?.tags) {
+          setTags(data.story.tags);
+        } else {
+          try {
+            const tagsResponse = await fetch(
+              `/api/stories/${id}/tags`,
+              {
+                cache: 'no-store',
+              }
+            );
+
+            if (tagsResponse.ok) {
+              const tagsData = await tagsResponse.json();
+              setTags(tagsData.tags || []);
+            }
+          } catch {
+            // A página continua funcionando mesmo se as tags falharem.
           }
-        );
-
-        const likesData = await likesResponse.json();
-
-        if (likesResponse.ok) {
-          setLikes(likesData.likes || 0);
-          setLiked(!!likesData.liked);
         }
       } catch (err) {
         setError(
@@ -112,16 +104,40 @@ export default function HistoriaPage() {
       }
     }
 
-    if (id) {
-      loadStory();
+    loadStory();
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    async function loadLikes() {
+      try {
+        const response = await fetch(
+          `/api/stories/${id}/like`,
+          {
+            cache: 'no-store',
+          }
+        );
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+
+        setLikes(data.likes || 0);
+        setLiked(Boolean(data.liked));
+      } catch {
+        // Não impede o restante da página de funcionar.
+      }
     }
+
+    loadLikes();
   }, [id]);
 
   async function handleLike() {
-    if (liking) return;
+    if (likeLoading) return;
 
     try {
-      setLiking(true);
+      setLikeLoading(true);
 
       const response = await fetch(
         `/api/stories/${id}/like`,
@@ -132,241 +148,331 @@ export default function HistoriaPage() {
 
       const data = await response.json();
 
-      if (response.status === 401) {
-        alert('Você precisa estar logado para curtir.');
-        return;
-      }
-
       if (!response.ok) {
-        alert(
-          data.error || 'Não foi possível atualizar a curtida.'
-        );
         return;
       }
 
       setLikes(data.likes || 0);
-      setLiked(!!data.liked);
+      setLiked(Boolean(data.liked));
     } catch {
-      alert('Não foi possível atualizar a curtida.');
+      // Silencioso para não quebrar a experiência.
     } finally {
-      setLiking(false);
+      setLikeLoading(false);
     }
   }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#0d0d0d] text-white flex items-center justify-center">
-        <p className="text-[#ff4f9a]">
+      <main className="min-h-screen bg-[#09070a] text-white flex items-center justify-center">
+        <div className="text-sm text-gray-400">
           Carregando história...
-        </p>
+        </div>
       </main>
     );
   }
 
   if (error || !story) {
     return (
-      <main className="min-h-screen bg-[#0d0d0d] text-white flex items-center justify-center px-6">
+      <main className="min-h-screen bg-[#09070a] text-white flex items-center justify-center px-6">
         <div className="text-center">
-          <p className="text-red-400 mb-5">
+          <p className="text-gray-300 mb-5">
             {error || 'História não encontrada.'}
           </p>
 
-          <button
-            onClick={() => router.back()}
-            className="px-5 py-3 rounded-xl bg-[#ff4f9a] text-black font-semibold"
+          <Link
+            href="/"
+            className="text-sm text-pink-300 hover:text-pink-200 transition"
           >
-            Voltar
-          </button>
+            Voltar para o início
+          </Link>
         </div>
       </main>
     );
   }
 
-  return (
-    <main className="min-h-screen bg-[#0d0d0d] text-white">
-      <div className="max-w-5xl mx-auto px-5 py-8">
+  const chapters = story.chapters || [];
 
-        {/* Voltar */}
-        <button
-          onClick={() => router.back()}
-          className="text-sm text-gray-400 hover:text-white transition mb-8"
+  const publishedChapters = chapters
+    .filter((chapter) => chapter.published)
+    .sort(
+      (a, b) =>
+        a.chapter_number - b.chapter_number
+    );
+
+  const firstChapter = publishedChapters[0];
+
+  const authorName =
+    story.author?.display_name ||
+    story.author?.username ||
+    'Autor';
+
+  return (
+    <main className="min-h-screen bg-[#09070a] text-white">
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 py-10">
+
+        {/* VOLTAR */}
+        <Link
+          href="/"
+          className="inline-flex items-center text-sm text-gray-400 hover:text-white transition mb-8"
         >
           ← Voltar
-        </button>
+        </Link>
 
-        {/* Informações da história */}
-        <section className="flex flex-col md:flex-row gap-8">
+        {/* CABEÇALHO */}
+        <section className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-8 md:gap-10">
 
-          {/* Capa */}
-          <div className="w-full md:w-64 shrink-0">
-            {story.cover_url ? (
-              <img
-                src={story.cover_url}
-                alt={story.title}
-                className="w-full aspect-[2/3] object-cover rounded-2xl border border-white/10"
-              />
-            ) : (
-              <div className="w-full aspect-[2/3] rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
-                <span className="text-gray-600">
+          {/* CAPA */}
+          <div className="w-full max-w-[260px] mx-auto md:mx-0">
+            <div className="aspect-[2/3] rounded-2xl overflow-hidden bg-white/[0.04] border border-white/10 shadow-2xl">
+              {story.cover_url ? (
+                <img
+                  src={story.cover_url}
+                  alt={`Capa de ${story.title}`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-600">
                   Sem capa
-                </span>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Conteúdo */}
-          <div className="flex-1">
+          {/* INFORMAÇÕES */}
+          <div className="flex flex-col justify-center">
 
-            <p className="text-sm text-[#ff4f9a] mb-2">
-              {story.status}
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mb-4">
 
-            <h1 className="text-4xl font-bold mb-4">
+              {/* CLASSIFICAÇÃO */}
+              {story.rating && (
+                <span className="inline-flex items-center justify-center min-w-9 h-7 px-2.5 rounded-md bg-white/[0.08] border border-white/10 text-xs font-medium text-gray-200">
+                  {story.rating}
+                </span>
+              )}
+
+              {/* STATUS */}
+              {story.status && (
+                <span className="inline-flex items-center h-7 px-3 rounded-md bg-pink-400/10 border border-pink-300/15 text-xs text-pink-200">
+                  {story.status}
+                </span>
+              )}
+            </div>
+
+            <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight mb-4">
               {story.title}
             </h1>
 
-            {story.profiles && (
-              <button
-                onClick={() =>
-                  router.push(
-                    `/perfil/${story.profiles?.username}`
-                  )
-                }
-                className="text-gray-400 hover:text-white transition mb-6"
-              >
-                por{' '}
-                <span className="text-white">
-                  {story.profiles.display_name ||
-                    story.profiles.username}
-                </span>
-              </button>
-            )}
-
-            <p className="text-gray-300 leading-7 whitespace-pre-wrap mb-8">
-              {story.description}
+            <p className="text-sm text-gray-400 mb-6">
+              por{' '}
+              <span className="text-gray-200">
+                {authorName}
+              </span>
             </p>
 
-            {/* Ações */}
+            {/* DESCRIÇÃO */}
+            {story.description && (
+              <p className="text-[16px] leading-7 text-gray-300 max-w-2xl mb-7 whitespace-pre-wrap">
+                {story.description}
+              </p>
+            )}
+
+            {/* TAGS */}
+            {tags.length > 0 && (
+              <div className="mb-8">
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="
+                        inline-flex
+                        items-center
+                        px-3
+                        py-1.5
+                        rounded-full
+                        bg-pink-300/[0.08]
+                        border
+                        border-pink-200/10
+                        text-xs
+                        text-pink-100
+                        hover:bg-pink-300/[0.13]
+                        transition
+                      "
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AÇÕES */}
             <div className="flex flex-wrap items-center gap-3">
 
-              {chapters.length > 0 && (
-                <button
-                  onClick={() =>
-                    router.push(
-                      `/capitulo/${chapters[0].id}`
-                    )
-                  }
-                  className="px-6 py-3 rounded-xl bg-[#ff4f9a] text-black font-semibold hover:opacity-90 transition"
+              {firstChapter && (
+                <Link
+                  href={`/capitulo/${firstChapter.id}`}
+                  className="
+                    inline-flex
+                    items-center
+                    justify-center
+                    px-6
+                    py-3
+                    rounded-xl
+                    bg-pink-400
+                    hover:bg-pink-300
+                    text-black
+                    font-medium
+                    text-sm
+                    transition
+                  "
                 >
                   Começar a ler
-                </button>
+                </Link>
               )}
 
-              {/* Curtida em formato de nuvem */}
               <button
+                type="button"
                 onClick={handleLike}
-                disabled={liking}
+                disabled={likeLoading}
+                className="
+                  inline-flex
+                  items-center
+                  gap-2
+                  px-4
+                  py-3
+                  rounded-xl
+                  border
+                  border-white/10
+                  bg-white/[0.04]
+                  hover:bg-white/[0.08]
+                  transition
+                  disabled:opacity-50
+                "
                 aria-label={
                   liked
-                    ? 'Descurtir história'
+                    ? 'Remover curtida'
                     : 'Curtir história'
                 }
-                className={`group px-5 py-3 rounded-xl border transition font-semibold flex items-center gap-2 ${
-                  liked
-                    ? 'bg-[#ff4f9a]/15 border-[#ff4f9a] text-[#ff4f9a]'
-                    : 'bg-white/5 border-white/10 text-white hover:border-[#ff4f9a]/50'
-                }`}
               >
-                <span
-                  className={`transition-transform duration-200 ${
-                    liking
-                      ? 'scale-90'
-                      : 'group-active:scale-125'
-                  }`}
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  <CloudIcon filled={liked} />
-                </span>
+                  <path
+                    d="M12 20.5C11.7 20.5 11.4 20.4 11.15 20.2C6.2 16.3 3 13.4 3 9.6C3 6.8 5.1 4.5 7.85 4.5C9.5 4.5 11 5.35 12 6.65C13 5.35 14.5 4.5 16.15 4.5C18.9 4.5 21 6.8 21 9.6C21 13.4 17.8 16.3 12.85 20.2C12.6 20.4 12.3 20.5 12 20.5Z"
+                    stroke={liked ? '#f9a8d4' : '#a3a3a3'}
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill={
+                      liked
+                        ? 'rgba(244,114,182,0.12)'
+                        : 'none'
+                    }
+                  />
+                </svg>
 
-                <span>
+                <span className="text-sm text-gray-300">
                   {likes}
-                </span>
-
-                <span className="text-sm">
-                  {liked ? 'Curtida' : 'Curtir'}
                 </span>
               </button>
 
-              <span className="text-sm text-gray-500">
-                {chapters.length}{' '}
-                {chapters.length === 1
-                  ? 'capítulo'
-                  : 'capítulos'}
-              </span>
-
+              {/* NOVO CAPÍTULO */}
+              <Link
+                href={`/novo-capitulo/${story.id}`}
+                className="
+                  inline-flex
+                  items-center
+                  justify-center
+                  px-4
+                  py-3
+                  rounded-xl
+                  border
+                  border-white/10
+                  bg-white/[0.04]
+                  hover:bg-white/[0.08]
+                  text-sm
+                  text-gray-300
+                  transition
+                "
+              >
+                Novo capítulo
+              </Link>
             </div>
-
           </div>
         </section>
 
-        {/* Lista de capítulos */}
-        <section className="mt-14">
+        {/* DIVISÓRIA */}
+        <div className="my-12 h-px bg-white/[0.08]" />
 
+        {/* CAPÍTULOS */}
+        <section>
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-2xl font-bold">
-              Capítulos
-            </h2>
+            <div>
+              <h2 className="text-xl font-semibold">
+                Capítulos
+              </h2>
 
-            <button
-              onClick={() =>
-                router.push(`/novo-capitulo/${story.id}`)
-              }
-              className="text-sm text-[#ff4f9a] hover:underline"
-            >
-              + Novo capítulo
-            </button>
+              <p className="text-sm text-gray-500 mt-1">
+                {publishedChapters.length}{' '}
+                {publishedChapters.length === 1
+                  ? 'capítulo publicado'
+                  : 'capítulos publicados'}
+              </p>
+            </div>
           </div>
 
-          {chapters.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
-              <p className="text-gray-500">
-                Esta história ainda não possui capítulos.
+          {publishedChapters.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.025] px-5 py-8 text-center">
+              <p className="text-gray-500 text-sm">
+                Esta história ainda não possui capítulos publicados.
               </p>
             </div>
           ) : (
             <div className="space-y-2">
-
-              {chapters.map((chapter) => (
-                <button
+              {publishedChapters.map((chapter) => (
+                <Link
                   key={chapter.id}
-                  onClick={() =>
-                    router.push(
-                      `/capitulo/${chapter.id}`
-                    )
-                  }
-                  className="w-full text-left px-5 py-4 rounded-xl bg-white/5 border border-white/10 hover:border-[#ff4f9a]/50 transition flex items-center justify-between gap-4"
+                  href={`/capitulo/${chapter.id}`}
+                  className="
+                    flex
+                    items-center
+                    justify-between
+                    gap-4
+                    rounded-xl
+                    border
+                    border-white/[0.07]
+                    bg-white/[0.025]
+                    px-5
+                    py-4
+                    hover:bg-white/[0.055]
+                    hover:border-pink-300/10
+                    transition
+                  "
                 >
-                  <div>
-                    <p className="text-xs text-[#ff4f9a] mb-1">
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500 mb-1">
                       Capítulo {chapter.chapter_number}
                     </p>
 
-                    <p className="font-semibold text-white">
-                      {chapter.title}
+                    <p className="text-sm text-gray-200 truncate">
+                      {chapter.title ||
+                        `Capítulo ${chapter.chapter_number}`}
                     </p>
                   </div>
 
-                  <span className="text-gray-500">
+                  <span className="text-gray-500 text-lg shrink-0">
                     →
                   </span>
-                </button>
+                </Link>
               ))}
-
             </div>
           )}
-
         </section>
 
       </div>
     </main>
   );
-}
+                  }
