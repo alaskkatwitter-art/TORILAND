@@ -27,6 +27,10 @@ export async function GET(
       );
     }
 
+    // =========================
+    // USUÁRIO LOGADO
+    // =========================
+
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get('toriland_session')?.value;
 
@@ -48,7 +52,10 @@ export async function GET(
       }
     }
 
-    // Busca a história
+    // =========================
+    // HISTÓRIA
+    // =========================
+
     const { data: story, error: storyError } = await supabase
       .from('stories')
       .select(`
@@ -81,10 +88,18 @@ export async function GET(
       );
     }
 
-    // Busca o perfil do autor
+    // =========================
+    // AUTOR
+    // =========================
+
     const { data: author, error: authorError } = await supabase
       .from('profiles')
-      .select('id, username, display_name, avatar_url')
+      .select(`
+        id,
+        username,
+        display_name,
+        avatar_url
+      `)
       .eq('id', story.author_id)
       .maybeSingle();
 
@@ -92,7 +107,10 @@ export async function GET(
       console.error('Erro ao buscar autor:', authorError);
     }
 
-    // Busca os capítulos publicados
+    // =========================
+    // CAPÍTULOS
+    // =========================
+
     const { data: chapters, error: chaptersError } = await supabase
       .from('chapters')
       .select(`
@@ -116,7 +134,12 @@ export async function GET(
       );
     }
 
-    // Busca as tags da história
+    const storyChapters = chapters || [];
+
+    // =========================
+    // TAGS
+    // =========================
+
     const { data: storyTags, error: tagsError } = await supabase
       .from('story_tags')
       .select(`
@@ -161,17 +184,26 @@ export async function GET(
       })
       .filter(Boolean);
 
-    // Busca quantidade de curtidas
+    // =========================
+    // CURTIDAS
+    // =========================
+
     const { count: likesCount, error: likesError } = await supabase
       .from('story_likes')
-      .select('*', { count: 'exact', head: true })
+      .select('*', {
+        count: 'exact',
+        head: true,
+      })
       .eq('story_id', id);
 
     if (likesError) {
       console.error('Erro ao contar curtidas:', likesError);
     }
 
-    // Verifica se o usuário atual curtiu
+    // =========================
+    // USUÁRIO CURTIU?
+    // =========================
+
     let liked = false;
 
     if (currentUserId) {
@@ -185,18 +217,35 @@ export async function GET(
       liked = !!like;
     }
 
+    // =========================
+    // RESPOSTA
+    // =========================
+
     return NextResponse.json({
       story: {
         ...story,
         author: author || null,
+
+        // Tags
         tags,
+
+        // Capítulos dentro da história
+        chapters: storyChapters,
+
+        // Curtidas
         likes: likesCount || 0,
         liked,
       },
-      chapters: chapters || [],
+
+      // Mantém também no nível principal
+      // para compatibilidade com o page.tsx antigo
+      chapters: storyChapters,
     });
   } catch (error) {
-    console.error('Erro inesperado na API da história:', error);
+    console.error(
+      'Erro inesperado na API da história:',
+      error
+    );
 
     return NextResponse.json(
       { error: 'Erro interno do servidor.' },
