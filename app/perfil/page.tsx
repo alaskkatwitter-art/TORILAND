@@ -76,30 +76,38 @@ export default function PerfilPage() {
   }, [router]);
 
   useEffect(() => {
-    const userId = user?.id;
-
-    if (!userId) return;
+    if (!user) return;
 
     async function loadStories() {
       setLoadingStories(true);
 
       try {
         const response = await fetch(
-          `/api/stories/author/${userId}`,
+          '/api/profile/stories',
           {
             cache: 'no-store',
           }
         );
 
+        const data = await response.json();
+
         if (!response.ok) {
+          console.error(
+            'Erro ao carregar histórias:',
+            data.error
+          );
+
           setStories([]);
           return;
         }
 
-        const data = await response.json();
-
         setStories(data.stories || []);
-      } catch {
+      } catch (error) {
+        console.error(
+          'Erro ao carregar histórias:',
+          error
+        );
+
         setStories([]);
       } finally {
         setLoadingStories(false);
@@ -107,7 +115,7 @@ export default function PerfilPage() {
     }
 
     loadStories();
-  }, [user?.id]);
+  }, [user]);
 
   function openEditor() {
     if (!user) return;
