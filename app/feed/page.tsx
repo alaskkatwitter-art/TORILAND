@@ -48,10 +48,7 @@ type Post = {
 
   media: Media[];
 
-  reaction_counts: Record<
-    string,
-    number
-  >;
+  reaction_counts: Record<string, number>;
 
   user_reactions: string[];
 
@@ -86,6 +83,7 @@ function CloudIcon({
       aria-hidden="true"
     >
       <path d="M7.2 18.2h10.1a4.1 4.1 0 0 0 .5-8.17A6.1 6.1 0 0 0 6 11.1a3.6 3.6 0 0 0 1.2 7.1Z" />
+
       {filled && (
         <path
           d="M8.2 14.2c.8.9 1.7 1.5 2.8 1.9.7.3 1.4.7 2 1.3.6-.6 1.3-1 2-1.3 1.1-.4 2-1 2.8-1.9"
@@ -170,23 +168,6 @@ function SendIcon() {
   );
 }
 
-function ChevronDownIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-4 w-4"
-      aria-hidden="true"
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
 function RefreshIcon() {
   return (
     <svg
@@ -211,9 +192,7 @@ function RefreshIcon() {
    HELPERS
 ========================================================= */
 
-function formatPostDateTime(
-  date: string
-) {
+function formatPostDateTime(date: string) {
   const value = new Date(date);
 
   return `${value.toLocaleDateString(
@@ -233,9 +212,7 @@ function formatPostDateTime(
   )}`;
 }
 
-function getInitial(
-  profile: Profile | null
-) {
+function getInitial(profile: Profile | null) {
   if (!profile) {
     return '?';
   }
@@ -249,9 +226,7 @@ function getInitial(
     .toUpperCase();
 }
 
-function getPostMedia(
-  post: Post
-): Media[] {
+function getPostMedia(post: Post): Media[] {
   if (post.media?.length) {
     return post.media;
   }
@@ -395,7 +370,8 @@ function SpotifyPreview({
         </span>
 
         <p className="mt-1 truncate text-sm font-bold text-white">
-          {data.title || 'Música no Spotify'}
+          {data.title ||
+            'Música no Spotify'}
         </p>
 
         {data.author_name && (
@@ -469,19 +445,11 @@ function PostMedia({
 
     return (
       <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-        {item.media_type === 'gif' ? (
-          <img
-            src={item.media_url}
-            alt=""
-            className="max-h-[620px] w-full object-contain"
-          />
-        ) : (
-          <img
-            src={item.media_url}
-            alt=""
-            className="max-h-[620px] w-full object-contain"
-          />
-        )}
+        <img
+          src={item.media_url}
+          alt=""
+          className="max-h-[620px] w-full object-contain"
+        />
       </div>
     );
   }
@@ -537,8 +505,10 @@ function CommentItem({
               }
               className="text-sm font-bold text-white transition hover:text-[#ff78b9]"
             >
-              {comment.author?.display_name ||
-                comment.author?.username ||
+              {comment.author
+                ?.display_name ||
+                comment.author
+                  ?.username ||
                 'Usuário'}
             </Link>
 
@@ -875,9 +845,7 @@ function FeedPost({
       `${window.location.origin}/feed?post=${post.id}`;
 
     try {
-      if (
-        navigator.share
-      ) {
+      if (navigator.share) {
         await navigator.share({
           title:
             post.author?.display_name ||
@@ -905,11 +873,6 @@ function FeedPost({
         );
       }
     } catch (error) {
-      /*
-       * O cancelamento da janela nativa
-       * de compartilhamento não deve
-       * mostrar erro.
-       */
       if (
         error instanceof Error &&
         error.name ===
@@ -1004,6 +967,7 @@ function FeedPost({
       setCommentsOpen(true);
     } catch (error) {
       console.error(error);
+
       alert(
         error instanceof Error
           ? error.message
@@ -1046,6 +1010,7 @@ function FeedPost({
   return (
     <article className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
       <div className="p-5 sm:p-6">
+
         {/* AUTHOR */}
 
         <div className="flex items-start gap-3">
@@ -1117,13 +1082,17 @@ function FeedPost({
 
         {/* ACTIONS */}
 
-        <div className="mt-5 flex items-center border-t border-white/[0.06] pt-3">
+        <div className="mt-5 flex items-center justify-between border-t border-white/[0.06] pt-3">
+
+          {/* LIKE */}
+
           <button
             type="button"
             onClick={toggleLike}
             disabled={liking}
             aria-label="Curtir"
-            className={`group flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition ${
+            title="Curtir"
+            className={`group flex h-11 min-w-[64px] items-center justify-center gap-1.5 rounded-xl px-3 transition active:scale-95 ${
               liked
                 ? 'text-[#ff78b9]'
                 : 'text-white/45 hover:bg-white/[0.04] hover:text-[#ff78b9]'
@@ -1141,61 +1110,58 @@ function FeedPost({
               />
             </span>
 
-            <span>
-              Curtir
-              {likeCount >
-                0 && (
-                <span className="ml-1 text-white/30">
-                  {likeCount}
-                </span>
-              )}
-            </span>
+            {likeCount > 0 && (
+              <span className="text-[11px] font-semibold text-current">
+                {likeCount}
+              </span>
+            )}
           </button>
+
+          {/* COMMENT */}
 
           <button
             type="button"
             onClick={() =>
               setCommentsOpen(
-                (value) =>
-                  !value
+                (value) => !value
               )
             }
             aria-label="Comentar"
-            className="group flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9]"
+            title="Comentar"
+            className="group flex h-11 min-w-[64px] items-center justify-center gap-1.5 rounded-xl px-3 text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9] active:scale-95"
           >
-            <CommentIcon />
-
-            <span>
-              Comentar
-              {post.comments_count >
-                0 && (
-                <span className="ml-1 text-white/30">
-                  {
-                    post.comments_count
-                  }
-                </span>
-              )}
+            <span className="transition-transform group-hover:scale-110">
+              <CommentIcon />
             </span>
+
+            {post.comments_count > 0 && (
+              <span className="text-[11px] font-semibold text-current">
+                {post.comments_count}
+              </span>
+            )}
           </button>
+
+          {/* SHARE */}
 
           <button
             type="button"
             onClick={sharePost}
             aria-label="Compartilhar"
-            className="group relative flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9]"
+            title="Compartilhar"
+            className="group relative flex h-11 min-w-[64px] items-center justify-center rounded-xl px-3 text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9] active:scale-95"
           >
-            <ShareIcon />
-
-            <span>
-              Compartilhar
+            <span className="transition-transform group-hover:scale-110">
+              <ShareIcon />
             </span>
 
             {shareMessage && (
-              <span className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#ff78b9] px-3 py-1.5 text-[10px] font-bold text-[#190d16] shadow-xl">
+              <span className="absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#ff78b9] px-3 py-1.5 text-[10px] font-bold text-[#190d16] shadow-xl">
                 {shareMessage}
               </span>
             )}
           </button>
+
+          {/* SAVE */}
 
           <button
             type="button"
@@ -1206,15 +1172,22 @@ function FeedPost({
                 ? 'Remover dos salvos'
                 : 'Salvar'
             }
-            className={`group flex min-w-0 items-center justify-center rounded-xl px-3 py-2.5 transition ${
+            title={
+              post.saved
+                ? 'Remover dos salvos'
+                : 'Salvar'
+            }
+            className={`group flex h-11 min-w-[64px] items-center justify-center rounded-xl px-3 transition active:scale-95 ${
               post.saved
                 ? 'text-[#ff78b9]'
                 : 'text-white/45 hover:bg-white/[0.04] hover:text-[#ff78b9]'
             }`}
           >
-            <BookmarkIcon
-              filled={post.saved}
-            />
+            <span className="transition-transform group-hover:scale-110">
+              <BookmarkIcon
+                filled={post.saved}
+              />
+            </span>
           </button>
         </div>
       </div>
@@ -1223,6 +1196,7 @@ function FeedPost({
 
       {commentsOpen && (
         <div className="border-t border-white/[0.06] bg-black/10 px-5 py-5 sm:px-6">
+
           {replyingTo && (
             <div className="mb-3 flex items-center justify-between rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05] px-3 py-2">
               <span className="text-xs text-white/50">
@@ -1438,6 +1412,7 @@ export default function FeedPage() {
 
   return (
     <main className="min-h-screen bg-[#080609] text-white">
+
       {/* BACKGROUND GLOW */}
 
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -1448,23 +1423,26 @@ export default function FeedPage() {
         <div className="absolute bottom-[-200px] left-[35%] h-[450px] w-[450px] rounded-full bg-[#ff78b9]/[0.035] blur-[130px]" />
       </div>
 
-      <div className="relative mx-auto min-h-screen w-full max-w-5xl px-4 pb-20 pt-6 sm:px-6 lg:px-8">
+      <div className="relative mx-auto min-h-screen w-full max-w-5xl px-4 pb-20 pt-5 sm:px-6 lg:px-8">
+
         {/* HEADER */}
 
-        <header className="mb-7 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#ff78b9]/70">
-              Nooklie
-            </p>
+        <header className="mb-6 flex items-center justify-between">
 
-            <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">
-              Feed
-            </h1>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9]">
+              <CloudIcon />
+            </div>
 
-            <p className="mt-1 text-sm text-white/35">
-              O que os escritores estão
-              compartilhando.
-            </p>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#ff78b9]/70">
+                Nooklie
+              </p>
+
+              <p className="mt-0.5 text-sm font-semibold text-white/65">
+                Entre escritores
+              </p>
+            </div>
           </div>
 
           <button
@@ -1475,6 +1453,7 @@ export default function FeedPage() {
             disabled={refreshing}
             className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/45 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9] disabled:opacity-40"
             aria-label="Atualizar Feed"
+            title="Atualizar"
           >
             <span
               className={
@@ -1487,6 +1466,32 @@ export default function FeedPage() {
             </span>
           </button>
         </header>
+
+        {/* CREATE POST */}
+
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              // O compositor será conectado aqui.
+            }}
+            className="group flex w-full items-center gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.025] p-3 text-left shadow-[0_15px_50px_rgba(0,0,0,0.16)] transition hover:border-[#ff78b9]/25 hover:bg-[#ff78b9]/[0.035]"
+          >
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#ff78b9]/20 bg-[#ff78b9]/[0.08] text-2xl font-light text-[#ff78b9] transition-transform group-hover:scale-105">
+              +
+            </span>
+
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-white/75">
+                Compartilhe alguma coisa
+              </span>
+
+              <span className="mt-0.5 block text-xs text-white/30">
+                Uma ideia, uma descoberta, uma história...
+              </span>
+            </span>
+          </button>
+        </div>
 
         {/* ERROR */}
 
@@ -1543,6 +1548,7 @@ export default function FeedPage() {
 
           <div className="flex min-h-[55vh] items-center justify-center">
             <div className="max-w-md text-center">
+
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05]">
                 <CloudIcon />
               </div>
