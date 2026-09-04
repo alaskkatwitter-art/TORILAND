@@ -66,15 +66,19 @@ export default function HistoriaPage() {
         setLoading(true);
         setError('');
 
-        const response = await fetch(`/api/stories/${id}`, {
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          `/api/stories/${id}`,
+          {
+            cache: 'no-store',
+          }
+        );
 
         const data = await response.json();
 
         if (!response.ok) {
           throw new Error(
-            data?.error || 'Não foi possível carregar a história.'
+            data?.error ||
+              'Não foi possível carregar a história.'
           );
         }
 
@@ -92,6 +96,7 @@ export default function HistoriaPage() {
         setLikes(Number(loadedStory?.likes || 0));
       } catch (err: any) {
         console.error(err);
+
         setError(
           err?.message ||
             'Não foi possível carregar a história.'
@@ -121,7 +126,8 @@ export default function HistoriaPage() {
 
       if (!response.ok) {
         throw new Error(
-          data?.error || 'Não foi possível atualizar a curtida.'
+          data?.error ||
+            'Não foi possível atualizar a curtida.'
         );
       }
 
@@ -138,7 +144,8 @@ export default function HistoriaPage() {
     if (!story?.tags) return [];
 
     return story.tags.filter(
-      (tag) => tag.category_slug === categorySlug
+      (tag) =>
+        tag.category_slug === categorySlug
     );
   }
 
@@ -152,16 +159,15 @@ export default function HistoriaPage() {
     );
   }
 
-  function getGenreTags() {
-    return getCategoryTags('genre');
-  }
-
-  const genreTags = getGenreTags();
+  const genreTags = getCategoryTags('genre');
   const fandomTags = getCategoryTags('fandom');
-  const characterTags = getCategoryTags('characters');
-  const relationshipTags = getCategoryTags('relationships');
+  const characterTags =
+    getCategoryTags('characters');
+  const relationshipTags =
+    getCategoryTags('relationships');
   const tropeTags = getCategoryTags('tropes');
-  const warningTags = getCategoryTags('content-warning');
+  const warningTags =
+    getCategoryTags('content-warning');
   const freeformTags = getFreeformTags();
 
   if (loading) {
@@ -183,7 +189,8 @@ export default function HistoriaPage() {
           </h1>
 
           <p className="text-sm text-gray-400 mb-6">
-            {error || 'Essa história não existe ou não está disponível.'}
+            {error ||
+              'Essa história não existe ou não está disponível.'}
           </p>
 
           <button
@@ -221,9 +228,8 @@ export default function HistoriaPage() {
         </div>
       </header>
 
-      {/* CONTEÚDO */}
       <div className="mx-auto max-w-6xl px-5 py-8">
-        {/* FICHA PRINCIPAL */}
+        {/* FICHA */}
         <section className="grid grid-cols-1 md:grid-cols-[230px_1fr] gap-7">
           {/* CAPA */}
           <div>
@@ -297,12 +303,14 @@ export default function HistoriaPage() {
 
                 <div className="flex flex-wrap gap-2">
                   {genreTags.map((tag) => (
-                    <span
+                    <TagButton
                       key={tag.id}
-                      className="rounded-lg border border-pink-400/20 bg-pink-500/10 px-3 py-1.5 text-sm text-pink-200"
-                    >
-                      {tag.name}
-                    </span>
+                      tag={tag}
+                      variant="genre"
+                      onClick={() =>
+                        router.push(`/tag/${tag.slug}`)
+                      }
+                    />
                   ))}
                 </div>
               </div>
@@ -314,6 +322,9 @@ export default function HistoriaPage() {
                 <TagGroup
                   title="Fandom"
                   tags={fandomTags}
+                  onTagClick={(tag) =>
+                    router.push(`/tag/${tag.slug}`)
+                  }
                 />
               )}
 
@@ -321,6 +332,9 @@ export default function HistoriaPage() {
                 <TagGroup
                   title="Personagens"
                   tags={characterTags}
+                  onTagClick={(tag) =>
+                    router.push(`/tag/${tag.slug}`)
+                  }
                 />
               )}
 
@@ -328,6 +342,9 @@ export default function HistoriaPage() {
                 <TagGroup
                   title="Relacionamentos"
                   tags={relationshipTags}
+                  onTagClick={(tag) =>
+                    router.push(`/tag/${tag.slug}`)
+                  }
                 />
               )}
 
@@ -335,6 +352,9 @@ export default function HistoriaPage() {
                 <TagGroup
                   title="Tropes"
                   tags={tropeTags}
+                  onTagClick={(tag) =>
+                    router.push(`/tag/${tag.slug}`)
+                  }
                 />
               )}
 
@@ -343,6 +363,9 @@ export default function HistoriaPage() {
                   title="Avisos de conteúdo"
                   tags={warningTags}
                   warning
+                  onTagClick={(tag) =>
+                    router.push(`/tag/${tag.slug}`)
+                  }
                 />
               )}
 
@@ -350,6 +373,9 @@ export default function HistoriaPage() {
                 <TagGroup
                   title="Tags"
                   tags={freeformTags}
+                  onTagClick={(tag) =>
+                    router.push(`/tag/${tag.slug}`)
+                  }
                 />
               )}
             </div>
@@ -388,7 +414,9 @@ export default function HistoriaPage() {
               <button
                 type="button"
                 onClick={() =>
-                  router.push(`/novo-capitulo/${story.id}`)
+                  router.push(
+                    `/novo-capitulo/${story.id}`
+                  )
                 }
                 className="rounded-xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm text-gray-300 hover:bg-white/[0.06] hover:text-white transition"
               >
@@ -398,7 +426,6 @@ export default function HistoriaPage() {
           </div>
         </section>
 
-        {/* DIVISÓRIA */}
         <div className="my-10 h-px bg-white/10" />
 
         {/* CAPÍTULOS */}
@@ -478,10 +505,12 @@ function TagGroup({
   title,
   tags,
   warning = false,
+  onTagClick,
 }: {
   title: string;
   tags: Tag[];
   warning?: boolean;
+  onTagClick: (tag: Tag) => void;
 }) {
   return (
     <div>
@@ -491,18 +520,45 @@ function TagGroup({
 
       <div className="flex flex-wrap gap-2">
         {tags.map((tag) => (
-          <span
+          <TagButton
             key={tag.id}
-            className={`rounded-lg border px-3 py-1.5 text-sm ${
-              warning
-                ? 'border-red-400/20 bg-red-500/[0.07] text-red-200'
-                : 'border-white/10 bg-white/[0.04] text-gray-300'
-            }`}
-          >
-            {tag.name}
-          </span>
+            tag={tag}
+            warning={warning}
+            onClick={() => onTagClick(tag)}
+          />
         ))}
       </div>
     </div>
+  );
+}
+
+function TagButton({
+  tag,
+  onClick,
+  warning = false,
+  variant,
+}: {
+  tag: Tag;
+  onClick: () => void;
+  warning?: boolean;
+  variant?: 'genre';
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+      className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+        variant === 'genre'
+          ? 'border-pink-400/20 bg-pink-500/10 text-pink-200 hover:border-pink-400/40 hover:bg-pink-500/15'
+          : warning
+          ? 'border-red-400/20 bg-red-500/[0.07] text-red-200 hover:border-red-400/40 hover:bg-red-500/10'
+          : 'border-white/10 bg-white/[0.04] text-gray-300 hover:border-pink-400/30 hover:bg-pink-500/10 hover:text-pink-200'
+      }`}
+    >
+      {tag.name}
+    </button>
   );
 }
