@@ -7,54 +7,39 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY!
 );
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('toriland_session')?.value;
+    /*
+     * Usa o próprio /api/auth/me para descobrir
+     * quem está logado, sem precisar conhecer
+     * a estrutura interna de auth_sessions.
+     */
+    const meResponse = await fetch(
+      new URL('/api/auth/me', request.url),
+      {
+        headers: {
+          cookie: (await cookies()).toString(),
+        },
+        cache: 'no-store',
+      }
+    );
 
-    if (!token) {
+    const meData = await meResponse.json();
+
+    if (!meResponse.ok || !meData.authenticated || !meData.user?.id) {
       return NextResponse.json(
         { error: 'Não autenticado.' },
         { status: 401 }
       );
     }
 
-    /*
-     * Usa a mesma sessão que já funciona no /api/auth/me.
-     * Primeiro encontramos a sessão pelo token.
-     */
-    const { data: session, error: sessionError } = await supabase
-      .from('auth_sessions')
-      .select('*')
-      .eq('token', token)
-      .maybeSingle();
+    const userId = meData.user.id;
 
-    if (sessionError) {
-      console.error('ERRO AUTH_SESSIONS:', sessionError);
-
-      return NextResponse.json(
-        {
-          error: 'Erro ao verificar sessão.',
-          details: sessionError.message,
-        },
-        { status: 500 }
-      );
-    }
-
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Sessão não encontrada.' },
-        { status: 401 }
-      );
-    }
-
-    const userId = session.user_id;
-
-    console.log('USER ID DA SESSÃO:', userId);
+    console.log('USUÁRIO DO PERFIL:', userId);
 
     /*
-     * Agora buscamos TODAS as histórias desse usuário.
-     * Não importa se possuem capítulos publicados ou não.
+     * Busca TODAS as histórias criadas pelo usuário.
+     * Não depende de capítulos publicados.
      */
     const { data: stories, error: storiesError } = await supabase
       .from('stories')
@@ -75,7 +60,7 @@ export async function GET() {
       });
 
     if (storiesError) {
-      console.error('ERRO STORIES:', storiesError);
+      console.error('ERRO AO BUSCAR STORIES:', storiesError);
 
       return NextResponse.json(
         {
@@ -92,7 +77,7 @@ export async function GET() {
       stories: stories || [],
     });
   } catch (error) {
-    console.error('ERRO GERAL:', error);
+    console.error('ERRO GERAL NA API DE STORIES:', error);
 
     return NextResponse.json(
       {
