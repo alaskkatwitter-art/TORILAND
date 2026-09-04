@@ -35,33 +35,46 @@ type NookPost = {
   updated_at: string;
 };
 
+type ProfileTab = 'stories' | 'nook';
+
 export default function PerfilPage() {
   const router = useRouter();
 
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
 
+  const tabsContainerRef = useRef<HTMLDivElement | null>(null);
+  const swipeStartX = useRef<number | null>(null);
+
   const [user, setUser] = useState<User | null>(null);
   const [stories, setStories] = useState<Story[]>([]);
   const [nookPosts, setNookPosts] = useState<NookPost[]>([]);
+
+  const [activeTab, setActiveTab] =
+    useState<ProfileTab>('stories');
 
   const [loading, setLoading] = useState(true);
   const [loadingStories, setLoadingStories] = useState(true);
   const [loadingNook, setLoadingNook] = useState(true);
 
   const [editing, setEditing] = useState(false);
-  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editDisplayName, setEditDisplayName] =
+    useState('');
   const [bio, setBio] = useState('');
   const [saving, setSaving] = useState(false);
 
   const [newPost, setNewPost] = useState('');
-  const [selectedStoryId, setSelectedStoryId] = useState('');
-  const [creatingPost, setCreatingPost] = useState(false);
+  const [selectedStoryId, setSelectedStoryId] =
+    useState('');
+  const [creatingPost, setCreatingPost] =
+    useState(false);
 
   const [editingNookPostId, setEditingNookPostId] =
     useState<string | null>(null);
 
-  const [editNookBody, setEditNookBody] = useState('');
+  const [editNookBody, setEditNookBody] =
+    useState('');
+
   const [editNookStoryId, setEditNookStoryId] =
     useState('');
 
@@ -215,10 +228,66 @@ export default function PerfilPage() {
     });
   }
 
+  function changeTab(tab: ProfileTab) {
+    setActiveTab(tab);
+
+    requestAnimationFrame(() => {
+      const container =
+        tabsContainerRef.current;
+
+      if (!container) return;
+
+      container.scrollTo({
+        left:
+          tab === 'stories'
+            ? 0
+            : container.clientWidth,
+        behavior: 'smooth',
+      });
+    });
+  }
+
+  function handleTabSwipeStart(
+    event: React.TouchEvent<HTMLDivElement>
+  ) {
+    swipeStartX.current =
+      event.touches[0]?.clientX ?? null;
+  }
+
+  function handleTabSwipeEnd(
+    event: React.TouchEvent<HTMLDivElement>
+  ) {
+    if (swipeStartX.current === null) return;
+
+    const endX =
+      event.changedTouches[0]?.clientX ?? null;
+
+    if (endX === null) {
+      swipeStartX.current = null;
+      return;
+    }
+
+    const distance =
+      endX - swipeStartX.current;
+
+    swipeStartX.current = null;
+
+    if (Math.abs(distance) < 50) return;
+
+    if (distance < 0) {
+      changeTab('nook');
+    } else {
+      changeTab('stories');
+    }
+  }
+
   function openEditor() {
     if (!user) return;
 
-    setEditDisplayName(user.display_name || '');
+    setEditDisplayName(
+      user.display_name || ''
+    );
+
     setBio(user.bio || '');
     setError('');
     setSuccess('');
@@ -263,6 +332,7 @@ export default function PerfilPage() {
       }
 
       setUser(data.user);
+
       setSuccess(
         'Perfil atualizado com sucesso.'
       );
@@ -302,6 +372,7 @@ export default function PerfilPage() {
 
     try {
       const formData = new FormData();
+
       formData.append('file', file);
 
       const response = await fetch(
@@ -373,6 +444,7 @@ export default function PerfilPage() {
 
     try {
       const formData = new FormData();
+
       formData.append('file', file);
 
       const response = await fetch(
@@ -454,7 +526,8 @@ export default function PerfilPage() {
           body: JSON.stringify({
             body: text,
             image_url: null,
-            story_id: selectedStoryId || null,
+            story_id:
+              selectedStoryId || null,
           }),
         }
       );
@@ -497,7 +570,9 @@ export default function PerfilPage() {
     }
   }
 
-  function getStoryTitle(storyId: string | null) {
+  function getStoryTitle(
+    storyId: string | null
+  ) {
     if (!storyId) return null;
 
     const story = stories.find(
@@ -507,10 +582,14 @@ export default function PerfilPage() {
     return story?.title || null;
   }
 
-  function startEditNookPost(post: NookPost) {
+  function startEditNookPost(
+    post: NookPost
+  ) {
     setEditingNookPostId(post.id);
     setEditNookBody(post.body);
-    setEditNookStoryId(post.story_id || '');
+    setEditNookStoryId(
+      post.story_id || ''
+    );
     setMenuOpenPostId(null);
     setError('');
     setSuccess('');
@@ -738,9 +817,11 @@ export default function PerfilPage() {
         }
       }}
     >
+      {/* HEADER */}
       <header className="border-b border-white/10 bg-[#100b12]">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
           <button
+            type="button"
             onClick={(event) => {
               event.stopPropagation();
               router.push('/');
@@ -755,6 +836,7 @@ export default function PerfilPage() {
           </button>
 
           <button
+            type="button"
             onClick={(event) => {
               event.stopPropagation();
               router.push('/');
@@ -766,14 +848,15 @@ export default function PerfilPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-5 py-8">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-5 sm:py-8">
         {/* PERFIL */}
         <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#191219]">
+          {/* CAPA DO PERFIL */}
           <button
             type="button"
             onClick={openCoverPicker}
             disabled={uploadingCover}
-            className="group relative block h-48 w-full overflow-hidden bg-gradient-to-r from-[#3b1b30] via-[#572544] to-[#241322]"
+            className="group relative block h-36 w-full overflow-hidden bg-gradient-to-r from-[#3b1b30] via-[#572544] to-[#241322] sm:h-44 md:h-48"
           >
             {user.cover_url && (
               <img
@@ -802,13 +885,14 @@ export default function PerfilPage() {
             className="hidden"
           />
 
-          <div className="relative px-6 pb-8 md:px-10">
-            <div className="-mt-14 flex flex-col items-start gap-5 md:flex-row md:items-end">
+          {/* DADOS DO PERFIL */}
+          <div className="relative px-5 pb-7 sm:px-7 md:px-10 md:pb-8">
+            <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 md:flex-row md:items-end">
               <button
                 type="button"
                 onClick={openAvatarPicker}
                 disabled={uploadingAvatar}
-                className="group relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-[#191219] bg-[#ff78b9] text-4xl font-black text-[#180d15] disabled:cursor-wait"
+                className="group relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-[#191219] bg-[#ff78b9] text-3xl font-black text-[#180d15] sm:h-28 sm:w-28 sm:text-4xl"
               >
                 {user.avatar_url ? (
                   <img
@@ -837,8 +921,8 @@ export default function PerfilPage() {
                 className="hidden"
               />
 
-              <div className="pb-1">
-                <h1 className="text-3xl font-black">
+              <div className="min-w-0 pb-1">
+                <h1 className="break-words text-2xl font-black sm:text-3xl">
                   {displayName}
                 </h1>
 
@@ -848,14 +932,15 @@ export default function PerfilPage() {
               </div>
 
               <button
+                type="button"
                 onClick={openEditor}
-                className="md:ml-auto rounded-full bg-[#ff78b9] px-6 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110"
+                className="md:ml-auto md:shrink-0 rounded-full bg-[#ff78b9] px-6 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110"
               >
                 Editar perfil
               </button>
             </div>
 
-            <div className="mt-7 max-w-2xl">
+            <div className="mt-6 max-w-2xl">
               <p className="text-sm leading-7 text-white/50">
                 {user.bio ||
                   'Ainda não há uma bio por aqui.'}
@@ -874,7 +959,7 @@ export default function PerfilPage() {
               </div>
             )}
 
-            <div className="mt-8 flex gap-8 border-t border-white/5 pt-6">
+            <div className="mt-7 flex gap-7 border-t border-white/5 pt-5 sm:gap-10">
               <div>
                 <p className="text-xl font-black">
                   {stories.length}
@@ -908,417 +993,518 @@ export default function PerfilPage() {
           </div>
         </section>
 
-        {/* MEU NOOK */}
-        <section className="relative mt-10 overflow-hidden rounded-3xl border border-[#ff78b9]/15 bg-[#191219]">
-          <div className="relative p-6 md:p-8">
-            <div className="mb-6">
-              <div className="flex items-center gap-3">
-                <div>
-                  <h2 className="text-2xl font-black">
-                    Meu Nook
-                  </h2>
+        {/* ABAS */}
+        <section className="mt-6">
+          <div className="relative flex border-b border-white/10">
+            <button
+              type="button"
+              onClick={() =>
+                changeTab('stories')
+              }
+              className={`relative flex-1 py-4 text-sm font-bold transition sm:flex-none sm:px-10 ${
+                activeTab === 'stories'
+                  ? 'text-[#ff78b9]'
+                  : 'text-white/35 hover:text-white/70'
+              }`}
+            >
+              Histórias
 
-                  <p className="mt-1 text-sm text-white/40">
-                    Um cantinho para compartilhar seus pensamentos como escritor.
+              {activeTab === 'stories' && (
+                <span className="absolute bottom-[-1px] left-0 h-0.5 w-full rounded-full bg-[#ff78b9]" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                changeTab('nook')
+              }
+              className={`relative flex-1 py-4 text-sm font-bold transition sm:flex-none sm:px-10 ${
+                activeTab === 'nook'
+                  ? 'text-[#ff78b9]'
+                  : 'text-white/35 hover:text-white/70'
+              }`}
+            >
+              Mural
+
+              {activeTab === 'nook' && (
+                <span className="absolute bottom-[-1px] left-0 h-0.5 w-full rounded-full bg-[#ff78b9]" />
+              )}
+            </button>
+          </div>
+
+          {/* CONTEÚDO DESLIZÁVEL */}
+          <div
+            ref={tabsContainerRef}
+            className="mt-6 flex w-full snap-x snap-mandatory overflow-x-hidden"
+            onTouchStart={handleTabSwipeStart}
+            onTouchEnd={handleTabSwipeEnd}
+          >
+            {/* HISTÓRIAS */}
+            <div
+              className={`w-full shrink-0 snap-start transition-opacity duration-200 ${
+                activeTab === 'stories'
+                  ? 'opacity-100'
+                  : 'opacity-0'
+              }`}
+            >
+              <div className="mb-5">
+                <h2 className="text-xl font-black sm:text-2xl">
+                  Histórias de {displayName}
+                </h2>
+
+                <p className="mt-1 text-sm text-white/40">
+                  As histórias criadas por este autor.
+                </p>
+              </div>
+
+              {loadingStories ? (
+                <div className="rounded-3xl border border-white/10 bg-[#191219] px-6 py-14 text-center">
+                  <p className="text-sm text-white/35">
+                    Carregando histórias...
                   </p>
                 </div>
-              </div>
-            </div>
+              ) : stories.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-white/10 bg-[#191219] px-6 py-14 text-center">
+                  <p className="text-sm text-white/35">
+                    Este autor ainda não criou nenhuma história.
+                  </p>
 
-            {/* NOVO POST */}
-            <div className="rounded-3xl border border-white/10 bg-[#100b12] p-4 md:p-5">
-              <textarea
-                value={newPost}
-                onChange={(event) =>
-                  setNewPost(event.target.value)
-                }
-                maxLength={5000}
-                rows={5}
-                placeholder="O que está passando pela sua cabeça?"
-                className="w-full resize-none bg-transparent text-sm leading-7 text-white outline-none placeholder:text-white/20"
-              />
-
-              <div className="mt-4 flex flex-col gap-3 border-t border-white/5 pt-4 sm:flex-row sm:items-center">
-                <div className="flex flex-1 items-center gap-3">
-                  <select
-                    value={selectedStoryId}
-                    onChange={(event) =>
-                      setSelectedStoryId(
-                        event.target.value
-                      )
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push('/')
                     }
-                    className="max-w-full rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-[#ff78b9]/50"
+                    className="mt-5 rounded-full border border-[#ff78b9]/30 px-5 py-2.5 text-sm font-semibold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
                   >
-                    <option value="">
-                      Vincular uma história
-                    </option>
-
-                    {stories.map((story) => (
-                      <option
-                        key={story.id}
-                        value={story.id}
-                      >
-                        {story.title}
-                      </option>
-                    ))}
-                  </select>
-
-                  <span className="text-xs text-white/25">
-                    {newPost.length}/5000
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleCreateNookPost}
-                  disabled={
-                    creatingPost ||
-                    !newPost.trim()
-                  }
-                  className="rounded-full bg-[#ff78b9] px-6 py-2.5 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {creatingPost
-                    ? 'Publicando...'
-                    : 'Publicar'}
-                </button>
-              </div>
-            </div>
-
-            {/* POSTS */}
-            <div className="mt-6">
-              {loadingNook ? (
-                <div className="rounded-3xl border border-white/5 bg-[#100b12] px-6 py-12 text-center">
-                  <p className="text-sm text-white/30">
-                    Carregando seu Nook...
-                  </p>
-                </div>
-              ) : nookPosts.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-white/10 bg-[#100b12] px-6 py-12 text-center">
-                  <p className="text-sm font-semibold text-white/50">
-                    Seu Nook ainda está vazio.
-                  </p>
-
-                  <p className="mt-1 text-xs text-white/25">
-                    Escreva alguma coisa acima para começar.
-                  </p>
+                    Voltar ao início
+                  </button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {nookPosts.map((post) => {
-                    const storyTitle =
-                      getStoryTitle(post.story_id);
-
-                    const isEditing =
-                      editingNookPostId === post.id;
-
-                    const isDeleting =
-                      deletingNookPostId === post.id;
-
-                    return (
-                      <article
-                        key={post.id}
-                        className="relative rounded-3xl border border-white/5 bg-[#100b12] p-5 transition hover:border-[#ff78b9]/15"
-                      >
-                        {post.pinned && (
-                          <div className="mb-3 text-xs font-bold text-[#ff78b9]">
-                            Post fixado
-                          </div>
-                        )}
-
-                        {/* MENU */}
-                        {!isEditing && (
-                          <div
-                            className="absolute right-4 top-4"
-                            onClick={(event) =>
-                              event.stopPropagation()
-                            }
-                          >
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setMenuOpenPostId(
-                                  menuOpenPostId ===
-                                    post.id
-                                    ? null
-                                    : post.id
-                                )
-                              }
-                              className="flex h-9 w-9 items-center justify-center rounded-full text-lg font-bold text-white/35 transition hover:bg-white/5 hover:text-white"
-                              aria-label="Opções do post"
-                            >
-                              ⋯
-                            </button>
-
-                            {menuOpenPostId ===
-                              post.id && (
-                              <div className="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#191219] p-1.5 shadow-2xl">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleTogglePinNookPost(
-                                      post
-                                    )
-                                  }
-                                  className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-white/65 transition hover:bg-white/5 hover:text-white"
-                                >
-                                  {post.pinned
-                                    ? 'Desafixar post'
-                                    : 'Fixar post'}
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    startEditNookPost(
-                                      post
-                                    )
-                                  }
-                                  className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-white/65 transition hover:bg-white/5 hover:text-white"
-                                >
-                                  Editar
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleDeleteNookPost(
-                                      post.id
-                                    )
-                                  }
-                                  disabled={isDeleting}
-                                  className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-red-300 transition hover:bg-red-400/5 disabled:opacity-40"
-                                >
-                                  {isDeleting
-                                    ? 'Excluindo...'
-                                    : 'Excluir'}
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {isEditing ? (
-                          <div className="pr-0">
-                            <textarea
-                              value={editNookBody}
-                              onChange={(event) =>
-                                setEditNookBody(
-                                  event.target.value
-                                )
-                              }
-                              maxLength={5000}
-                              rows={6}
-                              className="w-full resize-none rounded-2xl border border-white/10 bg-[#191219] px-4 py-3 text-sm leading-7 text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/50"
-                            />
-
-                            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-                              <select
-                                value={
-                                  editNookStoryId
-                                }
-                                onChange={(event) =>
-                                  setEditNookStoryId(
-                                    event.target.value
-                                  )
-                                }
-                                className="flex-1 rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-[#ff78b9]/50"
-                              >
-                                <option value="">
-                                  Sem história vinculada
-                                </option>
-
-                                {stories.map(
-                                  (story) => (
-                                    <option
-                                      key={story.id}
-                                      value={story.id}
-                                    >
-                                      {story.title}
-                                    </option>
-                                  )
-                                )}
-                              </select>
-
-                              <span className="text-xs text-white/25">
-                                {editNookBody.length}
-                                /5000
-                              </span>
-                            </div>
-
-                            <div className="mt-4 flex gap-3">
-                              <button
-                                type="button"
-                                onClick={
-                                  cancelEditNookPost
-                                }
-                                disabled={
-                                  savingNookPost
-                                }
-                                className="rounded-full border border-white/10 px-5 py-2.5 text-xs font-semibold text-white/50 transition hover:border-white/20 hover:text-white disabled:opacity-40"
-                              >
-                                Cancelar
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={
-                                  handleSaveNookPostEdit
-                                }
-                                disabled={
-                                  savingNookPost ||
-                                  !editNookBody.trim()
-                                }
-                                className="rounded-full bg-[#ff78b9] px-5 py-2.5 text-xs font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-40"
-                              >
-                                {savingNookPost
-                                  ? 'Salvando...'
-                                  : 'Salvar'}
-                              </button>
-                            </div>
-                          </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
+                  {stories.map((story) => (
+                    <button
+                      key={story.id}
+                      type="button"
+                      onClick={() =>
+                        router.push(
+                          `/historia/${story.id}`
+                        )
+                      }
+                      className="group overflow-hidden rounded-2xl border border-white/10 bg-[#191219] text-left transition hover:-translate-y-1 hover:border-[#ff78b9]/30 sm:rounded-3xl"
+                    >
+                      {/* CAPA COMPACTA */}
+                      <div className="relative aspect-[2/3] overflow-hidden bg-[#241722]">
+                        {story.cover_url ? (
+                          <img
+                            src={story.cover_url}
+                            alt={`Capa de ${story.title}`}
+                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                          />
                         ) : (
-                          <>
-                            <p className="whitespace-pre-wrap pr-8 text-sm leading-7 text-white/75">
-                              {post.body}
-                            </p>
-
-                            {post.image_url && (
-                              <div className="mt-4 overflow-hidden rounded-2xl">
-                                <img
-                                  src={post.image_url}
-                                  alt=""
-                                  className="max-h-[500px] w-full object-cover"
-                                />
-                              </div>
-                            )}
-
-                            {storyTitle && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  router.push(
-                                    `/historia/${post.story_id}`
-                                  )
-                                }
-                                className="mt-4 rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/5 px-4 py-2 text-xs font-semibold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
-                              >
-                                {storyTitle}
-                              </button>
-                            )}
-
-                            <div className="mt-4 border-t border-white/5 pt-3">
-                              <span className="text-xs text-white/25">
-                                {new Date(
-                                  post.created_at
-                                ).toLocaleDateString(
-                                  'pt-BR',
-                                  {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                    year: 'numeric',
-                                  }
-                                )}
-                              </span>
-                            </div>
-                          </>
+                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#3b1b30] to-[#241322] p-4 text-center">
+                            <span className="text-sm font-black text-[#ff78b9]/70 sm:text-lg">
+                              {story.title}
+                            </span>
+                          </div>
                         )}
-                      </article>
-                    );
-                  })}
+
+                        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
+
+                        {story.status && (
+                          <span className="absolute left-2 top-2 max-w-[75%] truncate rounded-full bg-black/60 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm sm:left-3 sm:top-3 sm:px-3 sm:py-1.5 sm:text-xs">
+                            {story.status}
+                          </span>
+                        )}
+
+                        {story.rating && (
+                          <span className="absolute right-2 top-2 rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm sm:right-3 sm:top-3 sm:px-3 sm:py-1.5 sm:text-xs">
+                            {story.rating}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="p-3 sm:p-4">
+                        <h3 className="line-clamp-2 text-sm font-black text-white transition group-hover:text-[#ff78b9] sm:text-base">
+                          {story.title}
+                        </h3>
+
+                        <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-white/35 sm:mt-2 sm:text-sm sm:leading-6">
+                          {story.description ||
+                            'Esta história ainda não possui uma sinopse.'}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
-          </div>
-        </section>
 
-        {/* HISTÓRIAS */}
-        <section className="mt-10">
-          <div className="mb-5">
-            <h2 className="text-2xl font-black">
-              Histórias de {displayName}
-            </h2>
+            {/* MURAL */}
+            <div
+              className={`w-full shrink-0 snap-start transition-opacity duration-200 ${
+                activeTab === 'nook'
+                  ? 'opacity-100'
+                  : 'opacity-0'
+              }`}
+            >
+              <section className="relative overflow-hidden rounded-3xl border border-[#ff78b9]/15 bg-[#191219]">
+                <div className="relative p-4 sm:p-6 md:p-8">
+                  <div className="mb-5">
+                    <h2 className="text-xl font-black sm:text-2xl">
+                      Mural
+                    </h2>
 
-            <p className="mt-1 text-sm text-white/40">
-              As histórias criadas por este autor aparecerão aqui.
-            </p>
-          </div>
-
-          {loadingStories ? (
-            <div className="rounded-3xl border border-white/10 bg-[#191219] px-6 py-14 text-center">
-              <p className="text-sm text-white/35">
-                Carregando histórias...
-              </p>
-            </div>
-          ) : stories.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-white/10 bg-[#191219] px-6 py-14 text-center">
-              <p className="text-sm text-white/35">
-                Este autor ainda não criou nenhuma história.
-              </p>
-
-              <button
-                onClick={() => router.push('/')}
-                className="mt-5 rounded-full border border-[#ff78b9]/30 px-5 py-2.5 text-sm font-semibold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
-              >
-                Voltar ao início
-              </button>
-            </div>
-          ) : (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {stories.map((story) => (
-                <button
-                  key={story.id}
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      `/historia/${story.id}`
-                    )
-                  }
-                  className="group overflow-hidden rounded-3xl border border-white/10 bg-[#191219] text-left transition hover:-translate-y-1 hover:border-[#ff78b9]/30"
-                >
-                  <div className="relative aspect-[3/4] overflow-hidden bg-[#241722]">
-                    {story.cover_url ? (
-                      <img
-                        src={story.cover_url}
-                        alt={`Capa de ${story.title}`}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#3b1b30] to-[#241322] px-6 text-center">
-                        <span className="text-2xl font-black text-[#ff78b9]/70">
-                          {story.title}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/80 to-transparent" />
-
-                    {story.status && (
-                      <span className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
-                        {story.status}
-                      </span>
-                    )}
-
-                    {story.rating && (
-                      <span className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm">
-                        {story.rating}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="p-5">
-                    <h3 className="line-clamp-2 text-lg font-black text-white transition group-hover:text-[#ff78b9]">
-                      {story.title}
-                    </h3>
-
-                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/40">
-                      {story.description ||
-                        'Esta história ainda não possui uma sinopse.'}
+                    <p className="mt-1 text-sm text-white/40">
+                      Um cantinho para compartilhar seus pensamentos como escritor.
                     </p>
                   </div>
-                </button>
-              ))}
+
+                  {/* NOVO POST */}
+                  <div className="rounded-3xl border border-white/10 bg-[#100b12] p-4 sm:p-5">
+                    <textarea
+                      value={newPost}
+                      onChange={(event) =>
+                        setNewPost(
+                          event.target.value
+                        )
+                      }
+                      maxLength={5000}
+                      rows={4}
+                      placeholder="O que está passando pela sua cabeça?"
+                      className="w-full resize-none bg-transparent text-sm leading-7 text-white outline-none placeholder:text-white/20"
+                    />
+
+                    <div className="mt-4 flex flex-col gap-3 border-t border-white/5 pt-4 sm:flex-row sm:items-center">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <select
+                          value={
+                            selectedStoryId
+                          }
+                          onChange={(event) =>
+                            setSelectedStoryId(
+                              event.target.value
+                            )
+                          }
+                          className="min-w-0 flex-1 rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-[#ff78b9]/50"
+                        >
+                          <option value="">
+                            Vincular uma história
+                          </option>
+
+                          {stories.map(
+                            (story) => (
+                              <option
+                                key={story.id}
+                                value={story.id}
+                              >
+                                {story.title}
+                              </option>
+                            )
+                          )}
+                        </select>
+
+                        <span className="shrink-0 text-xs text-white/25">
+                          {newPost.length}/5000
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={
+                          handleCreateNookPost
+                        }
+                        disabled={
+                          creatingPost ||
+                          !newPost.trim()
+                        }
+                        className="rounded-full bg-[#ff78b9] px-6 py-2.5 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {creatingPost
+                          ? 'Publicando...'
+                          : 'Publicar'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* POSTS */}
+                  <div className="mt-6">
+                    {loadingNook ? (
+                      <div className="rounded-3xl border border-white/5 bg-[#100b12] px-6 py-12 text-center">
+                        <p className="text-sm text-white/30">
+                          Carregando seu Mural...
+                        </p>
+                      </div>
+                    ) : nookPosts.length === 0 ? (
+                      <div className="rounded-3xl border border-dashed border-white/10 bg-[#100b12] px-6 py-12 text-center">
+                        <p className="text-sm font-semibold text-white/50">
+                          Seu Mural ainda está vazio.
+                        </p>
+
+                        <p className="mt-1 text-xs text-white/25">
+                          Escreva alguma coisa acima para começar.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {nookPosts.map(
+                          (post) => {
+                            const storyTitle =
+                              getStoryTitle(
+                                post.story_id
+                              );
+
+                            const isEditing =
+                              editingNookPostId ===
+                              post.id;
+
+                            const isDeleting =
+                              deletingNookPostId ===
+                              post.id;
+
+                            return (
+                              <article
+                                key={post.id}
+                                className="relative rounded-3xl border border-white/5 bg-[#100b12] p-4 transition hover:border-[#ff78b9]/15 sm:p-5"
+                              >
+                                {post.pinned && (
+                                  <div className="mb-3 text-xs font-bold text-[#ff78b9]">
+                                    Post fixado
+                                  </div>
+                                )}
+
+                                {/* MENU */}
+                                {!isEditing && (
+                                  <div
+                                    className="absolute right-3 top-3 sm:right-4 sm:top-4"
+                                    onClick={(
+                                      event
+                                    ) =>
+                                      event.stopPropagation()
+                                    }
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setMenuOpenPostId(
+                                          menuOpenPostId ===
+                                            post.id
+                                            ? null
+                                            : post.id
+                                        )
+                                      }
+                                      className="flex h-9 w-9 items-center justify-center rounded-full text-lg font-bold text-white/35 transition hover:bg-white/5 hover:text-white"
+                                      aria-label="Opções do post"
+                                    >
+                                      ⋯
+                                    </button>
+
+                                    {menuOpenPostId ===
+                                      post.id && (
+                                      <div className="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#191219] p-1.5 shadow-2xl">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleTogglePinNookPost(
+                                              post
+                                            )
+                                          }
+                                          className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-white/65 transition hover:bg-white/5 hover:text-white"
+                                        >
+                                          {post.pinned
+                                            ? 'Desafixar post'
+                                            : 'Fixar post'}
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            startEditNookPost(
+                                              post
+                                            )
+                                          }
+                                          className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-white/65 transition hover:bg-white/5 hover:text-white"
+                                        >
+                                          Editar
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleDeleteNookPost(
+                                              post.id
+                                            )
+                                          }
+                                          disabled={
+                                            isDeleting
+                                          }
+                                          className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-red-300 transition hover:bg-red-400/5 disabled:opacity-40"
+                                        >
+                                          {isDeleting
+                                            ? 'Excluindo...'
+                                            : 'Excluir'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {isEditing ? (
+                                  <div className="pr-0">
+                                    <textarea
+                                      value={
+                                        editNookBody
+                                      }
+                                      onChange={(
+                                        event
+                                      ) =>
+                                        setEditNookBody(
+                                          event.target
+                                            .value
+                                        )
+                                      }
+                                      maxLength={5000}
+                                      rows={6}
+                                      className="w-full resize-none rounded-2xl border border-white/10 bg-[#191219] px-4 py-3 text-sm leading-7 text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/50"
+                                    />
+
+                                    <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                                      <select
+                                        value={
+                                          editNookStoryId
+                                        }
+                                        onChange={(
+                                          event
+                                        ) =>
+                                          setEditNookStoryId(
+                                            event.target
+                                              .value
+                                          )
+                                        }
+                                        className="flex-1 rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-[#ff78b9]/50"
+                                      >
+                                        <option value="">
+                                          Sem história vinculada
+                                        </option>
+
+                                        {stories.map(
+                                          (
+                                            story
+                                          ) => (
+                                            <option
+                                              key={
+                                                story.id
+                                              }
+                                              value={
+                                                story.id
+                                              }
+                                            >
+                                              {
+                                                story.title
+                                              }
+                                            </option>
+                                          )
+                                        )}
+                                      </select>
+
+                                      <span className="text-xs text-white/25">
+                                        {
+                                          editNookBody.length
+                                        }
+                                        /5000
+                                      </span>
+                                    </div>
+
+                                    <div className="mt-4 flex gap-3">
+                                      <button
+                                        type="button"
+                                        onClick={
+                                          cancelEditNookPost
+                                        }
+                                        disabled={
+                                          savingNookPost
+                                        }
+                                        className="rounded-full border border-white/10 px-5 py-2.5 text-xs font-semibold text-white/50 transition hover:border-white/20 hover:text-white disabled:opacity-40"
+                                      >
+                                        Cancelar
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={
+                                          handleSaveNookPostEdit
+                                        }
+                                        disabled={
+                                          savingNookPost ||
+                                          !editNookBody.trim()
+                                        }
+                                        className="rounded-full bg-[#ff78b9] px-5 py-2.5 text-xs font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-40"
+                                      >
+                                        {savingNookPost
+                                          ? 'Salvando...'
+                                          : 'Salvar'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className="whitespace-pre-wrap pr-8 text-sm leading-7 text-white/75">
+                                      {post.body}
+                                    </p>
+
+                                    {post.image_url && (
+                                      <div className="mt-4 overflow-hidden rounded-2xl">
+                                        <img
+                                          src={
+                                            post.image_url
+                                          }
+                                          alt=""
+                                          className="max-h-[500px] w-full object-cover"
+                                        />
+                                      </div>
+                                    )}
+
+                                    {storyTitle && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          router.push(
+                                            `/historia/${post.story_id}`
+                                          )
+                                        }
+                                        className="mt-4 max-w-full truncate rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/5 px-4 py-2 text-xs font-semibold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
+                                      >
+                                        {storyTitle}
+                                      </button>
+                                    )}
+
+                                    <div className="mt-4 border-t border-white/5 pt-3">
+                                      <span className="text-xs text-white/25">
+                                        {new Date(
+                                          post.created_at
+                                        ).toLocaleDateString(
+                                          'pt-BR',
+                                          {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric',
+                                          }
+                                        )}
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
+                              </article>
+                            );
+                          }
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
             </div>
-          )}
+          </div>
         </section>
       </div>
 
@@ -1338,6 +1524,7 @@ export default function PerfilPage() {
               </div>
 
               <button
+                type="button"
                 onClick={closeEditor}
                 disabled={saving}
                 className="text-2xl leading-none text-white/40 transition hover:text-white disabled:opacity-40"
@@ -1409,6 +1596,7 @@ export default function PerfilPage() {
 
               <div className="flex gap-3 pt-2">
                 <button
+                  type="button"
                   onClick={closeEditor}
                   disabled={saving}
                   className="flex-1 rounded-full border border-white/10 px-5 py-3 text-sm font-semibold text-white/60 transition hover:border-white/20 hover:text-white disabled:opacity-40"
@@ -1417,6 +1605,7 @@ export default function PerfilPage() {
                 </button>
 
                 <button
+                  type="button"
                   onClick={handleSave}
                   disabled={saving}
                   className="flex-1 rounded-full bg-[#ff78b9] px-5 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-50"
