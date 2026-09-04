@@ -73,6 +73,13 @@ type ReactionSummary = {
   comments_count: number;
 };
 
+type SpotifyPreviewData = {
+  title: string;
+  thumbnail_url?: string | null;
+  author_name?: string | null;
+  provider_name?: string | null;
+};
+
 type ProfileTab = 'stories' | 'nook';
 
 const REACTIONS = [
@@ -94,40 +101,270 @@ const ACCEPTED_MEDIA_TYPES = [
   'image/gif',
 ];
 
+const SPOTIFY_URL_REGEX =
+  /https?:\/\/(?:open\.)?spotify\.com\/(?:intl-[a-zA-Z-]+\/)?(?:track|album|playlist|artist|episode|show)\/[A-Za-z0-9]+(?:\?[^\s]+)?/g;
+
+function SpotifyPreview({
+  url,
+}: {
+  url: string;
+}) {
+  const [preview, setPreview] =
+    useState<SpotifyPreviewData | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPreview() {
+      try {
+        const response = await fetch(
+          `/api/spotify/oembed?url=${encodeURIComponent(
+            url
+          )}`,
+          {
+            cache: 'no-store',
+          }
+        );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data =
+          await response.json();
+
+        if (!cancelled) {
+          setPreview(data);
+        }
+      } catch {
+        // Se a prévia falhar, o link continua funcionando.
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  if (loading) {
+    return (
+      <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-[#191219]">
+        <div className="flex items-center gap-3 p-3">
+          <div className="h-16 w-16 shrink-0 animate-pulse rounded-xl bg-white/5" />
+
+          <div className="min-w-0 flex-1">
+            <div className="h-3 w-2/3 animate-pulse rounded bg-white/5" />
+
+            <div className="mt-2 h-2.5 w-1/3 animate-pulse rounded bg-white/5" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!preview) {
+    return null;
+  }
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(event) =>
+        event.stopPropagation()
+      }
+      className="mt-3 flex overflow-hidden rounded-2xl border border-white/10 bg-[#191219] transition hover:border-[#1DB954]/40 hover:bg-[#211a21]"
+    >
+      {preview.thumbnail_url ? (
+        <img
+          src={preview.thumbnail_url}
+          alt=""
+          className="h-20 w-20 shrink-0 object-cover sm:h-24 sm:w-24"
+        />
+      ) : (
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center bg-[#1DB954]/10 text-2xl sm:h-24 sm:w-24">
+          🎵
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-black text-[#1DB954]">
+            Spotify
+          </span>
+        </div>
+
+        <p className="mt-1 truncate text-sm font-bold text-white">
+          {preview.title}
+        </p>
+
+        {preview.author_name && (
+          <p className="mt-0.5 truncate text-xs text-white/40">
+            {preview.author_name}
+          </p>
+        )}
+      </div>
+
+      <div className="flex shrink-0 items-center px-3 text-white/25">
+        ↗
+      </div>
+    </a>
+  );
+}
+
+function renderPostBody(body: string) {
+  const matches = Array.from(
+    body.matchAll(SPOTIFY_URL_REGEX)
+  );
+
+  if (!matches.length) {
+    return (
+      <p className="whitespace-pre-wrap pr-8 text-sm leading-7 text-white/75">
+        {body}
+      </p>
+    );
+  }
+
+  const content: ReactNode[] = [];
+  let lastIndex = 0;
+
+  matches.forEach((match, index) => {
+    const url = match[0];
+    const start = match.index ?? 0;
+
+    if (start > lastIndex) {
+      content.push(
+        <span
+          key={`text-${index}`}
+          className="whitespace-pre-wrap"
+        >
+          {body.slice(lastIndex, start)}
+        </span>
+      );
+    }
+
+    content.push(
+      <a
+        key={`spotify-link-${index}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(event) =>
+          event.stopPropagation()
+        }
+        className="break-all font-semibold text-[#1DB954] underline decoration-[#1DB954]/30 underline-offset-2 transition hover:text-[#5ee58a]"
+      >
+        {url}
+      </a>
+    );
+
+    content.push(
+      <SpotifyPreview
+        key={`spotify-preview-${index}`}
+        url={url}
+      />
+    );
+
+    lastIndex = start + url.length;
+  });
+
+  if (lastIndex < body.length) {
+    content.push(
+      <span
+        key="text-final"
+        className="whitespace-pre-wrap"
+      >
+        {body.slice(lastIndex)}
+      </span>
+    );
+  }
+
+  return (
+    <div className="pr-8 text-sm leading-7 text-white/75">
+      {content}
+    </div>
+  );
+}
+
 export default function PerfilPage() {
   const router = useRouter();
 
-  const avatarInputRef = useRef<HTMLInputElement | null>(null);
-  const coverInputRef = useRef<HTMLInputElement | null>(null);
-  const mediaInputRef = useRef<HTMLInputElement | null>(null);
-  const tabsContainerRef = useRef<HTMLDivElement | null>(null);
-  const swipeStartX = useRef<number | null>(null);
+  const avatarInputRef =
+    useRef<HTMLInputElement | null>(null);
 
-  const [user, setUser] = useState<User | null>(null);
-  const [stories, setStories] = useState<Story[]>([]);
-  const [nookPosts, setNookPosts] = useState<NookPost[]>([]);
+  const coverInputRef =
+    useRef<HTMLInputElement | null>(null);
+
+  const mediaInputRef =
+    useRef<HTMLInputElement | null>(null);
+
+  const tabsContainerRef =
+    useRef<HTMLDivElement | null>(null);
+
+  const swipeStartX =
+    useRef<number | null>(null);
+
+  const [user, setUser] =
+    useState<User | null>(null);
+
+  const [stories, setStories] =
+    useState<Story[]>([]);
+
+  const [nookPosts, setNookPosts] =
+    useState<NookPost[]>([]);
+
   const [activeTab, setActiveTab] =
     useState<ProfileTab>('stories');
 
-  const [loading, setLoading] = useState(true);
-  const [loadingStories, setLoadingStories] = useState(true);
-  const [loadingNook, setLoadingNook] = useState(true);
+  const [loading, setLoading] =
+    useState(true);
 
-  const [editing, setEditing] = useState(false);
-  const [editDisplayName, setEditDisplayName] = useState('');
-  const [bio, setBio] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [loadingStories, setLoadingStories] =
+    useState(true);
+
+  const [loadingNook, setLoadingNook] =
+    useState(true);
+
+  const [editing, setEditing] =
+    useState(false);
+
+  const [editDisplayName, setEditDisplayName] =
+    useState('');
+
+  const [bio, setBio] =
+    useState('');
+
+  const [saving, setSaving] =
+    useState(false);
 
   /* =========================
      NOVO POST
   ========================= */
 
-  const [newPost, setNewPost] = useState('');
-  const [selectedStoryId, setSelectedStoryId] = useState('');
-  const [creatingPost, setCreatingPost] = useState(false);
+  const [newPost, setNewPost] =
+    useState('');
 
-  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
-  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  const [selectedStoryId, setSelectedStoryId] =
+    useState('');
+
+  const [creatingPost, setCreatingPost] =
+    useState(false);
+
+  const [mediaFiles, setMediaFiles] =
+    useState<File[]>([]);
+
+  const [mediaPreviews, setMediaPreviews] =
+    useState<string[]>([]);
 
   /* =========================
      EDIÇÃO DE POST
@@ -136,9 +373,14 @@ export default function PerfilPage() {
   const [editingNookPostId, setEditingNookPostId] =
     useState<string | null>(null);
 
-  const [editNookBody, setEditNookBody] = useState('');
-  const [editNookStoryId, setEditNookStoryId] = useState('');
-  const [savingNookPost, setSavingNookPost] = useState(false);
+  const [editNookBody, setEditNookBody] =
+    useState('');
+
+  const [editNookStoryId, setEditNookStoryId] =
+    useState('');
+
+  const [savingNookPost, setSavingNookPost] =
+    useState(false);
 
   const [deletingNookPostId, setDeletingNookPostId] =
     useState<string | null>(null);
@@ -151,10 +393,14 @@ export default function PerfilPage() {
   ========================= */
 
   const [reactionData, setReactionData] =
-    useState<Record<string, ReactionSummary>>({});
+    useState<
+      Record<string, ReactionSummary>
+    >({});
 
   const [commentsByPost, setCommentsByPost] =
-    useState<Record<string, NookComment[]>>({});
+    useState<
+      Record<string, NookComment[]>
+    >({});
 
   const [commentsOpen, setCommentsOpen] =
     useState<Record<string, boolean>>({});
@@ -177,16 +423,23 @@ export default function PerfilPage() {
   const [editingCommentBody, setEditingCommentBody] =
     useState('');
 
-  const [savingComment, setSavingComment] = useState(false);
+  const [savingComment, setSavingComment] =
+    useState(false);
 
   const [deletingCommentId, setDeletingCommentId] =
     useState<string | null>(null);
 
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] =
+    useState(false);
 
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [uploadingCover, setUploadingCover] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+  const [success, setSuccess] =
+    useState('');
 
   /* =========================
      CARREGAR USUÁRIO
@@ -195,18 +448,25 @@ export default function PerfilPage() {
   useEffect(() => {
     async function loadUser() {
       try {
-        const response = await fetch('/api/auth/me', {
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          '/api/auth/me',
+          {
+            cache: 'no-store',
+          }
+        );
 
         if (!response.ok) {
           router.push('/login');
           return;
         }
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
-        if (data.authenticated && data.user) {
+        if (
+          data.authenticated &&
+          data.user
+        ) {
           setUser(data.user);
         } else {
           router.push('/login');
@@ -230,11 +490,15 @@ export default function PerfilPage() {
       setLoadingStories(true);
 
       try {
-        const response = await fetch('/api/profile/stories', {
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          '/api/profile/stories',
+          {
+            cache: 'no-store',
+          }
+        );
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
         if (!response.ok) {
           console.error(
@@ -242,18 +506,22 @@ export default function PerfilPage() {
             data.error,
             data.details
           );
+
           setStories([]);
           return;
         }
 
         setStories(
-          Array.isArray(data.stories) ? data.stories : []
+          Array.isArray(data.stories)
+            ? data.stories
+            : []
         );
       } catch (error) {
         console.error(
           'Erro ao carregar histórias:',
           error
         );
+
         setStories([]);
       } finally {
         setLoadingStories(false);
@@ -272,11 +540,15 @@ export default function PerfilPage() {
       setLoadingNook(true);
 
       try {
-        const response = await fetch('/api/nook-posts', {
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          '/api/nook-posts',
+          {
+            cache: 'no-store',
+          }
+        );
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
         if (!response.ok) {
           console.error(
@@ -284,21 +556,29 @@ export default function PerfilPage() {
             data.error,
             data.details
           );
+
           setNookPosts([]);
           return;
         }
 
         const posts: NookPost[] =
-          Array.isArray(data.posts) ? data.posts : [];
+          Array.isArray(data.posts)
+            ? data.posts
+            : [];
 
-        setNookPosts(sortNookPosts(posts));
+        setNookPosts(
+          sortNookPosts(posts)
+        );
 
-        await loadReactionSummaries(posts);
+        await loadReactionSummaries(
+          posts
+        );
       } catch (error) {
         console.error(
           'Erro ao carregar Mural:',
           error
         );
+
         setNookPosts([]);
       } finally {
         setLoadingNook(false);
@@ -316,13 +596,16 @@ export default function PerfilPage() {
     return REACTIONS.reduce(
       (result, emoji) => {
         result[emoji] = 0;
+
         return result;
       },
       {} as Record<string, number>
     );
   }
 
-  async function loadReactionSummary(postId: string) {
+  async function loadReactionSummary(
+    postId: string
+  ) {
     try {
       const response = await fetch(
         `/api/nook-posts/reactions?post_id=${encodeURIComponent(
@@ -335,63 +618,87 @@ export default function PerfilPage() {
 
       if (!response.ok) return;
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
-      setReactionData((current) => ({
-        ...current,
-        [postId]: {
-          counts:
-            data.counts || emptyReactionCounts(),
-          user_reactions:
-            data.user_reactions || [],
-          comments_count:
-            data.comments_count || 0,
-        },
-      }));
+      setReactionData(
+        (current) => ({
+          ...current,
+          [postId]: {
+            counts:
+              data.counts ||
+              emptyReactionCounts(),
+
+            user_reactions:
+              data.user_reactions ||
+              [],
+
+            comments_count:
+              data.comments_count ||
+              0,
+          },
+        })
+      );
     } catch {
       // Não quebra o Mural.
     }
   }
 
-  async function loadReactionSummaries(posts: NookPost[]) {
-    const results = await Promise.all(
-      posts.map(async (post) => {
-        try {
-          const response = await fetch(
-            `/api/nook-posts/reactions?post_id=${encodeURIComponent(
-              post.id
-            )}`,
-            {
-              cache: 'no-store',
-            }
-          );
+  async function loadReactionSummaries(
+    posts: NookPost[]
+  ) {
+    const results =
+      await Promise.all(
+        posts.map(async (post) => {
+          try {
+            const response =
+              await fetch(
+                `/api/nook-posts/reactions?post_id=${encodeURIComponent(
+                  post.id
+                )}`,
+                {
+                  cache: 'no-store',
+                }
+              );
 
-          if (!response.ok) return null;
+            if (!response.ok)
+              return null;
 
-          const data = await response.json();
+            const data =
+              await response.json();
 
-          return {
-            postId: post.id,
-            summary: {
-              counts:
-                data.counts || emptyReactionCounts(),
-              user_reactions:
-                data.user_reactions || [],
-              comments_count:
-                data.comments_count || 0,
-            },
-          };
-        } catch {
-          return null;
-        }
-      })
-    );
+            return {
+              postId: post.id,
 
-    const summaries: Record<string, ReactionSummary> = {};
+              summary: {
+                counts:
+                  data.counts ||
+                  emptyReactionCounts(),
+
+                user_reactions:
+                  data.user_reactions ||
+                  [],
+
+                comments_count:
+                  data.comments_count ||
+                  0,
+              },
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+    const summaries: Record<
+      string,
+      ReactionSummary
+    > = {};
 
     for (const result of results) {
       if (result) {
-        summaries[result.postId] = result.summary;
+        summaries[result.postId] =
+          result.summary;
       }
     }
 
@@ -404,42 +711,61 @@ export default function PerfilPage() {
   ) {
     const current =
       reactionData[postId] || {
-        counts: emptyReactionCounts(),
+        counts:
+          emptyReactionCounts(),
+
         user_reactions: [],
+
         comments_count: 0,
       };
 
     const reacted =
-      current.user_reactions.includes(emoji);
+      current.user_reactions.includes(
+        emoji
+      );
 
-    setReactionData((previous) => ({
-      ...previous,
-      [postId]: {
-        ...current,
-        counts: {
-          ...current.counts,
-          [emoji]: Math.max(
-            0,
-            (current.counts[emoji] || 0) +
-              (reacted ? -1 : 1)
-          ),
+    setReactionData(
+      (previous) => ({
+        ...previous,
+
+        [postId]: {
+          ...current,
+
+          counts: {
+            ...current.counts,
+
+            [emoji]: Math.max(
+              0,
+              (current.counts[emoji] ||
+                0) +
+                (reacted ? -1 : 1)
+            ),
+          },
+
+          user_reactions: reacted
+            ? current.user_reactions.filter(
+                (item) =>
+                  item !== emoji
+              )
+            : [
+                ...current.user_reactions,
+                emoji,
+              ],
         },
-        user_reactions: reacted
-          ? current.user_reactions.filter(
-              (item) => item !== emoji
-            )
-          : [...current.user_reactions, emoji],
-      },
-    }));
+      })
+    );
 
     try {
       const response = await fetch(
         '/api/nook-posts/reactions',
         {
           method: 'POST',
+
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':
+              'application/json',
           },
+
           body: JSON.stringify({
             post_id: postId,
             emoji,
@@ -448,10 +774,14 @@ export default function PerfilPage() {
       );
 
       if (!response.ok) {
-        await loadReactionSummary(postId);
+        await loadReactionSummary(
+          postId
+        );
       }
     } catch {
-      await loadReactionSummary(postId);
+      await loadReactionSummary(
+        postId
+      );
     }
   }
 
@@ -459,11 +789,15 @@ export default function PerfilPage() {
      COMENTÁRIOS
   ========================= */
 
-  async function loadComments(postId: string) {
-    setLoadingComments((current) => ({
-      ...current,
-      [postId]: true,
-    }));
+  async function loadComments(
+    postId: string
+  ) {
+    setLoadingComments(
+      (current) => ({
+        ...current,
+        [postId]: true,
+      })
+    );
 
     try {
       const response = await fetch(
@@ -475,13 +809,15 @@ export default function PerfilPage() {
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setError(
           data.error ||
             'Não foi possível carregar os comentários.'
         );
+
         return;
       }
 
@@ -490,43 +826,64 @@ export default function PerfilPage() {
           ? data.comments
           : [];
 
-      setCommentsByPost((current) => ({
-        ...current,
-        [postId]: comments,
-      }));
+      setCommentsByPost(
+        (current) => ({
+          ...current,
+          [postId]: comments,
+        })
+      );
 
-      setReactionData((current) => ({
-        ...current,
-        [postId]: {
-          ...(current[postId] || {
-            counts: emptyReactionCounts(),
-            user_reactions: [],
-            comments_count: 0,
-          }),
-          comments_count: comments.length,
-        },
-      }));
+      setReactionData(
+        (current) => ({
+          ...current,
+
+          [postId]: {
+            ...(current[postId] || {
+              counts:
+                emptyReactionCounts(),
+
+              user_reactions: [],
+
+              comments_count: 0,
+            }),
+
+            comments_count:
+              comments.length,
+          },
+        })
+      );
     } catch {
       setError(
         'Não foi possível carregar os comentários.'
       );
     } finally {
-      setLoadingComments((current) => ({
-        ...current,
-        [postId]: false,
-      }));
+      setLoadingComments(
+        (current) => ({
+          ...current,
+          [postId]: false,
+        })
+      );
     }
   }
 
-  async function toggleComments(postId: string) {
-    const isOpen = commentsOpen[postId] || false;
+  async function toggleComments(
+    postId: string
+  ) {
+    const isOpen =
+      commentsOpen[postId] ||
+      false;
 
-    setCommentsOpen((current) => ({
-      ...current,
-      [postId]: !isOpen,
-    }));
+    setCommentsOpen(
+      (current) => ({
+        ...current,
+        [postId]: !isOpen,
+      })
+    );
 
-    if (!isOpen && !commentsByPost[postId]) {
+    if (
+      !isOpen &&
+      !commentsByPost[postId]
+    ) {
       await loadComments(postId);
     }
   }
@@ -536,8 +893,14 @@ export default function PerfilPage() {
     parentId?: string | null
   ) {
     const value = parentId
-      ? (replyDrafts[parentId] || '').trim()
-      : (commentDrafts[postId] || '').trim();
+      ? (
+          replyDrafts[parentId] ||
+          ''
+        ).trim()
+      : (
+          commentDrafts[postId] ||
+          ''
+        ).trim();
 
     if (!value) return;
 
@@ -545,6 +908,7 @@ export default function PerfilPage() {
       setError(
         'O comentário pode ter no máximo 2000 caracteres.'
       );
+
       return;
     }
 
@@ -556,39 +920,49 @@ export default function PerfilPage() {
         '/api/nook-posts/comments',
         {
           method: 'POST',
+
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':
+              'application/json',
           },
+
           body: JSON.stringify({
             post_id: postId,
             content: value,
-            parent_id: parentId || null,
+            parent_id:
+              parentId || null,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setError(
           data.error ||
             'Não foi possível publicar o comentário.'
         );
+
         return;
       }
 
       if (parentId) {
-        setReplyDrafts((current) => ({
-          ...current,
-          [parentId]: '',
-        }));
+        setReplyDrafts(
+          (current) => ({
+            ...current,
+            [parentId]: '',
+          })
+        );
 
         setReplyingTo(null);
       } else {
-        setCommentDrafts((current) => ({
-          ...current,
-          [postId]: '',
-        }));
+        setCommentDrafts(
+          (current) => ({
+            ...current,
+            [postId]: '',
+          })
+        );
       }
 
       await loadComments(postId);
@@ -601,9 +975,17 @@ export default function PerfilPage() {
     }
   }
 
-  function startEditComment(comment: NookComment) {
-    setEditingCommentId(comment.id);
-    setEditingCommentBody(comment.content);
+  function startEditComment(
+    comment: NookComment
+  ) {
+    setEditingCommentId(
+      comment.id
+    );
+
+    setEditingCommentBody(
+      comment.content
+    );
+
     setError('');
   }
 
@@ -615,14 +997,17 @@ export default function PerfilPage() {
   }
 
   async function handleSaveComment() {
-    if (!editingCommentId) return;
+    if (!editingCommentId)
+      return;
 
-    const content = editingCommentBody.trim();
+    const content =
+      editingCommentBody.trim();
 
     if (!content) {
       setError(
         'O comentário não pode ficar vazio.'
       );
+
       return;
     }
 
@@ -630,6 +1015,7 @@ export default function PerfilPage() {
       setError(
         'O comentário pode ter no máximo 2000 caracteres.'
       );
+
       return;
     }
 
@@ -641,38 +1027,52 @@ export default function PerfilPage() {
         `/api/nook-posts/comments/${editingCommentId}`,
         {
           method: 'PATCH',
+
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':
+              'application/json',
           },
+
           body: JSON.stringify({
             content,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setError(
           data.error ||
             'Não foi possível editar o comentário.'
         );
+
         return;
       }
 
-      const comment = data.comment;
+      const comment =
+        data.comment;
 
       if (comment?.post_id) {
-        await loadComments(comment.post_id);
+        await loadComments(
+          comment.post_id
+        );
       } else {
         for (const post of nookPosts) {
           if (
-            commentsByPost[post.id]?.some(
+            commentsByPost[
+              post.id
+            ]?.some(
               (item) =>
-                item.id === editingCommentId
+                item.id ===
+                editingCommentId
             )
           ) {
-            await loadComments(post.id);
+            await loadComments(
+              post.id
+            );
+
             break;
           }
         }
@@ -692,7 +1092,10 @@ export default function PerfilPage() {
   async function handleDeleteComment(
     comment: NookComment
   ) {
-    setDeletingCommentId(comment.id);
+    setDeletingCommentId(
+      comment.id
+    );
+
     setError('');
 
     try {
@@ -703,17 +1106,21 @@ export default function PerfilPage() {
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setError(
           data.error ||
             'Não foi possível excluir o comentário.'
         );
+
         return;
       }
 
-      await loadComments(comment.post_id);
+      await loadComments(
+        comment.post_id
+      );
     } catch {
       setError(
         'Não foi possível excluir o comentário.'
@@ -727,28 +1134,43 @@ export default function PerfilPage() {
      ORDENAÇÃO
   ========================= */
 
-  function sortNookPosts(posts: NookPost[]) {
-    return [...posts].sort((a, b) => {
-      if (a.pinned !== b.pinned) {
-        return a.pinned ? -1 : 1;
-      }
+  function sortNookPosts(
+    posts: NookPost[]
+  ) {
+    return [...posts].sort(
+      (a, b) => {
+        if (
+          a.pinned !== b.pinned
+        ) {
+          return a.pinned
+            ? -1
+            : 1;
+        }
 
-      return (
-        new Date(b.created_at).getTime() -
-        new Date(a.created_at).getTime()
-      );
-    });
+        return (
+          new Date(
+            b.created_at
+          ).getTime() -
+          new Date(
+            a.created_at
+          ).getTime()
+        );
+      }
+    );
   }
 
   /* =========================
      ABAS
   ========================= */
 
-  function changeTab(tab: ProfileTab) {
+  function changeTab(
+    tab: ProfileTab
+  ) {
     setActiveTab(tab);
 
     requestAnimationFrame(() => {
-      const container = tabsContainerRef.current;
+      const container =
+        tabsContainerRef.current;
 
       if (!container) return;
 
@@ -757,6 +1179,7 @@ export default function PerfilPage() {
           tab === 'stories'
             ? 0
             : container.clientWidth,
+
         behavior: 'smooth',
       });
     });
@@ -766,16 +1189,23 @@ export default function PerfilPage() {
     event: TouchEvent<HTMLDivElement>
   ) {
     swipeStartX.current =
-      event.touches[0]?.clientX ?? null;
+      event.touches[0]?.clientX ??
+      null;
   }
 
   function handleTabSwipeEnd(
     event: TouchEvent<HTMLDivElement>
   ) {
-    if (swipeStartX.current === null) return;
+    if (
+      swipeStartX.current ===
+      null
+    ) {
+      return;
+    }
 
     const endX =
-      event.changedTouches[0]?.clientX ?? null;
+      event.changedTouches[0]
+        ?.clientX ?? null;
 
     if (endX === null) {
       swipeStartX.current = null;
@@ -783,11 +1213,13 @@ export default function PerfilPage() {
     }
 
     const distance =
-      endX - swipeStartX.current;
+      endX -
+      swipeStartX.current;
 
     swipeStartX.current = null;
 
-    if (Math.abs(distance) < 50) return;
+    if (Math.abs(distance) < 50)
+      return;
 
     if (distance < 0) {
       changeTab('nook');
@@ -803,8 +1235,12 @@ export default function PerfilPage() {
   function openEditor() {
     if (!user) return;
 
-    setEditDisplayName(user.display_name || '');
+    setEditDisplayName(
+      user.display_name || ''
+    );
+
     setBio(user.bio || '');
+
     setError('');
     setSuccess('');
     setEditing(true);
@@ -827,23 +1263,30 @@ export default function PerfilPage() {
         '/api/profile/update',
         {
           method: 'PATCH',
+
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':
+              'application/json',
           },
+
           body: JSON.stringify({
-            display_name: editDisplayName,
+            display_name:
+              editDisplayName,
+
             bio,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setError(
           data.error ||
             'Não foi possível salvar as alterações.'
         );
+
         return;
       }
 
@@ -882,7 +1325,8 @@ export default function PerfilPage() {
   async function handleAvatarChange(
     event: ChangeEvent<HTMLInputElement>
   ) {
-    const file = event.target.files?.[0];
+    const file =
+      event.target.files?.[0];
 
     if (!file) return;
 
@@ -891,8 +1335,13 @@ export default function PerfilPage() {
     setSuccess('');
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const formData =
+        new FormData();
+
+      formData.append(
+        'file',
+        file
+      );
 
       const response = await fetch(
         '/api/profile/avatar',
@@ -902,23 +1351,28 @@ export default function PerfilPage() {
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setError(
           data.error ||
             'Não foi possível atualizar sua foto de perfil.'
         );
+
         return;
       }
 
-      setUser((currentUser) =>
-        currentUser
-          ? {
-              ...currentUser,
-              avatar_url: data.avatar_url,
-            }
-          : currentUser
+      setUser(
+        (currentUser) =>
+          currentUser
+            ? {
+                ...currentUser,
+
+                avatar_url:
+                  data.avatar_url,
+              }
+            : currentUser
       );
 
       setSuccess(
@@ -933,10 +1387,15 @@ export default function PerfilPage() {
         'Não foi possível enviar a foto. Tente novamente.'
       );
     } finally {
-      setUploadingAvatar(false);
+      setUploadingAvatar(
+        false
+      );
 
-      if (avatarInputRef.current) {
-        avatarInputRef.current.value = '';
+      if (
+        avatarInputRef.current
+      ) {
+        avatarInputRef.current.value =
+          '';
       }
     }
   }
@@ -957,7 +1416,8 @@ export default function PerfilPage() {
   async function handleCoverChange(
     event: ChangeEvent<HTMLInputElement>
   ) {
-    const file = event.target.files?.[0];
+    const file =
+      event.target.files?.[0];
 
     if (!file) return;
 
@@ -966,8 +1426,13 @@ export default function PerfilPage() {
     setSuccess('');
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const formData =
+        new FormData();
+
+      formData.append(
+        'file',
+        file
+      );
 
       const response = await fetch(
         '/api/profile/cover',
@@ -977,23 +1442,28 @@ export default function PerfilPage() {
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setError(
           data.error ||
             'Não foi possível atualizar sua capa.'
         );
+
         return;
       }
 
-      setUser((currentUser) =>
-        currentUser
-          ? {
-              ...currentUser,
-              cover_url: data.cover_url,
-            }
-          : currentUser
+      setUser(
+        (currentUser) =>
+          currentUser
+            ? {
+                ...currentUser,
+
+                cover_url:
+                  data.cover_url,
+              }
+            : currentUser
       );
 
       setSuccess(
@@ -1008,10 +1478,15 @@ export default function PerfilPage() {
         'Não foi possível enviar a capa. Tente novamente.'
       );
     } finally {
-      setUploadingCover(false);
+      setUploadingCover(
+        false
+      );
 
-      if (coverInputRef.current) {
-        coverInputRef.current.value = '';
+      if (
+        coverInputRef.current
+      ) {
+        coverInputRef.current.value =
+          '';
       }
     }
   }
@@ -1023,85 +1498,105 @@ export default function PerfilPage() {
   function handleMediaSelection(
     event: ChangeEvent<HTMLInputElement>
   ) {
-    const selected = Array.from(
-      event.target.files || []
-    );
+    const selected =
+      Array.from(
+        event.target.files || []
+      );
 
-    if (!selected.length) return;
+    if (!selected.length)
+      return;
 
     setError('');
 
-    setMediaFiles((current) => {
-      const availableSlots =
-        MAX_MEDIA - current.length;
+    setMediaFiles(
+      (current) => {
+        const availableSlots =
+          MAX_MEDIA -
+          current.length;
 
-      if (availableSlots <= 0) {
-        setError(
-          'Você pode adicionar no máximo 4 imagens ou GIFs por post.'
-        );
-        return current;
-      }
+        if (availableSlots <= 0) {
+          setError(
+            'Você pode adicionar no máximo 4 imagens ou GIFs por post.'
+          );
 
-      const validFiles: File[] = [];
+          return current;
+        }
 
-      for (const file of selected) {
+        const validFiles: File[] =
+          [];
+
+        for (const file of selected) {
+          if (
+            !ACCEPTED_MEDIA_TYPES.includes(
+              file.type
+            )
+          ) {
+            setError(
+              'Use apenas JPG, PNG, WEBP ou GIF.'
+            );
+
+            continue;
+          }
+
+          if (
+            file.size >
+            MAX_FILE_SIZE
+          ) {
+            setError(
+              'Cada imagem pode ter no máximo 10 MB.'
+            );
+
+            continue;
+          }
+
+          validFiles.push(file);
+        }
+
         if (
-          !ACCEPTED_MEDIA_TYPES.includes(
-            file.type
-          )
+          validFiles.length >
+          availableSlots
         ) {
           setError(
-            'Use apenas JPG, PNG, WEBP ou GIF.'
+            'Você pode adicionar no máximo 4 imagens ou GIFs por post.'
           );
-          continue;
         }
 
-        if (file.size > MAX_FILE_SIZE) {
-          setError(
-            'Cada imagem pode ter no máximo 10 MB.'
-          );
-          continue;
-        }
+        return [
+          ...current,
 
-        validFiles.push(file);
+          ...validFiles.slice(
+            0,
+            availableSlots
+          ),
+        ];
       }
+    );
 
-      if (
-        validFiles.length >
-        availableSlots
-      ) {
-        setError(
-          'Você pode adicionar no máximo 4 imagens ou GIFs por post.'
-        );
-      }
-
-      return [
-        ...current,
-        ...validFiles.slice(
-          0,
-          availableSlots
-        ),
-      ];
-    });
-
-    if (mediaInputRef.current) {
-      mediaInputRef.current.value = '';
+    if (
+      mediaInputRef.current
+    ) {
+      mediaInputRef.current.value =
+        '';
     }
   }
 
-  function removeMedia(index: number) {
-    setMediaFiles((current) =>
-      current.filter(
-        (_, itemIndex) =>
-          itemIndex !== index
-      )
+  function removeMedia(
+    index: number
+  ) {
+    setMediaFiles(
+      (current) =>
+        current.filter(
+          (_, itemIndex) =>
+            itemIndex !== index
+        )
     );
   }
 
   useEffect(() => {
-    const urls = mediaFiles.map((file) =>
-      URL.createObjectURL(file)
-    );
+    const urls =
+      mediaFiles.map((file) =>
+        URL.createObjectURL(file)
+      );
 
     setMediaPreviews(urls);
 
@@ -1115,19 +1610,22 @@ export default function PerfilPage() {
   async function uploadPostMedia(
     postId: string
   ) {
-    const uploaded: PostMedia[] = [];
+    const uploaded: PostMedia[] =
+      [];
 
     for (const file of mediaFiles) {
-      const formData = new FormData();
+      const formData =
+        new FormData();
 
-      formData.append('file', file);
-      formData.append('post_id', postId);
+      formData.append(
+        'file',
+        file
+      );
 
-      /*
-       * Não enviamos mais "position".
-       * A tabela nook_post_media não possui essa coluna.
-       * A ordem será determinada por created_at.
-       */
+      formData.append(
+        'post_id',
+        postId
+      );
 
       const response = await fetch(
         '/api/nook-posts/media',
@@ -1137,7 +1635,8 @@ export default function PerfilPage() {
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -1147,7 +1646,9 @@ export default function PerfilPage() {
       }
 
       if (data.media) {
-        uploaded.push(data.media);
+        uploaded.push(
+          data.media
+        );
       }
     }
 
@@ -1159,7 +1660,8 @@ export default function PerfilPage() {
   ========================= */
 
   async function handleCreateNookPost() {
-    const text = newPost.trim();
+    const text =
+      newPost.trim();
 
     if (
       !text &&
@@ -1168,6 +1670,7 @@ export default function PerfilPage() {
       setError(
         'Escreva alguma coisa ou adicione uma imagem/GIF.'
       );
+
       return;
     }
 
@@ -1175,6 +1678,7 @@ export default function PerfilPage() {
       setError(
         'O post pode ter no máximo 5000 caracteres.'
       );
+
       return;
     }
 
@@ -1187,25 +1691,33 @@ export default function PerfilPage() {
         '/api/nook-posts',
         {
           method: 'POST',
+
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':
+              'application/json',
           },
+
           body: JSON.stringify({
             body: text,
+
             image_url: null,
+
             story_id:
-              selectedStoryId || null,
+              selectedStoryId ||
+              null,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setError(
           data.error ||
             'Não foi possível publicar o post.'
         );
+
         return;
       }
 
@@ -1221,6 +1733,7 @@ export default function PerfilPage() {
 
           createdPost = {
             ...createdPost,
+
             media: uploaded,
           };
         } catch (mediaError) {
@@ -1235,22 +1748,28 @@ export default function PerfilPage() {
         }
       }
 
-      setNookPosts((currentPosts) =>
-        sortNookPosts([
-          createdPost,
-          ...currentPosts,
-        ])
+      setNookPosts(
+        (currentPosts) =>
+          sortNookPosts([
+            createdPost,
+            ...currentPosts,
+          ])
       );
 
-      setReactionData((current) => ({
-        ...current,
-        [createdPost.id]: {
-          counts:
-            emptyReactionCounts(),
-          user_reactions: [],
-          comments_count: 0,
-        },
-      }));
+      setReactionData(
+        (current) => ({
+          ...current,
+
+          [createdPost.id]: {
+            counts:
+              emptyReactionCounts(),
+
+            user_reactions: [],
+
+            comments_count: 0,
+          },
+        })
+      );
 
       setNewPost('');
       setSelectedStoryId('');
@@ -1286,7 +1805,8 @@ export default function PerfilPage() {
     if (!storyId) return null;
 
     const story = stories.find(
-      (item) => item.id === storyId
+      (item) =>
+        item.id === storyId
     );
 
     return story?.title || null;
@@ -1299,8 +1819,14 @@ export default function PerfilPage() {
   function startEditNookPost(
     post: NookPost
   ) {
-    setEditingNookPostId(post.id);
-    setEditNookBody(post.body);
+    setEditingNookPostId(
+      post.id
+    );
+
+    setEditNookBody(
+      post.body
+    );
+
     setEditNookStoryId(
       post.story_id || ''
     );
@@ -1319,7 +1845,8 @@ export default function PerfilPage() {
   }
 
   async function handleSaveNookPostEdit() {
-    if (!editingNookPostId) return;
+    if (!editingNookPostId)
+      return;
 
     const post = nookPosts.find(
       (item) =>
@@ -1327,16 +1854,20 @@ export default function PerfilPage() {
         editingNookPostId
     );
 
-    const text = editNookBody.trim();
+    const text =
+      editNookBody.trim();
 
     if (
       !text &&
       !post?.image_url &&
-      !(post?.media?.length)
+      !(
+        post?.media?.length
+      )
     ) {
       setError(
         'O post não pode ficar vazio.'
       );
+
       return;
     }
 
@@ -1344,6 +1875,7 @@ export default function PerfilPage() {
       setError(
         'O post pode ter no máximo 5000 caracteres.'
       );
+
       return;
     }
 
@@ -1356,46 +1888,58 @@ export default function PerfilPage() {
         `/api/nook-posts/${editingNookPostId}`,
         {
           method: 'PATCH',
+
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':
+              'application/json',
           },
+
           body: JSON.stringify({
             body: text,
+
             story_id:
-              editNookStoryId || null,
+              editNookStoryId ||
+              null,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setError(
           data.error ||
             'Não foi possível editar o post.'
         );
+
         return;
       }
 
       if (data.post) {
-        setNookPosts((currentPosts) =>
-          sortNookPosts(
-            currentPosts.map(
-              (currentPost) =>
-                currentPost.id ===
-                data.post.id
-                  ? {
-                      ...data.post,
-                      media:
-                        currentPost.media,
-                    }
-                  : currentPost
+        setNookPosts(
+          (currentPosts) =>
+            sortNookPosts(
+              currentPosts.map(
+                (currentPost) =>
+                  currentPost.id ===
+                  data.post.id
+                    ? {
+                        ...data.post,
+
+                        media:
+                          currentPost.media,
+                      }
+                    : currentPost
+              )
             )
-          )
         );
       }
 
-      setEditingNookPostId(null);
+      setEditingNookPostId(
+        null
+      );
+
       setEditNookBody('');
       setEditNookStoryId('');
 
@@ -1431,40 +1975,47 @@ export default function PerfilPage() {
         `/api/nook-posts/${post.id}`,
         {
           method: 'PATCH',
+
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':
+              'application/json',
           },
+
           body: JSON.stringify({
             pinned: !post.pinned,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setError(
           data.error ||
             'Não foi possível alterar o post.'
         );
+
         return;
       }
 
       if (data.post) {
-        setNookPosts((currentPosts) =>
-          sortNookPosts(
-            currentPosts.map(
-              (currentPost) =>
-                currentPost.id ===
-                data.post.id
-                  ? {
-                      ...data.post,
-                      media:
-                        currentPost.media,
-                    }
-                  : currentPost
+        setNookPosts(
+          (currentPosts) =>
+            sortNookPosts(
+              currentPosts.map(
+                (currentPost) =>
+                  currentPost.id ===
+                  data.post.id
+                    ? {
+                        ...data.post,
+
+                        media:
+                          currentPost.media,
+                      }
+                    : currentPost
+              )
             )
-          )
         );
       }
 
@@ -1492,7 +2043,11 @@ export default function PerfilPage() {
     postId: string
   ) {
     setMenuOpenPostId(null);
-    setDeletingNookPostId(postId);
+
+    setDeletingNookPostId(
+      postId
+    );
+
     setError('');
     setSuccess('');
 
@@ -1504,34 +2059,49 @@ export default function PerfilPage() {
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         setError(
           data.error ||
             'Não foi possível excluir o post.'
         );
+
         return;
       }
 
-      setNookPosts((currentPosts) =>
-        currentPosts.filter(
-          (post) =>
-            post.id !== postId
-        )
+      setNookPosts(
+        (currentPosts) =>
+          currentPosts.filter(
+            (post) =>
+              post.id !== postId
+          )
       );
 
-      setReactionData((current) => {
-        const copy = { ...current };
-        delete copy[postId];
-        return copy;
-      });
+      setReactionData(
+        (current) => {
+          const copy = {
+            ...current,
+          };
 
-      setCommentsByPost((current) => {
-        const copy = { ...current };
-        delete copy[postId];
-        return copy;
-      });
+          delete copy[postId];
+
+          return copy;
+        }
+      );
+
+      setCommentsByPost(
+        (current) => {
+          const copy = {
+            ...current,
+          };
+
+          delete copy[postId];
+
+          return copy;
+        }
+      );
 
       setSuccess(
         'Post excluído com sucesso.'
@@ -1545,7 +2115,9 @@ export default function PerfilPage() {
         'Não foi possível excluir o post. Tente novamente.'
       );
     } finally {
-      setDeletingNookPostId(null);
+      setDeletingNookPostId(
+        null
+      );
     }
   }
 
@@ -1553,7 +2125,9 @@ export default function PerfilPage() {
      RENDER DE MÍDIAS
   ========================= */
 
-  function getPostMedia(post: NookPost) {
+  function getPostMedia(
+    post: NookPost
+  ) {
     if (
       post.media &&
       post.media.length > 0
@@ -1583,9 +2157,14 @@ export default function PerfilPage() {
       return [
         {
           id: `legacy-${post.id}`,
+
           post_id: post.id,
-          media_url: post.image_url,
-          media_type: 'image' as const,
+
+          media_url:
+            post.image_url,
+
+          media_type:
+            'image' as const,
         },
       ];
     }
@@ -1596,7 +2175,8 @@ export default function PerfilPage() {
   function renderPostMedia(
     post: NookPost
   ) {
-    const media = getPostMedia(post);
+    const media =
+      getPostMedia(post);
 
     if (!media.length) {
       return null;
@@ -1660,7 +2240,8 @@ export default function PerfilPage() {
       comment.author_id ===
       user?.id;
 
-    const author = comment.author;
+    const author =
+      comment.author;
 
     const authorName =
       author?.display_name ||
@@ -1684,7 +2265,9 @@ export default function PerfilPage() {
           <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#ff78b9] text-xs font-black text-[#180d15]">
             {author?.avatar_url ? (
               <img
-                src={author.avatar_url}
+                src={
+                  author.avatar_url
+                }
                 alt=""
                 className="h-full w-full object-cover"
               />
@@ -1745,7 +2328,9 @@ export default function PerfilPage() {
                     value={
                       editingCommentBody
                     }
-                    onChange={(event) =>
+                    onChange={(
+                      event
+                    ) =>
                       setEditingCommentBody(
                         event.target
                           .value
@@ -1829,6 +2414,7 @@ export default function PerfilPage() {
                     setReplyDrafts(
                       (current) => ({
                         ...current,
+
                         [comment.id]:
                           event.target
                             .value,
@@ -2495,8 +3081,10 @@ export default function PerfilPage() {
                               ] || {
                                 counts:
                                   emptyReactionCounts(),
+
                                 user_reactions:
                                   [],
+
                                 comments_count:
                                   0,
                               };
@@ -2519,6 +3107,39 @@ export default function PerfilPage() {
                                 }
                                 className="relative rounded-3xl border border-white/5 bg-[#100b12] p-4 transition hover:border-[#ff78b9]/15 sm:p-5"
                               >
+                                {/* AUTOR DO POST */}
+
+                                <div className="mb-4 flex items-center gap-3 pr-10">
+                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#ff78b9] text-sm font-black text-[#180d15]">
+                                    {user.avatar_url ? (
+                                      <img
+                                        src={
+                                          user.avatar_url
+                                        }
+                                        alt=""
+                                        className="h-full w-full object-cover"
+                                      />
+                                    ) : (
+                                      user.username
+                                        .charAt(
+                                          0
+                                        )
+                                        .toUpperCase()
+                                    )}
+                                  </div>
+
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-bold text-white/85">
+                                      {user.display_name ||
+                                        user.username}
+                                    </p>
+
+                                    <p className="truncate text-xs text-[#ff78b9]">
+                                      @{user.username}
+                                    </p>
+                                  </div>
+                                </div>
+
                                 {post.pinned && (
                                   <div className="mb-3 text-xs font-bold text-[#ff78b9]">
                                     📌 Post fixado
@@ -2703,13 +3324,10 @@ export default function PerfilPage() {
                                   <>
                                     {/* TEXTO */}
 
-                                    {post.body && (
-                                      <p className="whitespace-pre-wrap pr-8 text-sm leading-7 text-white/75">
-                                        {
-                                          post.body
-                                        }
-                                      </p>
-                                    )}
+                                    {post.body &&
+                                      renderPostBody(
+                                        post.body
+                                      )}
 
                                     {/* MÍDIAS */}
 
@@ -2807,11 +3425,11 @@ export default function PerfilPage() {
                                       </button>
                                     </div>
 
-                                    {/* DATA */}
+                                    {/* DATA + HORA */}
 
                                     <div className="mt-3 flex items-center justify-between">
                                       <span className="text-xs text-white/25">
-                                        {formatDate(
+                                        {formatPostDateTime(
                                           post.created_at
                                         )}
                                       </span>
@@ -2840,6 +3458,7 @@ export default function PerfilPage() {
                                                   current
                                                 ) => ({
                                                   ...current,
+
                                                   [post.id]:
                                                     event
                                                       .target
@@ -3058,7 +3677,9 @@ export default function PerfilPage() {
 ========================= */
 
 function formatDate(date: string) {
-  return new Date(date).toLocaleDateString(
+  return new Date(
+    date
+  ).toLocaleDateString(
     'pt-BR',
     {
       day: '2-digit',
@@ -3066,6 +3687,29 @@ function formatDate(date: string) {
       year: 'numeric',
     }
   );
+}
+
+function formatPostDateTime(
+  date: string
+) {
+  const value =
+    new Date(date);
+
+  return `${value.toLocaleDateString(
+    'pt-BR',
+    {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }
+  )} • ${value.toLocaleTimeString(
+    'en-US',
+    {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }
+  )}`;
 }
 
 function CloudLogo() {
