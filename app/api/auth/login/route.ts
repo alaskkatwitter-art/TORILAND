@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
@@ -9,18 +8,16 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY!
 );
 
-const SESSION_DURATION_DAYS = 30;
-const SESSION_DURATION_SECONDS =
-  SESSION_DURATION_DAYS * 24 * 60 * 60;
+const SESSION_DAYS = 30;
+const SESSION_SECONDS = SESSION_DAYS * 24 * 60 * 60;
 
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
+    const { username, password } = await request.json();
 
-    const username = data?.username?.trim().toLowerCase();
-    const password = data?.password;
+    const cleanUsername = username?.trim().toLowerCase();
 
-    if (!username || !password) {
+    if (!cleanUsername || !password) {
       return NextResponse.json(
         {
           error: 'Username e senha são obrigatórios.',
@@ -29,7 +26,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!/^[a-z0-9_]{3,30}$/.test(username)) {
+    if (!/^[a-z0-9_]{3,30}$/.test(cleanUsername)) {
       return NextResponse.json(
         {
           error:
@@ -46,26 +43,26 @@ export async function POST(request: Request) {
       await supabase
         .from('auth_accounts')
         .select('id, username, password_hash')
-        .eq('username', username)
+        .eq('username', cleanUsername)
         .maybeSingle();
 
     if (accountError) {
       console.error(
-        'Erro ao procurar conta no login:',
+        'Erro ao procurar conta:',
         accountError
       );
 
       return NextResponse.json(
         {
           error:
-            'Não foi possível entrar agora. Tente novamente.',
+            'Não foi possível verificar sua conta. Tente novamente.',
         },
         { status: 500 }
       );
     }
 
     /*
-     * Não revelamos se o username existe ou não.
+     * Username inexistente.
      */
     if (!account) {
       return NextResponse.json(
@@ -77,14 +74,14 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Confere a senha usando o mesmo bcrypt usado no cadastro.
+     * Confere a senha salva no cadastro.
      */
-    const passwordValid = await bcrypt.compare(
+    const passwordIsValid = await bcrypt.compare(
       password,
       account.password_hash
     );
 
-    if (!passwordValid) {
+    if (!passwordIsValid) {
       return NextResponse.json(
         {
           error: 'Username ou senha incorretos.',
@@ -94,26 +91,29 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Gera um token de sessão aleatório.
-     *
-     * O token puro vai apenas para o cookie.
-     * No banco guardamos somente o SHA-256.
+     * Cria um token de sessão completamente aleatório.
      */
     const sessionToken = crypto
       .randomBytes(32)
-      .toString('base64url');
+      .toString('hex');
 
+    /*
+     * No banco guardamos somente o hash do token.
+     */
     const tokenHash = crypto
       .createHash('sha256')
       .update(sessionToken)
       .digest('hex');
 
+    /*
+     * Sessão válida por 30 dias.
+     */
     const expiresAt = new Date(
-      Date.now() + SESSION_DURATION_SECONDS * 1000
+      Date.now() + SESSION_SECONDS * 1000
     ).toISOString();
 
     /*
-     * Cria a sessão no banco.
+     * Salva a sessão no banco.
      */
     const { error: sessionError } = await supabase
       .from('auth_sessions')
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Cria a resposta de sucesso.
+     * Cria a resposta.
      */
     const response = NextResponse.json(
       {
@@ -154,17 +154,7 @@ export async function POST(request: Request) {
     );
 
     /*
-     * Cookie da sessão.
-     *
-     * httpOnly:
-     * JavaScript do navegador não consegue ler o token.
-     *
-     * secure:
-     * em produção, o cookie só trafega por HTTPS.
-     *
-     * sameSite=lax:
-     * ajuda a proteger contra CSRF mantendo o funcionamento
-     * normal da navegação.
+     * Cria o cookie que o /api/auth/me procura.
      */
     response.cookies.set({
       name: 'toriland_session',
@@ -173,16 +163,20 @@ export async function POST(request: Request) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: SESSION_DURATION_SECONDS,
+      maxAge: SESSION_SECONDS,
     });
 
     return response;
   } catch (error) {
-    console.error('Erro inesperado no login:', error);
+    console.error(
+      'Erro inesperado no login:',
+      error
+    );
 
     return NextResponse.json(
       {
-        error: 'Não foi possível conectar ao Toriland.',
+        error:
+          'Não foi possível realizar o login.',
       },
       { status: 500 }
     );
