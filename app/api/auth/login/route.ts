@@ -48,14 +48,15 @@ export async function POST(request: Request) {
 
     if (accountError) {
       console.error(
-        'Erro ao procurar conta:',
+        'ERRO AO PROCURAR CONTA:',
         accountError
       );
 
       return NextResponse.json(
         {
           error:
-            'Não foi possível verificar sua conta. Tente novamente.',
+            'Não foi possível verificar sua conta.',
+          debug: accountError.message,
         },
         { status: 500 }
       );
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Confere a senha salva no cadastro.
+     * Confere a senha.
      */
     const passwordIsValid = await bcrypt.compare(
       password,
@@ -91,7 +92,7 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Cria um token de sessão completamente aleatório.
+     * Cria um token de sessão aleatório.
      */
     const sessionToken = crypto
       .randomBytes(32)
@@ -125,14 +126,18 @@ export async function POST(request: Request) {
 
     if (sessionError) {
       console.error(
-        'Erro ao criar sessão:',
+        'ERRO AO CRIAR SESSÃO NO SUPABASE:',
         sessionError
       );
 
       return NextResponse.json(
         {
           error:
-            'Não foi possível criar sua sessão. Tente novamente.',
+            'Não foi possível criar sua sessão.',
+          debug: sessionError.message,
+          code: sessionError.code,
+          details: sessionError.details,
+          hint: sessionError.hint,
         },
         { status: 500 }
       );
@@ -169,7 +174,7 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     console.error(
-      'Erro inesperado no login:',
+      'ERRO INESPERADO NO LOGIN:',
       error
     );
 
@@ -177,6 +182,10 @@ export async function POST(request: Request) {
       {
         error:
           'Não foi possível realizar o login.',
+        debug:
+          error instanceof Error
+            ? error.message
+            : String(error),
       },
       { status: 500 }
     );
