@@ -79,8 +79,10 @@ const SPOTIFY_URL_REGEX =
 
 function CloudIcon({
   filled = false,
+  className = 'h-5 w-5',
 }: {
   filled?: boolean;
+  className?: string;
 }) {
   return (
     <svg
@@ -90,7 +92,7 @@ function CloudIcon({
       strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-5 w-5"
+      className={className}
       aria-hidden="true"
     >
       <path d="M7.2 18.2h10.1a4.1 4.1 0 0 0 .5-8.17A6.1 6.1 0 0 0 6 11.1a3.6 3.6 0 0 0 1.2 7.1Z" />
@@ -233,6 +235,177 @@ function ChevronRightIcon() {
   );
 }
 
+function MenuIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="m6 6 12 12" />
+      <path d="m18 6-12 12" />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="m3.5 10.5 8.5-7 8.5 7" />
+      <path d="M5.5 9.5V20h13V9.5" />
+      <path d="M9.5 20v-6h5v6" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6" />
+    </svg>
+  );
+}
+
+function BookIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21V5.5Z" />
+      <path d="M4 5.5V21" />
+      <path d="M8 7h8" />
+      <path d="M8 10h8" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <rect x="3.5" y="5" width="17" height="16" rx="2.5" />
+      <path d="M7.5 3v4" />
+      <path d="M16.5 3v4" />
+      <path d="M3.5 9h17" />
+      <path d="M8 13h.01" />
+      <path d="M12 13h.01" />
+      <path d="M16 13h.01" />
+      <path d="M8 17h.01" />
+      <path d="M12 17h.01" />
+      <path d="M16 17h.01" />
+    </svg>
+  );
+}
+
+function BookmarkMenuIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M6.5 4.5A1.5 1.5 0 0 1 8 3h8a1.5 1.5 0 0 1 1.5 1.5V21l-5.5-3-5.5 3V4.5Z" />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V20h-2.4v-.2a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.46 15a1.7 1.7 0 0 0-1.56-1.03H6.7v-2.4h.2A1.7 1.7 0 0 0 8.46 10a1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 12.73 5.2V5h2.4v.2a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.2v2.4h-.2A1.7 1.7 0 0 0 19.4 15Z" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10" />
+      <path d="M14 8l4 4-4 4" />
+      <path d="M18 12H9" />
+    </svg>
+  );
+}
+
 /* =========================================================
    HELPERS
 ========================================================= */
@@ -257,7 +430,9 @@ function formatPostDateTime(date: string) {
   )}`;
 }
 
-function getInitial(profile: Profile | CurrentUser | null) {
+function getInitial(
+  profile: Profile | CurrentUser | null
+) {
   if (!profile) {
     return '?';
   }
@@ -325,66 +500,55 @@ function Avatar({
 }
 
 /* =========================================================
-   PRÓXIMAS ATTS
+   PRÓXIMAS ATUALIZAÇÕES
 ========================================================= */
 
-type UpcomingUpdate = {
+type ApiUpcomingUpdate = {
   id: string;
-  date: string;
-  username: string;
-  displayName: string;
-  storyTitle: string;
-  chapter: string;
+  chapter_id: string;
+  story_id: string;
+  chapter_number: number;
+  chapter_title: string;
+  story_title: string;
+  story_cover_url: string | null;
+  scheduled_for: string;
+  author: {
+    id: string;
+    username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+};
+
+type UpcomingUpdate = ApiUpcomingUpdate & {
   color: string;
 };
 
-const DEMO_UPDATES: UpcomingUpdate[] = [
-  {
-    id: 'update-1',
-    date: '2026-09-08',
-    username: 'lyra',
-    displayName: 'Lyra',
-    storyTitle: 'The Last Summer',
-    chapter: 'Cap. 18',
-    color: '#ff78b9',
-  },
-  {
-    id: 'update-2',
-    date: '2026-09-12',
-    username: 'maria',
-    displayName: 'Maria',
-    storyTitle: 'Entre Nós',
-    chapter: 'Cap. 07',
-    color: '#b88cff',
-  },
-  {
-    id: 'update-3',
-    date: '2026-09-15',
-    username: 'alice',
-    displayName: 'Alice',
-    storyTitle: 'A Promessa',
-    chapter: 'Cap. 24',
-    color: '#7ddcff',
-  },
-  {
-    id: 'update-4',
-    date: '2026-09-15',
-    username: 'nina',
-    displayName: 'Nina',
-    storyTitle: 'Depois da Chuva',
-    chapter: 'Cap. 11',
-    color: '#ffd36e',
-  },
-  {
-    id: 'update-5',
-    date: '2026-09-21',
-    username: 'clara',
-    displayName: 'Clara',
-    storyTitle: 'Constelações',
-    chapter: 'Cap. 32',
-    color: '#8ee39a',
-  },
+const UPDATE_COLORS = [
+  '#ff78b9',
+  '#b88cff',
+  '#7ddcff',
+  '#ffd36e',
+  '#8ee39a',
+  '#ff9c7d',
+  '#c7a6ff',
+  '#72e0c1',
 ];
+
+function getAuthorColor(
+  authorId: string,
+  authorIds: string[]
+) {
+  const index = authorIds.indexOf(authorId);
+
+  if (index === -1) {
+    return UPDATE_COLORS[0];
+  }
+
+  return UPDATE_COLORS[
+    index % UPDATE_COLORS.length
+  ];
+}
 
 function getCalendarDays(
   year: number,
@@ -422,7 +586,44 @@ function getCalendarDays(
   return days;
 }
 
-function UpcomingUpdatesCard() {
+function formatScheduledTime(
+  date: string
+) {
+  return new Date(
+    date
+  ).toLocaleTimeString(
+    'pt-BR',
+    {
+      hour: '2-digit',
+      minute: '2-digit',
+    }
+  );
+}
+
+function formatScheduledDate(
+  date: string
+) {
+  return new Date(
+    date
+  ).toLocaleDateString(
+    'pt-BR',
+    {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }
+  );
+}
+
+function UpcomingUpdatesContent({
+  updates,
+  onClose,
+  mobile = false,
+}: {
+  updates: UpcomingUpdate[];
+  onClose?: () => void;
+  mobile?: boolean;
+}) {
   const now = new Date();
 
   const [
@@ -461,17 +662,33 @@ function UpcomingUpdatesCard() {
     );
 
   const updatesForMonth =
-    DEMO_UPDATES.filter((update) => {
-      const date = new Date(
-        `${update.date}T12:00:00`
-      );
+    useMemo(() => {
+      return updates
+        .filter((update) => {
+          const date = new Date(
+            update.scheduled_for
+          );
 
-      return (
-        date.getFullYear() ===
-          year &&
-        date.getMonth() === month
-      );
-    });
+          return (
+            date.getFullYear() ===
+              year &&
+            date.getMonth() === month
+          );
+        })
+        .sort(
+          (a, b) =>
+            new Date(
+              a.scheduled_for
+            ).getTime() -
+            new Date(
+              b.scheduled_for
+            ).getTime()
+        );
+    }, [
+      updates,
+      year,
+      month,
+    ]);
 
   function goPreviousMonth() {
     setCalendarDate(
@@ -497,280 +714,359 @@ function UpcomingUpdatesCard() {
     day: number
   ) {
     return updatesForMonth.filter(
-      (update) =>
-        new Date(
-          `${update.date}T12:00:00`
-        ).getDate() === day
+      (update) => {
+        const date = new Date(
+          update.scheduled_for
+        );
+
+        return (
+          date.getDate() === day
+        );
+      }
     );
   }
 
   return (
-    <aside className="hidden w-[270px] shrink-0 lg:block">
-      <div className="sticky top-6 overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+    <div
+      className={
+        mobile
+          ? 'flex h-full min-h-0 flex-col'
+          : ''
+      }
+    >
+      {/* HEADER */}
 
-        {/* HEADER */}
+      <div className="border-b border-white/[0.06] px-5 pb-4 pt-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <CloudIcon
+                className="h-5 w-5 text-[#ff78b9]"
+              />
 
-        <div className="border-b border-white/[0.06] px-5 pb-4 pt-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg">☁️</span>
-
-                <h2 className="text-sm font-black uppercase tracking-[0.12em] text-white">
-                  Próximas ATTs
-                </h2>
-              </div>
-
-              <p className="mt-1.5 text-[11px] leading-4 text-white/35">
-                Acompanhe as próximas
-                atualizações.
-              </p>
+              <h2 className="text-sm font-black uppercase tracking-[0.12em] text-white">
+                Próximas ATTs
+              </h2>
             </div>
-          </div>
-        </div>
 
-        {/* CALENDAR */}
-
-        <div className="px-4 py-4">
-
-          {/* MONTH NAVIGATION */}
-
-          <div className="mb-4 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={goPreviousMonth}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.05] hover:text-[#ff78b9]"
-              aria-label="Mês anterior"
-            >
-              <ChevronLeftIcon />
-            </button>
-
-            <p className="text-xs font-black capitalize text-white">
-              {monthName}{' '}
-              <span className="text-white/35">
-                {year}
-              </span>
+            <p className="mt-1.5 text-[11px] leading-4 text-white/35">
+              Acompanhe as próximas
+              atualizações.
             </p>
+          </div>
 
+          {mobile && onClose && (
             <button
               type="button"
-              onClick={goNextMonth}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.05] hover:text-[#ff78b9]"
-              aria-label="Próximo mês"
+              onClick={onClose}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/35 transition hover:bg-white/[0.05] hover:text-white"
+              aria-label="Fechar calendário"
             >
-              <ChevronRightIcon />
+              <CloseIcon />
             </button>
-          </div>
-
-          {/* WEEK DAYS */}
-
-          <div className="grid grid-cols-7 gap-1">
-            {[
-              'D',
-              'S',
-              'T',
-              'Q',
-              'Q',
-              'S',
-              'S',
-            ].map(
-              (
-                day,
-                index
-              ) => (
-                <div
-                  key={`${day}-${index}`}
-                  className="flex h-7 items-center justify-center text-[9px] font-bold text-white/20"
-                >
-                  {day}
-                </div>
-              )
-            )}
-          </div>
-
-          {/* DAYS */}
-
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map(
-              (
-                day,
-                index
-              ) => {
-                if (
-                  day === null
-                ) {
-                  return (
-                    <div
-                      key={`empty-${index}`}
-                      className="h-9"
-                    />
-                  );
-                }
-
-                const updates =
-                  getUpdatesForDay(
-                    day
-                  );
-
-                const today =
-                  new Date();
-
-                const isToday =
-                  today.getFullYear() ===
-                    year &&
-                  today.getMonth() ===
-                    month &&
-                  today.getDate() ===
-                    day;
-
-                return (
-                  <div
-                    key={day}
-                    className={`relative flex h-9 items-center justify-center rounded-xl text-[10px] transition ${
-                      isToday
-                        ? 'bg-[#ff78b9]/[0.09] font-black text-[#ff78b9]'
-                        : 'text-white/45 hover:bg-white/[0.025]'
-                    }`}
-                  >
-                    <span
-                      className={
-                        updates.length
-                          ? 'relative z-10'
-                          : ''
-                      }
-                    >
-                      {day}
-                    </span>
-
-                    {/* NUVENS DAS ATUALIZAÇÕES */}
-
-                    {updates.length >
-                      0 && (
-                      <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-[2px]">
-                        {updates
-                          .slice(
-                            0,
-                            3
-                          )
-                          .map(
-                            (
-                              update
-                            ) => (
-                              <span
-                                key={
-                                  update.id
-                                }
-                                className="h-[5px] w-[8px] rounded-full opacity-90"
-                                style={{
-                                  backgroundColor:
-                                    update.color,
-                                }}
-                              />
-                            )
-                          )}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-            )}
-          </div>
+          )}
         </div>
+      </div>
 
-        {/* LEGEND */}
+      {/* CALENDAR */}
 
-        <div className="border-t border-white/[0.06] px-4 py-4">
+      <div className="px-4 py-4">
+        {/* MONTH NAVIGATION */}
 
-          <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/20">
-            Próximas atualizações
+        <div className="mb-4 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={goPreviousMonth}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.05] hover:text-[#ff78b9]"
+            aria-label="Mês anterior"
+          >
+            <ChevronLeftIcon />
+          </button>
+
+          <p className="text-xs font-black capitalize text-white">
+            {monthName}{' '}
+            <span className="text-white/35">
+              {year}
+            </span>
           </p>
 
-          <div className="space-y-3">
-            {updatesForMonth.length >
-            0 ? (
-              updatesForMonth
-                .slice(0, 5)
-                .map(
-                  (update) => {
-                    const date =
-                      new Date(
-                        `${update.date}T12:00:00`
-                      );
+          <button
+            type="button"
+            onClick={goNextMonth}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.05] hover:text-[#ff78b9]"
+            aria-label="Próximo mês"
+          >
+            <ChevronRightIcon />
+          </button>
+        </div>
 
-                    const day =
-                      date.getDate();
+        {/* WEEK DAYS */}
 
-                    return (
-                      <Link
-                        key={
-                          update.id
-                        }
-                        href={`/profile/${update.username}`}
-                        className="group flex items-start gap-2.5 rounded-xl p-1.5 -mx-1.5 transition hover:bg-white/[0.035]"
-                      >
-                        {/* MINI NUVEM */}
+        <div className="grid grid-cols-7 gap-1">
+          {[
+            'D',
+            'S',
+            'T',
+            'Q',
+            'Q',
+            'S',
+            'S',
+          ].map(
+            (
+              day,
+              index
+            ) => (
+              <div
+                key={`${day}-${index}`}
+                className="flex h-7 items-center justify-center text-[9px] font-bold text-white/20"
+              >
+                {day}
+              </div>
+            )
+          )}
+        </div>
 
-                        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/[0.035]">
-                          <span
-                            className="text-sm leading-none"
-                            style={{
-                              filter: `drop-shadow(0 0 5px ${update.color})`,
-                            }}
-                          >
-                            ☁
-                          </span>
-                        </div>
+        {/* DAYS */}
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <p className="truncate text-[11px] font-bold text-white transition group-hover:text-[#ff78b9]">
-                              @{update.username}
-                            </p>
+        <div className="grid grid-cols-7 gap-1">
+          {calendarDays.map(
+            (
+              day,
+              index
+            ) => {
+              if (
+                day === null
+              ) {
+                return (
+                  <div
+                    key={`empty-${index}`}
+                    className="h-10"
+                  />
+                );
+              }
 
+              const dayUpdates =
+                getUpdatesForDay(
+                  day
+                );
+
+              const today =
+                new Date();
+
+              const isToday =
+                today.getFullYear() ===
+                  year &&
+                today.getMonth() ===
+                  month &&
+                today.getDate() ===
+                  day;
+
+              return (
+                <div
+                  key={day}
+                  className={`relative flex h-10 items-center justify-center rounded-xl text-[10px] transition ${
+                    isToday
+                      ? 'bg-[#ff78b9]/[0.09] font-black text-[#ff78b9]'
+                      : 'text-white/45 hover:bg-white/[0.025]'
+                  }`}
+                >
+                  <span
+                    className={
+                      dayUpdates.length
+                        ? 'relative z-10'
+                        : ''
+                    }
+                  >
+                    {day}
+                  </span>
+
+                  {/* NUVENS DAS ATUALIZAÇÕES */}
+
+                  {dayUpdates.length >
+                    0 && (
+                    <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-[2px]">
+                      {dayUpdates
+                        .slice(
+                          0,
+                          3
+                        )
+                        .map(
+                          (
+                            update
+                          ) => (
                             <span
-                              className="shrink-0 text-[9px] font-bold"
+                              key={
+                                update.id
+                              }
+                              className="relative block h-[6px] w-[9px]"
                               style={{
                                 color:
                                   update.color,
+                                filter: `drop-shadow(0 0 4px ${update.color})`,
                               }}
+                              title={`${update.author.display_name || update.author.username} — ${update.chapter_title}`}
                             >
-                              {day} set.
+                              <CloudIcon
+                                className="h-[7px] w-[10px]"
+                              />
                             </span>
-                          </div>
+                          )
+                        )}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+          )}
+        </div>
+      </div>
 
-                          <p className="mt-0.5 truncate text-[10px] text-white/35">
-                            {update.storyTitle}
-                            {' · '}
-                            {update.chapter}
-                          </p>
-                        </div>
-                      </Link>
+      {/* LEGEND */}
+
+      <div
+        className={`border-t border-white/[0.06] px-4 py-4 ${
+          mobile
+            ? 'min-h-0 flex-1 overflow-y-auto'
+            : ''
+        }`}
+      >
+        <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/20">
+          Próximas atualizações
+        </p>
+
+        <div className="space-y-3">
+          {updatesForMonth.length >
+          0 ? (
+            updatesForMonth
+              .slice(0, 8)
+              .map(
+                (update) => {
+                  const date =
+                    new Date(
+                      update.scheduled_for
                     );
-                  }
-                )
-            ) : (
-              <div className="py-3 text-center">
-                <span className="text-lg">
-                  ☁️
-                </span>
 
-                <p className="mt-2 text-[10px] text-white/25">
-                  Nenhuma atualização
-                  programada.
-                </p>
+                  const day =
+                    date.getDate();
+
+                  return (
+                    <Link
+                      key={
+                        update.id
+                      }
+                      href={`/historia/${update.story_id}`}
+                      onClick={
+                        onClose
+                      }
+                      className="group flex items-start gap-2.5 rounded-xl p-1.5 -mx-1.5 transition hover:bg-white/[0.035]"
+                    >
+                      {/* MINI NUVEM */}
+
+                      <div
+                        className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.035]"
+                        style={{
+                          color:
+                            update.color,
+                          filter: `drop-shadow(0 0 5px ${update.color}55)`,
+                        }}
+                      >
+                        <CloudIcon
+                          className="h-4 w-4"
+                        />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="truncate text-[11px] font-bold text-white transition group-hover:text-[#ff78b9]">
+                            @
+                            {
+                              update
+                                .author
+                                .username
+                            }
+                          </p>
+
+                          <span
+                            className="shrink-0 text-[9px] font-bold"
+                            style={{
+                              color:
+                                update.color,
+                            }}
+                          >
+                            {day}{' '}
+                            {date.toLocaleDateString(
+                              'pt-BR',
+                              {
+                                month:
+                                  'short',
+                              }
+                            )}
+                          </span>
+                        </div>
+
+                        <p className="mt-0.5 truncate text-[10px] text-white/45">
+                          {update.story_title ||
+                            update.storyTitle}
+                          {' · '}
+                          Cap.{' '}
+                          {
+                            update.chapter_number
+                          }
+                        </p>
+
+                        <p className="mt-0.5 text-[9px] text-white/25">
+                          {
+                            update.chapter_title
+                          }{' '}
+                          ·{' '}
+                          {formatScheduledTime(
+                            update.scheduled_for
+                          )}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                }
+              )
+          ) : (
+            <div className="py-5 text-center">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.035] text-white/20">
+                <CloudIcon />
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* FOOTER */}
-
-        <div className="border-t border-white/[0.06] px-5 py-3">
-          <p className="text-center text-[9px] leading-4 text-white/20">
-            As nuvens mostram quando
-            suas autoras vão atualizar.
-          </p>
+              <p className="mt-3 text-[10px] text-white/25">
+                Nenhuma atualização
+                programada para este
+                mês.
+              </p>
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* FOOTER */}
+
+      <div className="border-t border-white/[0.06] px-5 py-3">
+        <p className="text-center text-[9px] leading-4 text-white/20">
+          As nuvens mostram quando
+          suas autoras vão atualizar.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function UpcomingUpdatesCard({
+  updates,
+}: {
+  updates: UpcomingUpdate[];
+}) {
+  return (
+    <aside className="hidden w-[270px] shrink-0 lg:block">
+      <div className="sticky top-6 overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+        <UpcomingUpdatesContent
+          updates={updates}
+        />
       </div>
     </aside>
   );
@@ -1813,6 +2109,237 @@ function FeedPost({
 }
 
 /* =========================================================
+   MENU MOBILE
+========================================================= */
+
+function MobileDrawer({
+  open,
+  onClose,
+  currentUser,
+  onOpenCalendar,
+}: {
+  open: boolean;
+  onClose: () => void;
+  currentUser: CurrentUser | null;
+  onOpenCalendar: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <>
+      {/* OVERLAY */}
+
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Fechar menu"
+        className="fixed inset-0 z-[80] bg-black/65 backdrop-blur-[2px] lg:hidden"
+      />
+
+      {/* DRAWER */}
+
+      <aside className="fixed left-0 top-0 z-[90] flex h-screen w-[84%] max-w-[360px] flex-col overflow-hidden rounded-r-[30px] border-r border-white/[0.08] bg-[#100c11] shadow-[20px_0_80px_rgba(0,0,0,0.45)] lg:hidden">
+
+        {/* TOP */}
+
+        <div className="border-b border-white/[0.06] px-5 pb-5 pt-6">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/feed"
+              onClick={onClose}
+              className="flex items-center gap-3"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9]">
+                <CloudIcon />
+              </div>
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#ff78b9]/70">
+                  Nooklie
+                </p>
+
+                <p className="mt-0.5 text-xs font-semibold text-white/45">
+                  Entre escritores
+                </p>
+              </div>
+            </Link>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-white/35 transition hover:bg-white/[0.05] hover:text-white"
+              aria-label="Fechar menu"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+
+          {/* USER */}
+
+          <Link
+            href={
+              currentUser
+                ? `/profile/${currentUser.username}`
+                : '/perfil'
+            }
+            onClick={onClose}
+            className="mt-6 flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3 transition hover:border-[#ff78b9]/20 hover:bg-white/[0.04]"
+          >
+            <Avatar
+              profile={currentUser}
+              size="normal"
+            />
+
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-white">
+                {currentUser?.display_name ||
+                  currentUser?.username ||
+                  'Usuário'}
+              </p>
+
+              <p className="mt-0.5 truncate text-xs text-[#ff78b9]/70">
+                @
+                {currentUser?.username ||
+                  'usuario'}
+              </p>
+            </div>
+          </Link>
+        </div>
+
+        {/* NAVIGATION */}
+
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <div className="space-y-1">
+            <Link
+              href="/feed"
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <HomeIcon />
+              <span>Início</span>
+            </Link>
+
+            <Link
+              href={
+                currentUser
+                  ? `/profile/${currentUser.username}`
+                  : '/perfil'
+              }
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <UserIcon />
+              <span>Meu perfil</span>
+            </Link>
+
+            <Link
+              href="/minhas-historias"
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <BookIcon />
+              <span>Minhas histórias</span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenCalendar();
+              }}
+              className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-sm font-semibold text-white/65 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <CalendarIcon />
+              <span>Próximas atualizações</span>
+            </button>
+
+            <Link
+              href="/salvos"
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <BookmarkMenuIcon />
+              <span>Salvos</span>
+            </Link>
+
+            <Link
+              href="/configuracoes"
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <SettingsIcon />
+              <span>Configurações</span>
+            </Link>
+          </div>
+        </nav>
+
+        {/* LOGOUT */}
+
+        <div className="border-t border-white/[0.06] p-3">
+          <Link
+            href="/logout"
+            onClick={onClose}
+            className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/40 transition hover:bg-red-400/[0.05] hover:text-red-300"
+          >
+            <LogoutIcon />
+            <span>Sair</span>
+          </Link>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+/* =========================================================
+   CALENDÁRIO MOBILE
+========================================================= */
+
+function MobileCalendarModal({
+  open,
+  updates,
+  onClose,
+}: {
+  open: boolean;
+  updates: UpcomingUpdate[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      'hidden';
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+    };
+  }, [open]);
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/70 p-3 backdrop-blur-sm lg:hidden">
+      <div className="mx-auto flex h-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#100c11] shadow-[0_25px_100px_rgba(0,0,0,0.5)]">
+        <UpcomingUpdatesContent
+          updates={updates}
+          onClose={onClose}
+          mobile
+        />
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
    FEED PAGE
 ========================================================= */
 
@@ -1845,6 +2372,23 @@ export default function FeedPage() {
   const [
     composerOpen,
     setComposerOpen,
+  ] = useState(false);
+
+  const [
+    upcomingUpdates,
+    setUpcomingUpdates,
+  ] = useState<
+    UpcomingUpdate[]
+  >([]);
+
+  const [
+    drawerOpen,
+    setDrawerOpen,
+  ] = useState(false);
+
+  const [
+    calendarOpen,
+    setCalendarOpen,
   ] = useState(false);
 
   /* =======================================================
@@ -1941,12 +2485,114 @@ export default function FeedPage() {
       []
     );
 
+  /* =======================================================
+     CARREGAR PRÓXIMAS ATUALIZAÇÕES
+  ======================================================= */
+
+  const loadUpcomingUpdates =
+    useCallback(async () => {
+      try {
+        const response =
+          await fetch(
+            '/api/upcoming-updates',
+            {
+              cache: 'no-store',
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              'Não foi possível carregar as próximas atualizações.'
+          );
+        }
+
+        const rawUpdates: ApiUpcomingUpdate[] =
+          data.updates || [];
+
+        /*
+         * Mantemos a ordem em que as autoras
+         * aparecem no resultado e damos uma
+         * cor fixa para cada autora.
+         */
+
+        const authorIds =
+          Array.from(
+            new Set(
+              rawUpdates.map(
+                (update) =>
+                  update.author.id
+              )
+            )
+          );
+
+        const coloredUpdates =
+          rawUpdates.map(
+            (update) => ({
+              ...update,
+              color:
+                getAuthorColor(
+                  update.author.id,
+                  authorIds
+                ),
+            })
+          );
+
+        setUpcomingUpdates(
+          coloredUpdates
+        );
+      } catch (error) {
+        console.error(
+          'Erro ao carregar próximas atualizações:',
+          error
+        );
+
+        setUpcomingUpdates([]);
+      }
+    }, []);
+
   useEffect(() => {
     loadCurrentUser();
     loadFeed();
+    loadUpcomingUpdates();
   }, [
     loadCurrentUser,
     loadFeed,
+    loadUpcomingUpdates,
+  ]);
+
+  /*
+   * Atualiza o calendário depois de publicar
+   * ou ao voltar para a página.
+   */
+
+  useEffect(() => {
+    const handleVisibility =
+      () => {
+        if (
+          document.visibilityState ===
+          'visible'
+        ) {
+          loadUpcomingUpdates();
+        }
+      };
+
+    document.addEventListener(
+      'visibilitychange',
+      handleVisibility
+    );
+
+    return () => {
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibility
+      );
+    };
+  }, [
+    loadUpcomingUpdates,
   ]);
 
   function updatePost(
@@ -1979,14 +2625,59 @@ export default function FeedPage() {
         <div className="absolute bottom-[-200px] left-[35%] h-[450px] w-[450px] rounded-full bg-[#ff78b9]/[0.035] blur-[130px]" />
       </div>
 
-      <div className="relative mx-auto min-h-screen w-full max-w-6xl px-4 pb-20 pt-5 sm:px-6 lg:px-8">
+      {/* MOBILE DRAWER */}
+
+      <MobileDrawer
+        open={drawerOpen}
+        onClose={() =>
+          setDrawerOpen(false)
+        }
+        currentUser={
+          currentUser
+        }
+        onOpenCalendar={() =>
+          setCalendarOpen(true)
+        }
+      />
+
+      {/* MOBILE CALENDAR */}
+
+      <MobileCalendarModal
+        open={calendarOpen}
+        updates={
+          upcomingUpdates
+        }
+        onClose={() =>
+          setCalendarOpen(false)
+        }
+      />
+
+      <div className="relative mx-auto min-h-screen w-full max-w-6xl px-4 pb-20 pt-4 sm:px-6 lg:px-8 lg:pt-5">
 
         {/* HEADER */}
 
         <header className="mb-6 flex items-center justify-between">
 
+          {/* MOBILE AVATAR */}
+
+          <button
+            type="button"
+            onClick={() =>
+              setDrawerOpen(true)
+            }
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#ff78b9]/20 bg-[#ff78b9]/[0.06] p-[2px] lg:hidden"
+            aria-label="Abrir menu"
+          >
+            <Avatar
+              profile={currentUser}
+              size="small"
+            />
+          </button>
+
+          {/* BRAND */}
+
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9]">
+            <div className="hidden h-9 w-9 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9] sm:flex">
               <CloudIcon />
             </div>
 
@@ -2001,13 +2692,16 @@ export default function FeedPage() {
             </div>
           </div>
 
+          {/* REFRESH */}
+
           <button
             type="button"
-            onClick={() =>
-              loadFeed(true)
-            }
+            onClick={() => {
+              loadFeed(true);
+              loadUpcomingUpdates();
+            }}
             disabled={refreshing}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/45 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9] disabled:opacity-40"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/45 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9] disabled:opacity-40 sm:h-11 sm:w-11"
             aria-label="Atualizar Feed"
             title="Atualizar"
           >
@@ -2200,10 +2894,14 @@ export default function FeedPage() {
           </div>
 
           {/* =================================================
-              PRÓXIMAS ATTS
+              PRÓXIMAS ATUALIZAÇÕES DESKTOP
           ================================================= */}
 
-          <UpcomingUpdatesCard />
+          <UpcomingUpdatesCard
+            updates={
+              upcomingUpdates
+            }
+          />
         </div>
       </div>
 
@@ -2219,6 +2917,7 @@ export default function FeedPage() {
         onPublished={() => {
           setComposerOpen(false);
           loadFeed(true);
+          loadUpcomingUpdates();
         }}
       />
     </main>
