@@ -11,38 +11,101 @@ export default function NovoCapituloPage() {
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+
+  const [publishMode, setPublishMode] = useState<
+    'now' | 'schedule'
+  >('now');
+
+  const [scheduledDate, setScheduledDate] =
+    useState('');
+
+  const [scheduledTime, setScheduledTime] =
+    useState('19:00');
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(
+    e: React.FormEvent
+  ) {
     e.preventDefault();
 
     setError('');
 
     if (!title.trim()) {
-      setError('Digite um título para o capítulo.');
+      setError(
+        'Digite um título para o capítulo.'
+      );
       return;
     }
 
     if (!body.trim()) {
-      setError('Escreva o conteúdo do capítulo.');
+      setError(
+        'Escreva o conteúdo do capítulo.'
+      );
       return;
+    }
+
+    if (
+      publishMode === 'schedule' &&
+      !scheduledDate
+    ) {
+      setError(
+        'Escolha a data de publicação.'
+      );
+      return;
+    }
+
+    let scheduledFor: string | null = null;
+
+    if (
+      publishMode === 'schedule' &&
+      scheduledDate
+    ) {
+      scheduledFor = `${scheduledDate}T${scheduledTime}:00`;
+
+      const selectedDate =
+        new Date(scheduledFor);
+
+      if (
+        Number.isNaN(
+          selectedDate.getTime()
+        )
+      ) {
+        setError(
+          'A data escolhida é inválida.'
+        );
+        return;
+      }
+
+      if (selectedDate <= new Date()) {
+        setError(
+          'A data de publicação precisa ser no futuro.'
+        );
+        return;
+      }
     }
 
     setSaving(true);
 
     try {
-      const response = await fetch('/api/chapters/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          story_id: storyId,
-          title: title.trim(),
-          body: body.trim(),
-        }),
-      });
+      const response = await fetch(
+        '/api/chapters/create',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            story_id: storyId,
+            title: title.trim(),
+            body: body.trim(),
+            publish_mode: publishMode,
+            scheduled_for: scheduledFor,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -55,9 +118,13 @@ export default function NovoCapituloPage() {
         return;
       }
 
-      router.push(`/historia/${storyId}`);
+      router.push(
+        `/historia/${storyId}`
+      );
     } catch {
-      setError('Erro de conexão. Tente novamente.');
+      setError(
+        'Erro de conexão. Tente novamente.'
+      );
       setSaving(false);
     }
   }
@@ -69,7 +136,8 @@ export default function NovoCapituloPage() {
         background: '#0b0b0f',
         color: '#f5f5f5',
         padding: '40px 20px',
-        fontFamily: 'Arial, sans-serif',
+        fontFamily:
+          'Arial, sans-serif',
       }}
     >
       <div
@@ -80,7 +148,9 @@ export default function NovoCapituloPage() {
       >
         <button
           onClick={() =>
-            router.push(`/historia/${storyId}`)
+            router.push(
+              `/historia/${storyId}`
+            )
           }
           style={{
             background: 'transparent',
@@ -109,10 +179,13 @@ export default function NovoCapituloPage() {
             marginBottom: '30px',
           }}
         >
-          Escreva mais um capítulo da sua história.
+          Escreva mais um capítulo da sua
+          história.
         </p>
 
-        <form onSubmit={handleSubmit}>
+        <form
+          onSubmit={handleSubmit}
+        >
           <label
             style={{
               display: 'block',
@@ -135,7 +208,8 @@ export default function NovoCapituloPage() {
               boxSizing: 'border-box',
               padding: '15px',
               borderRadius: '10px',
-              border: '1px solid #333',
+              border:
+                '1px solid #333',
               background: '#15151b',
               color: '#fff',
               fontSize: '16px',
@@ -166,16 +240,242 @@ export default function NovoCapituloPage() {
               boxSizing: 'border-box',
               padding: '18px',
               borderRadius: '10px',
-              border: '1px solid #333',
+              border:
+                '1px solid #333',
               background: '#15151b',
               color: '#fff',
               fontSize: '17px',
               lineHeight: '1.7',
               resize: 'vertical',
               outline: 'none',
-              fontFamily: 'Georgia, serif',
+              fontFamily:
+                'Georgia, serif',
             }}
           />
+
+          {/* PUBLICAÇÃO */}
+
+          <div
+            style={{
+              marginTop: '28px',
+              padding: '20px',
+              borderRadius: '14px',
+              border:
+                '1px solid #2d2830',
+              background: '#111116',
+            }}
+          >
+            <h2
+              style={{
+                fontSize: '18px',
+                marginBottom: '6px',
+              }}
+            >
+              Publicação
+            </h2>
+
+            <p
+              style={{
+                color: '#888',
+                fontSize: '14px',
+                marginBottom: '18px',
+              }}
+            >
+              Escolha quando seus leitores
+              poderão acessar este capítulo.
+            </p>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns:
+                  'repeat(2, minmax(0, 1fr))',
+                gap: '12px',
+              }}
+            >
+              {/* PUBLICAR AGORA */}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPublishMode('now')
+                }
+                style={{
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border:
+                    publishMode === 'now'
+                      ? '2px solid #ff4fa3'
+                      : '1px solid #333',
+                  background:
+                    publishMode === 'now'
+                      ? 'rgba(255,79,163,0.10)'
+                      : '#15151b',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 'bold',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Publicar agora
+                </div>
+
+                <div
+                  style={{
+                    color: '#888',
+                    fontSize: '13px',
+                  }}
+                >
+                  O capítulo ficará disponível
+                  imediatamente.
+                </div>
+              </button>
+
+              {/* AGENDAR */}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPublishMode(
+                    'schedule'
+                  )
+                }
+                style={{
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border:
+                    publishMode ===
+                    'schedule'
+                      ? '2px solid #ff4fa3'
+                      : '1px solid #333',
+                  background:
+                    publishMode ===
+                    'schedule'
+                      ? 'rgba(255,79,163,0.10)'
+                      : '#15151b',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 'bold',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Agendar publicação
+                </div>
+
+                <div
+                  style={{
+                    color: '#888',
+                    fontSize: '13px',
+                  }}
+                >
+                  Escolha o dia e horário em que
+                  o capítulo será liberado.
+                </div>
+              </button>
+            </div>
+
+            {/* DATA */}
+
+            {publishMode ===
+              'schedule' && (
+              <div
+                style={{
+                  marginTop: '18px',
+                  display: 'grid',
+                  gridTemplateColumns:
+                    '1fr 1fr',
+                  gap: '14px',
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      marginBottom: '7px',
+                      color: '#ccc',
+                      fontSize: '14px',
+                    }}
+                  >
+                    Data
+                  </label>
+
+                  <input
+                    type="date"
+                    value={scheduledDate}
+                    onChange={(e) =>
+                      setScheduledDate(
+                        e.target.value
+                      )
+                    }
+                    min={
+                      new Date()
+                        .toISOString()
+                        .split('T')[0]
+                    }
+                    style={{
+                      width: '100%',
+                      boxSizing:
+                        'border-box',
+                      padding: '13px',
+                      borderRadius: '10px',
+                      border:
+                        '1px solid #333',
+                      background:
+                        '#15151b',
+                      color: '#fff',
+                      fontSize: '15px',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      marginBottom: '7px',
+                      color: '#ccc',
+                      fontSize: '14px',
+                    }}
+                  >
+                    Horário
+                  </label>
+
+                  <input
+                    type="time"
+                    value={scheduledTime}
+                    onChange={(e) =>
+                      setScheduledTime(
+                        e.target.value
+                      )
+                    }
+                    style={{
+                      width: '100%',
+                      boxSizing:
+                        'border-box',
+                      padding: '13px',
+                      borderRadius: '10px',
+                      border:
+                        '1px solid #333',
+                      background:
+                        '#15151b',
+                      color: '#fff',
+                      fontSize: '15px',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
           {error && (
             <p
@@ -209,7 +509,13 @@ export default function NovoCapituloPage() {
             }}
           >
             {saving
-              ? 'Publicando...'
+              ? publishMode ===
+                'schedule'
+                ? 'Agendando...'
+                : 'Publicando...'
+              : publishMode ===
+                'schedule'
+              ? 'Agendar capítulo'
               : 'Publicar capítulo'}
           </button>
         </form>
