@@ -1,4 +1,3 @@
-```tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -49,6 +48,7 @@ type ProfileResponse = {
   user?: User;
   stories?: Story[];
   posts?: NookPost[];
+  error?: string;
 };
 
 type Tab = 'stories' | 'nook';
@@ -75,45 +75,47 @@ export default function PublicProfilePage() {
 
   const usernameParam = params?.username;
 
-  const username = Array.isArray(usernameParam)
-    ? usernameParam[0]
-    : usernameParam;
+  const username =
+    typeof usernameParam === 'string'
+      ? usernameParam
+      : Array.isArray(usernameParam)
+        ? usernameParam[0]
+        : undefined;
 
   const [user, setUser] = useState<User | null>(null);
   const [stories, setStories] = useState<Story[]>([]);
   const [posts, setPosts] = useState<NookPost[]>([]);
 
-  const [activeTab, setActiveTab] =
-    useState<Tab>('stories');
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState('');
+  const [activeTab, setActiveTab] = useState<Tab>('stories');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!username) return;
+    if (!username) {
+      setLoading(false);
+      setError('Perfil não encontrado.');
+      return;
+    }
 
     async function loadProfile() {
       setLoading(true);
       setError('');
 
       try {
+        const encodedUsername = encodeURIComponent(username);
+
         const response = await fetch(
-          `/api/public-profile/${encodeURIComponent(username)}`,
+          `/api/public-profile/${encodedUsername}`,
           {
             cache: 'no-store',
           }
         );
 
-        const data: ProfileResponse =
-          await response.json();
+        const data: ProfileResponse = await response.json();
 
         if (!response.ok) {
           setError(
-            (data as { error?: string }).error ||
-              'Perfil não encontrado.'
+            data.error || 'Perfil não encontrado.'
           );
           return;
         }
@@ -124,11 +126,13 @@ export default function PublicProfilePage() {
         }
 
         setUser(data.user);
+
         setStories(
           Array.isArray(data.stories)
             ? data.stories
             : []
         );
+
         setPosts(
           Array.isArray(data.posts)
             ? data.posts
@@ -227,8 +231,7 @@ export default function PublicProfilePage() {
             className="relative h-44 overflow-hidden sm:h-60"
             style={{
               backgroundColor:
-                user.theme_color ||
-                '#241924',
+                user.theme_color || '#241924',
             }}
           >
             {user.cover_url ? (
@@ -263,9 +266,10 @@ export default function PublicProfilePage() {
                       .toUpperCase()}
                   </div>
                 )}
+
               </div>
 
-              {/* BOTÃO DE EDITAR APENAS NO PRÓPRIO PERFIL */}
+              {/* BOTÃO DO PRÓPRIO PERFIL */}
               <button
                 type="button"
                 onClick={() => router.push('/perfil')}
@@ -300,11 +304,10 @@ export default function PublicProfilePage() {
         {/* ABAS */}
         <div className="mt-5 rounded-2xl border border-white/10 bg-[#151015] p-1.5">
           <div className="grid grid-cols-2 gap-1">
+
             <button
               type="button"
-              onClick={() =>
-                setActiveTab('stories')
-              }
+              onClick={() => setActiveTab('stories')}
               className={`rounded-xl px-4 py-3 text-sm font-black transition ${
                 activeTab === 'stories'
                   ? 'bg-white text-black'
@@ -316,9 +319,7 @@ export default function PublicProfilePage() {
 
             <button
               type="button"
-              onClick={() =>
-                setActiveTab('nook')
-              }
+              onClick={() => setActiveTab('nook')}
               className={`rounded-xl px-4 py-3 text-sm font-black transition ${
                 activeTab === 'nook'
                   ? 'bg-white text-black'
@@ -327,6 +328,7 @@ export default function PublicProfilePage() {
             >
               Mural
             </button>
+
           </div>
         </div>
 
@@ -364,6 +366,7 @@ export default function PublicProfilePage() {
                       className="group overflow-hidden rounded-3xl border border-white/10 bg-[#151015] text-left transition hover:-translate-y-0.5 hover:border-white/20"
                     >
                       <div className="relative aspect-[16/9] overflow-hidden bg-[#211a21]">
+
                         {story.cover_url ? (
                           <img
                             src={story.cover_url}
@@ -383,6 +386,7 @@ export default function PublicProfilePage() {
                             {story.status}
                           </span>
                         )}
+
                       </div>
 
                       <div className="p-5">
@@ -397,6 +401,7 @@ export default function PublicProfilePage() {
                         )}
 
                         <div className="mt-4 flex items-center justify-between text-xs text-white/30">
+
                           <span>
                             {story.rating
                               ? `Classificação ${story.rating}`
@@ -409,6 +414,7 @@ export default function PublicProfilePage() {
                                 story.created_at
                             )}
                           </span>
+
                         </div>
                       </div>
                     </button>
@@ -437,6 +443,7 @@ export default function PublicProfilePage() {
                 </div>
               ) : (
                 <div className="space-y-4">
+
                   {posts.map((post) => (
                     <article
                       key={post.id}
@@ -445,6 +452,7 @@ export default function PublicProfilePage() {
                       <div className="p-5 sm:p-6">
 
                         <div className="flex items-center gap-3">
+
                           {user.avatar_url ? (
                             <img
                               src={user.avatar_url}
@@ -481,6 +489,7 @@ export default function PublicProfilePage() {
                               📌
                             </span>
                           )}
+
                         </div>
 
                         {post.body && (
@@ -526,16 +535,18 @@ export default function PublicProfilePage() {
                                 ))}
                             </div>
                           )}
+
                       </div>
                     </article>
                   ))}
+
                 </div>
               )}
             </>
           )}
+
         </section>
       </div>
     </main>
   );
 }
-```
