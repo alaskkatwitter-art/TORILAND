@@ -1,35 +1,24 @@
 'use client';
 
-import {
-  ChangeEvent,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Story = {
   id: string;
   title: string;
+  cover_url: string | null;
 };
 
-type PostMedia = {
-  id: string;
-  post_id: string;
-  media_url: string;
-  media_type: 'image' | 'gif';
-  created_at?: string;
-};
-
-type NookPostComposerProps = {
+type Props = {
   open: boolean;
   onClose: () => void;
   onPublished?: () => void;
 };
 
+const MAX_TEXT = 5000;
 const MAX_MEDIA = 4;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-const ACCEPTED_MEDIA_TYPES = [
+const ACCEPTED_TYPES = [
   'image/jpeg',
   'image/png',
   'image/webp',
@@ -40,525 +29,470 @@ export default function NookPostComposer({
   open,
   onClose,
   onPublished,
-}: NookPostComposerProps) {
-  const mediaInputRef =
-    useRef<HTMLInputElement | null>(null);
+}: Props) {
+  const [body, setBody] = useState('');
+  const [storyId, setStoryId] = useState('');
+  const [stories, setStories] = useState<Story[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  const [loadingStories, setLoadingStories] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [error, setError] = useState('');
 
-  const [newPost, setNewPost] =
-    useState('');
+  const canPublish = useMemo(() => {
+    return body.trim().length > 0 || mediaFiles.length > 0;
+  }, [body, mediaFiles]);
 
-  const [selectedStoryId, setSelectedStoryId] =
-    useState('');
-
-  const [stories, setStories] =
-    useState<Story[]>([]);
-
-  const [mediaFiles, setMediaFiles] =
-    useState<File[]>([]);
-
-  const [mediaPreviews, setMediaPreviews] =
-    useState<string[]>([]);
-
-  const [creatingPost, setCreatingPost] =
-    useState(false);
-
-  const [error, setError] =
-    useState('');
-
+  /*
+   * Carrega as histórias do usuário quando o compositor é aberto.
+   */
   useEffect(() => {
     if (!open) return;
 
     setError('');
 
+    let active = true;
+
     async function loadStories() {
+      setLoadingStories(true);
+
       try {
-        const response = await fetch(
-          '/api/profile/stories',
-          {
-            cache: 'no-store',
-          }
-        );
+        const response = await fetch('/api/profile/stories', {
+          cache: 'no-store',
+        });
 
-        if (!response.ok) return;
+        const data = await response.json();
 
-        const data =
-          await response.json();
+        if (!response.ok) {
+          throw new Error(
+            data.error || 'Não foi possível carregar suas histórias.'
+          );
+        }
 
-        setStories(
-          Array.isArray(data.stories)
-            ? data.stories
-            : []
-        );
-      } catch {
-        setStories([]);
+        if (active) {
+          setStories(data.stories || []);
+        }
+      } catch (err) {
+        console.error(err);
+
+        if (active) {
+          setStories([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingStories(false);
+        }
       }
     }
 
     loadStories();
-  }, [open]);
-
-  useEffect(() => {
-    const urls =
-      mediaFiles.map((file) =>
-        URL.createObjectURL(file)
-      );
-
-    setMediaPreviews(urls);
 
     return () => {
-      urls.forEach((url) =>
-        URL.revokeObjectURL(url)
-      );
+      active = false;
     };
-  }, [mediaFiles]);
+  }, [open]);
 
+  /*
+   * Libera os previews criados com URL.createObjectURL
+   * quando o componente for desmontado.
+   */
+  useEffect(() => {
+    return () => {
+      mediaPreviews.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+    };
+  }, [mediaPreviews]);
+
+  /*
+   * Fecha com ESC.
+   */
   useEffect(() => {
     if (!open) return;
 
-    const handleKeyDown = (
-      event: KeyboardEvent
-    ) => {
-      if (event.key === 'Escape') {
-        if (creatingPost) return;
-
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !publishing) {
         handleClose();
       }
-    };
+    }
 
-    document.addEventListener(
-      'keydown',
-      handleKeyDown
-    );
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.removeEventListener(
-        'keydown',
-        handleKeyDown
-      );
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, creatingPost]);
+  }, [open, publishing]);
 
-  function handleClose() {
-    if (creatingPost) return;
+  /*
+   * Limpa completamente o compositor.
+   */
+  function resetComposer() {
+    mediaPreviews.forEach((url) => {
+      URL.revokeObjectURL(url);
+    });
 
-    setNewPost('');
-    setSelectedStoryId('');
+    setBody('');
+    setStoryId('');
     setMediaFiles([]);
     setMediaPreviews([]);
     setError('');
+  }
 
+  function handleClose() {
+    if (publishing) return;
+
+    resetComposer();
     onClose();
   }
 
+  /*
+   * Seleção de imagens/GIFs.
+   */
   function handleMediaSelection(
-    event: ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>
   ) {
-    const selected =
-      Array.from(
-        event.target.files || []
-      );
+    const selected = Array.from(event.target.files || []);
 
     if (!selected.length) return;
 
     setError('');
 
-    setMediaFiles((current) => {
-      const availableSlots =
-        MAX_MEDIA - current.length;
+    if (mediaFiles.length + selected.length > MAX_MEDIA) {
+      setError(
+        `Você pode adicionar no máximo ${MAX_MEDIA} imagens ou GIFs.`
+      );
 
-      if (availableSlots <= 0) {
-        setError(
-          'Você pode adicionar no máximo 4 imagens ou GIFs por publicação.'
-        );
-
-        return current;
-      }
-
-      const validFiles: File[] = [];
-
-      for (const file of selected) {
-        if (
-          !ACCEPTED_MEDIA_TYPES.includes(
-            file.type
-          )
-        ) {
-          setError(
-            'Use apenas JPG, PNG, WEBP ou GIF.'
-          );
-
-          continue;
-        }
-
-        if (file.size > MAX_FILE_SIZE) {
-          setError(
-            'Cada imagem pode ter no máximo 10 MB.'
-          );
-
-          continue;
-        }
-
-        validFiles.push(file);
-      }
-
-      if (
-        validFiles.length >
-        availableSlots
-      ) {
-        setError(
-          'Você pode adicionar no máximo 4 imagens ou GIFs por publicação.'
-        );
-      }
-
-      return [
-        ...current,
-        ...validFiles.slice(
-          0,
-          availableSlots
-        ),
-      ];
-    });
-
-    if (mediaInputRef.current) {
-      mediaInputRef.current.value = '';
+      event.target.value = '';
+      return;
     }
+
+    for (const file of selected) {
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        setError('Use apenas JPG, PNG, WEBP ou GIF.');
+
+        event.target.value = '';
+        return;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        setError('Cada arquivo pode ter no máximo 10 MB.');
+
+        event.target.value = '';
+        return;
+      }
+    }
+
+    const previews = selected.map((file) =>
+      URL.createObjectURL(file)
+    );
+
+    setMediaFiles((current) => [...current, ...selected]);
+    setMediaPreviews((current) => [...current, ...previews]);
+
+    event.target.value = '';
   }
 
+  /*
+   * Remove uma imagem/GIF selecionado.
+   */
   function removeMedia(index: number) {
+    const preview = mediaPreviews[index];
+
+    if (preview) {
+      URL.revokeObjectURL(preview);
+    }
+
     setMediaFiles((current) =>
-      current.filter(
-        (_, itemIndex) =>
-          itemIndex !== index
-      )
+      current.filter((_, fileIndex) => fileIndex !== index)
+    );
+
+    setMediaPreviews((current) =>
+      current.filter((_, previewIndex) => previewIndex !== index)
     );
   }
 
-  async function uploadPostMedia(
-    postId: string
-  ) {
-    const uploaded: PostMedia[] = [];
-
+  /*
+   * Faz upload dos arquivos depois que o post já foi criado.
+   */
+  async function uploadPostMedia(postId: string) {
     for (const file of mediaFiles) {
-      const formData =
-        new FormData();
+      const formData = new FormData();
 
       formData.append('file', file);
       formData.append('post_id', postId);
 
-      const response = await fetch(
-        '/api/nook-posts/media',
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
+      const response = await fetch('/api/nook-posts/media', {
+        method: 'POST',
+        body: formData,
+      });
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
           data.error ||
-            'Não foi possível enviar uma das mídias.'
+            'Não foi possível enviar uma das imagens.'
         );
       }
-
-      if (data.media) {
-        uploaded.push(data.media);
-      }
     }
-
-    return uploaded;
   }
 
-  async function handleCreatePost() {
-    const text =
-      newPost.trim();
+  /*
+   * Publica o post.
+   */
+  async function handlePublish() {
+    if (!canPublish || publishing) return;
 
-    if (
-      !text &&
-      mediaFiles.length === 0
-    ) {
-      setError(
-        'Escreva alguma coisa ou adicione uma imagem/GIF.'
-      );
-
-      return;
-    }
-
-    if (text.length > 5000) {
-      setError(
-        'A publicação pode ter no máximo 5000 caracteres.'
-      );
-
-      return;
-    }
-
-    setCreatingPost(true);
+    setPublishing(true);
     setError('');
 
     try {
-      const response = await fetch(
-        '/api/nook-posts',
-        {
-          method: 'POST',
+      /*
+       * Primeiro criamos o post.
+       */
+      const response = await fetch('/api/nook-posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          body: body.trim() || null,
+          image_url: null,
+          story_id: storyId || null,
+        }),
+      });
 
-          headers: {
-            'Content-Type':
-              'application/json',
-          },
-
-          body: JSON.stringify({
-            body: text,
-            image_url: null,
-            story_id:
-              selectedStoryId || null,
-          }),
-        }
-      );
-
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
-        setError(
+        throw new Error(
           data.error ||
-            'Não foi possível publicar.'
+            'Não foi possível criar a publicação.'
         );
-
-        return;
       }
 
-      const createdPost =
-        data.post;
-
-      if (
-        mediaFiles.length > 0 &&
-        createdPost?.id
-      ) {
+      /*
+       * Depois enviamos as imagens/GIFs.
+       */
+      if (data.post?.id && mediaFiles.length > 0) {
         try {
-          await uploadPostMedia(
-            createdPost.id
-          );
+          await uploadPostMedia(data.post.id);
         } catch (mediaError) {
-          console.error(
-            'Erro ao enviar mídias:',
-            mediaError
-          );
+          console.error(mediaError);
 
           setError(
-            'A publicação foi criada, mas não foi possível enviar todas as mídias.'
+            mediaError instanceof Error
+              ? mediaError.message
+              : 'A publicação foi criada, mas não foi possível enviar todas as imagens.'
           );
 
-          onPublished?.();
-
+          setPublishing(false);
           return;
         }
       }
 
+      /*
+       * Sucesso.
+       *
+       * Importante:
+       * não usamos handleClose() aqui porque publishing ainda
+       * está como true. Resetamos diretamente antes de fechar.
+       */
+      resetComposer();
+      onClose();
       onPublished?.();
-
-      handleClose();
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
 
       setError(
-        'Não foi possível publicar. Tente novamente.'
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível publicar.'
       );
     } finally {
-      setCreatingPost(false);
+      setPublishing(false);
     }
   }
 
-  if (!open) {
-    return null;
-  }
+  if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/75 px-3 py-3 backdrop-blur-sm sm:items-center sm:px-5 sm:py-6"
-      onMouseDown={(event) => {
-        if (
-          event.target === event.currentTarget
-        ) {
-          handleClose();
-        }
-      }}
-    >
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-white/10 bg-[#191219] shadow-2xl">
-        {/* CABEÇALHO */}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
+      {/* Fundo clicável */}
+      <div
+        className="absolute inset-0"
+        onClick={handleClose}
+      />
 
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 bg-[#191219]/95 px-5 py-4 backdrop-blur-xl sm:px-6">
+      {/* Modal */}
+      <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[28px] border border-white/[0.1] bg-[#100c11] shadow-[0_30px_100px_rgba(0,0,0,0.6)]">
+        {/* Cabeçalho */}
+        <div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-4">
           <div>
-            <h2 className="text-lg font-black text-white">
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#ff78b9]">
+              Nooklie
+            </p>
+
+            <h2 className="mt-1 text-lg font-black text-white">
               Nova publicação
             </h2>
-
-            <p className="mt-0.5 text-xs text-white/30">
-              Compartilhe alguma coisa com outros escritores.
-            </p>
           </div>
 
           <button
             type="button"
             onClick={handleClose}
-            disabled={creatingPost}
+            disabled={publishing}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-xl text-white/45 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-30"
             aria-label="Fechar"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-2xl leading-none text-white/35 transition hover:bg-white/5 hover:text-white disabled:opacity-30"
           >
             ×
           </button>
         </div>
 
-        <div className="p-5 sm:p-6">
-          {/* TEXTO */}
-
+        {/* Conteúdo */}
+        <div className="max-h-[78vh] overflow-y-auto px-5 py-5">
+          {/* Texto */}
           <textarea
-            autoFocus
-            value={newPost}
+            value={body}
             onChange={(event) =>
-              setNewPost(
-                event.target.value
-              )
+              setBody(event.target.value.slice(0, MAX_TEXT))
             }
-            maxLength={5000}
-            rows={7}
-            placeholder="O que está passando pela sua cabeça?"
-            className="w-full resize-none rounded-2xl border border-white/10 bg-[#100b12] px-4 py-4 text-sm leading-7 text-white outline-none placeholder:text-white/20 transition focus:border-[#ff78b9]/50"
+            placeholder="O que você quer compartilhar com os escritores?"
+            rows={6}
+            autoFocus
+            className="w-full resize-none rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 text-[15px] leading-7 text-white outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/35"
           />
 
-          {/* CONTADOR */}
-
-          <div className="mt-2 text-right text-xs text-white/25">
-            {newPost.length}/5000
+          {/* Contador */}
+          <div className="mt-2 flex justify-end">
+            <span className="text-[11px] text-white/25">
+              {body.length}/{MAX_TEXT}
+            </span>
           </div>
 
-          {/* PREVIEWS */}
-
+          {/* Previews */}
           {mediaPreviews.length > 0 && (
-            <div
-              className={`mt-4 grid gap-2 ${
-                mediaPreviews.length === 1
-                  ? 'grid-cols-1'
-                  : 'grid-cols-2'
-              }`}
-            >
-              {mediaPreviews.map(
-                (preview, index) => (
-                  <div
-                    key={preview}
-                    className="group relative aspect-square overflow-hidden rounded-2xl bg-[#100b12]"
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {mediaPreviews.map((preview, index) => (
+                <div
+                  key={`${preview}-${index}`}
+                  className="group relative aspect-square overflow-hidden rounded-2xl border border-white/[0.08] bg-black/30"
+                >
+                  <img
+                    src={preview}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => removeMedia(index)}
+                    disabled={publishing}
+                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white transition hover:bg-[#ff78b9] hover:text-[#190d16] disabled:opacity-30"
+                    aria-label="Remover imagem"
                   >
-                    <img
-                      src={preview}
-                      alt={`Prévia ${index + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeMedia(index)
-                      }
-                      disabled={creatingPost}
-                      aria-label={`Remover mídia ${index + 1}`}
-                      className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-xl text-white transition hover:bg-black disabled:opacity-40"
-                    >
-                      ×
-                    </button>
-
-                    <span className="absolute bottom-2 left-2 rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
-                      {index + 1} / 4
-                    </span>
-                  </div>
-                )
-              )}
+                    ×
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* OPÇÕES */}
+          {/* Upload */}
+          <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-white/75">
+                Adicionar imagens ou GIFs
+              </p>
 
-          <div className="mt-5 flex flex-col gap-3 border-t border-white/5 pt-5 sm:flex-row sm:items-center">
-            <div className="flex min-w-0 flex-1 gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  mediaInputRef.current?.click()
-                }
-                disabled={
-                  creatingPost ||
-                  mediaFiles.length >=
-                    MAX_MEDIA
-                }
-                className="shrink-0 rounded-full border border-white/10 px-4 py-2.5 text-xs font-semibold text-white/50 transition hover:border-[#ff78b9]/40 hover:text-[#ff78b9] disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                Adicionar mídia
-                {mediaFiles.length > 0 &&
-                  ` ${mediaFiles.length}/4`}
-              </button>
+              <p className="mt-1 text-xs text-white/30">
+                Até 4 arquivos • 10 MB cada
+              </p>
+            </div>
+
+            <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-[#ff78b9]/20 bg-[#ff78b9]/[0.08] px-4 py-2.5 text-xs font-bold text-[#ff78b9] transition hover:bg-[#ff78b9]/[0.14]">
+              Escolher arquivos
 
               <input
-                ref={mediaInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 multiple
-                onChange={
-                  handleMediaSelection
+                onChange={handleMediaSelection}
+                disabled={
+                  publishing ||
+                  mediaFiles.length >= MAX_MEDIA
                 }
                 className="hidden"
               />
-
-              <select
-                value={selectedStoryId}
-                onChange={(event) =>
-                  setSelectedStoryId(
-                    event.target.value
-                  )
-                }
-                disabled={creatingPost}
-                className="min-w-0 flex-1 rounded-full border border-white/10 bg-[#100b12] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-[#ff78b9]/50 disabled:opacity-40"
-              >
-                <option value="">
-                  Vincular uma história
-                </option>
-
-                {stories.map((story) => (
-                  <option
-                    key={story.id}
-                    value={story.id}
-                  >
-                    {story.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              type="button"
-              onClick={
-                handleCreatePost
-              }
-              disabled={
-                creatingPost ||
-                (!newPost.trim() &&
-                  mediaFiles.length === 0)
-              }
-              className="rounded-full bg-[#ff78b9] px-7 py-3 text-sm font-black text-[#180d15] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {creatingPost
-                ? 'Publicando...'
-                : 'Publicar'}
-            </button>
+            </label>
           </div>
 
-          {/* ERRO */}
+          {/* História */}
+          <div className="mt-4 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
+            <label className="block text-sm font-bold text-white/75">
+              Vincular a uma história
+            </label>
 
+            <p className="mt-1 text-xs text-white/30">
+              Opcional. A publicação ficará associada à sua história.
+            </p>
+
+            <select
+              value={storyId}
+              onChange={(event) =>
+                setStoryId(event.target.value)
+              }
+              disabled={publishing || loadingStories}
+              className="mt-3 w-full rounded-xl border border-white/[0.08] bg-[#171118] px-3 py-3 text-sm text-white outline-none focus:border-[#ff78b9]/35"
+            >
+              <option value="">
+                {loadingStories
+                  ? 'Carregando histórias...'
+                  : 'Nenhuma história'}
+              </option>
+
+              {stories.map((story) => (
+                <option
+                  key={story.id}
+                  value={story.id}
+                >
+                  {story.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Erro */}
           {error && (
-            <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm leading-6 text-red-300">
-              {error}
+            <div className="mt-4 rounded-xl border border-red-400/15 bg-red-400/[0.05] px-4 py-3">
+              <p className="text-xs font-semibold leading-5 text-red-300">
+                {error}
+              </p>
             </div>
           )}
+        </div>
+
+        {/* Rodapé */}
+        <div className="flex items-center justify-end gap-3 border-t border-white/[0.07] px-5 py-4">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={publishing}
+            className="rounded-xl px-4 py-2.5 text-sm font-bold text-white/45 transition hover:bg-white/[0.04] hover:text-white disabled:opacity-30"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePublish}
+            disabled={!canPublish || publishing}
+            className="rounded-xl bg-[#ff78b9] px-5 py-2.5 text-sm font-black text-[#190d16] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            {publishing ? 'Publicando...' : 'Publicar'}
+          </button>
         </div>
       </div>
     </div>
   );
-            }
+}
