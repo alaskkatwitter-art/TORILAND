@@ -734,8 +734,6 @@ function UpcomingUpdatesContent({
           : ''
       }
     >
-      {/* HEADER */}
-
       <div className="border-b border-white/[0.06] px-5 pb-4 pt-5">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -768,11 +766,7 @@ function UpcomingUpdatesContent({
         </div>
       </div>
 
-      {/* CALENDAR */}
-
       <div className="px-4 py-4">
-        {/* MONTH NAVIGATION */}
-
         <div className="mb-4 flex items-center justify-between">
           <button
             type="button"
@@ -800,8 +794,6 @@ function UpcomingUpdatesContent({
           </button>
         </div>
 
-        {/* WEEK DAYS */}
-
         <div className="grid grid-cols-7 gap-1">
           {[
             'D',
@@ -825,8 +817,6 @@ function UpcomingUpdatesContent({
             )
           )}
         </div>
-
-        {/* DAYS */}
 
         <div className="grid grid-cols-7 gap-1">
           {calendarDays.map(
@@ -880,8 +870,6 @@ function UpcomingUpdatesContent({
                     {day}
                   </span>
 
-                  {/* NUVENS DAS ATUALIZAÇÕES */}
-
                   {dayUpdates.length >
                     0 && (
                     <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-[2px]">
@@ -921,8 +909,6 @@ function UpcomingUpdatesContent({
         </div>
       </div>
 
-      {/* LEGEND */}
-
       <div
         className={`border-t border-white/[0.06] px-4 py-4 ${
           mobile
@@ -960,8 +946,6 @@ function UpcomingUpdatesContent({
                       }
                       className="group flex items-start gap-2.5 rounded-xl p-1.5 -mx-1.5 transition hover:bg-white/[0.035]"
                     >
-                      {/* MINI NUVEM */}
-
                       <div
                         className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.035]"
                         style={{
@@ -1042,8 +1026,6 @@ function UpcomingUpdatesContent({
           )}
         </div>
       </div>
-
-      {/* FOOTER */}
 
       <div className="border-t border-white/[0.06] px-5 py-3">
         <p className="text-center text-[9px] leading-4 text-white/20">
@@ -1292,7 +1274,7 @@ function CommentItem({
             <Link
               href={
                 comment.author
-                  ? `/profile/${comment.author.username}`
+                  ? `/perfil/${encodeURIComponent(comment.author.username)}`
                   : '#'
               }
               className="text-sm font-bold text-white transition hover:text-[#ff78b9]"
@@ -1809,7 +1791,7 @@ function FeedPost({
           <Link
             href={
               post.author
-                ? `/profile/${post.author.username}`
+                ? `/perfil/${encodeURIComponent(post.author.username)}`
                 : '#'
             }
           >
@@ -1824,7 +1806,7 @@ function FeedPost({
                 <Link
                   href={
                     post.author
-                      ? `/profile/${post.author.username}`
+                      ? `/perfil/${encodeURIComponent(post.author.username)}`
                       : '#'
                   }
                   className="block truncate text-sm font-bold text-white transition hover:text-[#ff78b9]"
@@ -1839,7 +1821,7 @@ function FeedPost({
                 <Link
                   href={
                     post.author
-                      ? `/profile/${post.author.username}`
+                      ? `/perfil/${encodeURIComponent(post.author.username)}`
                       : '#'
                   }
                   className="block truncate text-xs text-[#ff78b9]/80 transition hover:text-[#ff78b9]"
@@ -2128,8 +2110,6 @@ function MobileDrawer({
 
   return (
     <>
-      {/* OVERLAY */}
-
       <button
         type="button"
         onClick={onClose}
@@ -2137,11 +2117,7 @@ function MobileDrawer({
         className="fixed inset-0 z-[80] bg-black/65 backdrop-blur-[2px] lg:hidden"
       />
 
-      {/* DRAWER */}
-
       <aside className="fixed left-0 top-0 z-[90] flex h-screen w-[84%] max-w-[360px] flex-col overflow-hidden rounded-r-[30px] border-r border-white/[0.08] bg-[#100c11] shadow-[20px_0_80px_rgba(0,0,0,0.45)] lg:hidden">
-
-        {/* TOP */}
 
         <div className="border-b border-white/[0.06] px-5 pb-5 pt-6">
           <div className="flex items-center justify-between">
@@ -2178,11 +2154,7 @@ function MobileDrawer({
           {/* USER */}
 
           <Link
-            href={
-              currentUser
-                ? `/profile/${currentUser.username}`
-                : '/perfil'
-            }
+            href="/perfil"
             onClick={onClose}
             className="mt-6 flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3 transition hover:border-[#ff78b9]/20 hover:bg-white/[0.04]"
           >
@@ -2221,11 +2193,7 @@ function MobileDrawer({
             </Link>
 
             <Link
-              href={
-                currentUser
-                  ? `/profile/${currentUser.username}`
-                  : '/perfil'
-              }
+              href="/perfil"
               onClick={onClose}
               className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
             >
@@ -2512,12 +2480,6 @@ export default function FeedPage() {
         const rawUpdates: ApiUpcomingUpdate[] =
           data.updates || [];
 
-        /*
-         * Mantemos a ordem em que as autoras
-         * aparecem no resultado e damos uma
-         * cor fixa para cada autora.
-         */
-
         const authorIds =
           Array.from(
             new Set(
@@ -2562,11 +2524,6 @@ export default function FeedPage() {
     loadFeed,
     loadUpcomingUpdates,
   ]);
-
-  /*
-   * Atualiza o calendário depois de publicar
-   * ou ao voltar para a página.
-   */
 
   useEffect(() => {
     const handleVisibility =
@@ -2854,8 +2811,6 @@ export default function FeedPage() {
               </div>
             ) : posts.length ===
               0 ? (
-              /* EMPTY */
-
               <div className="flex min-h-[55vh] items-center justify-center">
                 <div className="max-w-md text-center">
 
@@ -2876,8 +2831,6 @@ export default function FeedPage() {
                 </div>
               </div>
             ) : (
-              /* POSTS */
-
               <div className="w-full space-y-5">
                 {posts.map((post) => (
                   <FeedPost
