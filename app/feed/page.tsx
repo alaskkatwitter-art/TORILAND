@@ -1479,7 +1479,7 @@ export default function FeedPage() {
 
         {/* CREATE POST */}
 
-        <div className="mb-6">
+        <div className="mx-auto mb-6 w-full max-w-[680px]">
           <button
             type="button"
             onClick={() =>
@@ -1526,7 +1526,7 @@ export default function FeedPage() {
         {/* LOADING */}
 
         {loading ? (
-          <div className="space-y-5">
+          <div className="mx-auto w-full max-w-[680px] space-y-5">
             {[1, 2, 3].map(
               (item) => (
                 <div
@@ -1578,7 +1578,7 @@ export default function FeedPage() {
         ) : (
           /* POSTS */
 
-          <div className="space-y-5">
+          <div className="mx-auto w-full max-w-[680px] space-y-5">
             {posts.map((post) => (
               <FeedPost
                 key={post.id}
