@@ -199,6 +199,40 @@ function RefreshIcon() {
   );
 }
 
+function ChevronLeftIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
 /* =========================================================
    HELPERS
 ========================================================= */
@@ -287,6 +321,458 @@ function Avatar({
         getInitial(profile)
       )}
     </div>
+  );
+}
+
+/* =========================================================
+   PRÓXIMAS ATTS
+========================================================= */
+
+type UpcomingUpdate = {
+  id: string;
+  date: string;
+  username: string;
+  displayName: string;
+  storyTitle: string;
+  chapter: string;
+  color: string;
+};
+
+const DEMO_UPDATES: UpcomingUpdate[] = [
+  {
+    id: 'update-1',
+    date: '2026-09-08',
+    username: 'lyra',
+    displayName: 'Lyra',
+    storyTitle: 'The Last Summer',
+    chapter: 'Cap. 18',
+    color: '#ff78b9',
+  },
+  {
+    id: 'update-2',
+    date: '2026-09-12',
+    username: 'maria',
+    displayName: 'Maria',
+    storyTitle: 'Entre Nós',
+    chapter: 'Cap. 07',
+    color: '#b88cff',
+  },
+  {
+    id: 'update-3',
+    date: '2026-09-15',
+    username: 'alice',
+    displayName: 'Alice',
+    storyTitle: 'A Promessa',
+    chapter: 'Cap. 24',
+    color: '#7ddcff',
+  },
+  {
+    id: 'update-4',
+    date: '2026-09-15',
+    username: 'nina',
+    displayName: 'Nina',
+    storyTitle: 'Depois da Chuva',
+    chapter: 'Cap. 11',
+    color: '#ffd36e',
+  },
+  {
+    id: 'update-5',
+    date: '2026-09-21',
+    username: 'clara',
+    displayName: 'Clara',
+    storyTitle: 'Constelações',
+    chapter: 'Cap. 32',
+    color: '#8ee39a',
+  },
+];
+
+function getCalendarDays(
+  year: number,
+  month: number
+) {
+  const firstDay = new Date(
+    year,
+    month,
+    1
+  ).getDay();
+
+  const daysInMonth = new Date(
+    year,
+    month + 1,
+    0
+  ).getDate();
+
+  const days: (
+    | number
+    | null
+  )[] = [];
+
+  for (let i = 0; i < firstDay; i++) {
+    days.push(null);
+  }
+
+  for (
+    let day = 1;
+    day <= daysInMonth;
+    day++
+  ) {
+    days.push(day);
+  }
+
+  return days;
+}
+
+function UpcomingUpdatesCard() {
+  const now = new Date();
+
+  const [
+    calendarDate,
+    setCalendarDate,
+  ] = useState(
+    new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1
+    )
+  );
+
+  const year =
+    calendarDate.getFullYear();
+
+  const month =
+    calendarDate.getMonth();
+
+  const monthName =
+    calendarDate.toLocaleDateString(
+      'pt-BR',
+      {
+        month: 'long',
+      }
+    );
+
+  const calendarDays =
+    useMemo(
+      () =>
+        getCalendarDays(
+          year,
+          month
+        ),
+      [year, month]
+    );
+
+  const updatesForMonth =
+    DEMO_UPDATES.filter((update) => {
+      const date = new Date(
+        `${update.date}T12:00:00`
+      );
+
+      return (
+        date.getFullYear() ===
+          year &&
+        date.getMonth() === month
+      );
+    });
+
+  function goPreviousMonth() {
+    setCalendarDate(
+      new Date(
+        year,
+        month - 1,
+        1
+      )
+    );
+  }
+
+  function goNextMonth() {
+    setCalendarDate(
+      new Date(
+        year,
+        month + 1,
+        1
+      )
+    );
+  }
+
+  function getUpdatesForDay(
+    day: number
+  ) {
+    return updatesForMonth.filter(
+      (update) =>
+        new Date(
+          `${update.date}T12:00:00`
+        ).getDate() === day
+    );
+  }
+
+  return (
+    <aside className="hidden w-[270px] shrink-0 lg:block">
+      <div className="sticky top-6 overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+
+        {/* HEADER */}
+
+        <div className="border-b border-white/[0.06] px-5 pb-4 pt-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">☁️</span>
+
+                <h2 className="text-sm font-black uppercase tracking-[0.12em] text-white">
+                  Próximas ATTs
+                </h2>
+              </div>
+
+              <p className="mt-1.5 text-[11px] leading-4 text-white/35">
+                Acompanhe as próximas
+                atualizações.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* CALENDAR */}
+
+        <div className="px-4 py-4">
+
+          {/* MONTH NAVIGATION */}
+
+          <div className="mb-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={goPreviousMonth}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.05] hover:text-[#ff78b9]"
+              aria-label="Mês anterior"
+            >
+              <ChevronLeftIcon />
+            </button>
+
+            <p className="text-xs font-black capitalize text-white">
+              {monthName}{' '}
+              <span className="text-white/35">
+                {year}
+              </span>
+            </p>
+
+            <button
+              type="button"
+              onClick={goNextMonth}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.05] hover:text-[#ff78b9]"
+              aria-label="Próximo mês"
+            >
+              <ChevronRightIcon />
+            </button>
+          </div>
+
+          {/* WEEK DAYS */}
+
+          <div className="grid grid-cols-7 gap-1">
+            {[
+              'D',
+              'S',
+              'T',
+              'Q',
+              'Q',
+              'S',
+              'S',
+            ].map(
+              (
+                day,
+                index
+              ) => (
+                <div
+                  key={`${day}-${index}`}
+                  className="flex h-7 items-center justify-center text-[9px] font-bold text-white/20"
+                >
+                  {day}
+                </div>
+              )
+            )}
+          </div>
+
+          {/* DAYS */}
+
+          <div className="grid grid-cols-7 gap-1">
+            {calendarDays.map(
+              (
+                day,
+                index
+              ) => {
+                if (
+                  day === null
+                ) {
+                  return (
+                    <div
+                      key={`empty-${index}`}
+                      className="h-9"
+                    />
+                  );
+                }
+
+                const updates =
+                  getUpdatesForDay(
+                    day
+                  );
+
+                const today =
+                  new Date();
+
+                const isToday =
+                  today.getFullYear() ===
+                    year &&
+                  today.getMonth() ===
+                    month &&
+                  today.getDate() ===
+                    day;
+
+                return (
+                  <div
+                    key={day}
+                    className={`relative flex h-9 items-center justify-center rounded-xl text-[10px] transition ${
+                      isToday
+                        ? 'bg-[#ff78b9]/[0.09] font-black text-[#ff78b9]'
+                        : 'text-white/45 hover:bg-white/[0.025]'
+                    }`}
+                  >
+                    <span
+                      className={
+                        updates.length
+                          ? 'relative z-10'
+                          : ''
+                      }
+                    >
+                      {day}
+                    </span>
+
+                    {/* NUVENS DAS ATUALIZAÇÕES */}
+
+                    {updates.length >
+                      0 && (
+                      <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-[2px]">
+                        {updates
+                          .slice(
+                            0,
+                            3
+                          )
+                          .map(
+                            (
+                              update
+                            ) => (
+                              <span
+                                key={
+                                  update.id
+                                }
+                                className="h-[5px] w-[8px] rounded-full opacity-90"
+                                style={{
+                                  backgroundColor:
+                                    update.color,
+                                }}
+                              />
+                            )
+                          )}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+            )}
+          </div>
+        </div>
+
+        {/* LEGEND */}
+
+        <div className="border-t border-white/[0.06] px-4 py-4">
+
+          <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/20">
+            Próximas atualizações
+          </p>
+
+          <div className="space-y-3">
+            {updatesForMonth.length >
+            0 ? (
+              updatesForMonth
+                .slice(0, 5)
+                .map(
+                  (update) => {
+                    const date =
+                      new Date(
+                        `${update.date}T12:00:00`
+                      );
+
+                    const day =
+                      date.getDate();
+
+                    return (
+                      <Link
+                        key={
+                          update.id
+                        }
+                        href={`/profile/${update.username}`}
+                        className="group flex items-start gap-2.5 rounded-xl p-1.5 -mx-1.5 transition hover:bg-white/[0.035]"
+                      >
+                        {/* MINI NUVEM */}
+
+                        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/[0.035]">
+                          <span
+                            className="text-sm leading-none"
+                            style={{
+                              filter: `drop-shadow(0 0 5px ${update.color})`,
+                            }}
+                          >
+                            ☁
+                          </span>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <p className="truncate text-[11px] font-bold text-white transition group-hover:text-[#ff78b9]">
+                              @{update.username}
+                            </p>
+
+                            <span
+                              className="shrink-0 text-[9px] font-bold"
+                              style={{
+                                color:
+                                  update.color,
+                              }}
+                            >
+                              {day} set.
+                            </span>
+                          </div>
+
+                          <p className="mt-0.5 truncate text-[10px] text-white/35">
+                            {update.storyTitle}
+                            {' · '}
+                            {update.chapter}
+                          </p>
+                        </div>
+                      </Link>
+                    );
+                  }
+                )
+            ) : (
+              <div className="py-3 text-center">
+                <span className="text-lg">
+                  ☁️
+                </span>
+
+                <p className="mt-2 text-[10px] text-white/25">
+                  Nenhuma atualização
+                  programada.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* FOOTER */}
+
+        <div className="border-t border-white/[0.06] px-5 py-3">
+          <p className="text-center text-[9px] leading-4 text-white/20">
+            As nuvens mostram quando
+            suas autoras vão atualizar.
+          </p>
+        </div>
+      </div>
+    </aside>
   );
 }
 
@@ -1493,7 +1979,7 @@ export default function FeedPage() {
         <div className="absolute bottom-[-200px] left-[35%] h-[450px] w-[450px] rounded-full bg-[#ff78b9]/[0.035] blur-[130px]" />
       </div>
 
-      <div className="relative mx-auto min-h-screen w-full max-w-5xl px-4 pb-20 pt-5 sm:px-6 lg:px-8">
+      <div className="relative mx-auto min-h-screen w-full max-w-6xl px-4 pb-20 pt-5 sm:px-6 lg:px-8">
 
         {/* HEADER */}
 
@@ -1538,171 +2024,187 @@ export default function FeedPage() {
         </header>
 
         {/* =================================================
-            CREATE POST
+            LAYOUT PRINCIPAL
         ================================================= */}
 
-        <div className="mx-auto mb-7 w-full max-w-[680px]">
-          <button
-            type="button"
-            onClick={() =>
-              setComposerOpen(true)
-            }
-            className="group w-full overflow-hidden rounded-[26px] border border-[#ff78b9]/15 bg-gradient-to-br from-[#ff78b9]/[0.09] via-white/[0.035] to-[#c63dff]/[0.05] p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition duration-300 hover:border-[#ff78b9]/35 hover:shadow-[0_20px_70px_rgba(255,120,185,0.08)] sm:p-6"
-          >
-            <div className="flex items-center gap-4">
+        <div className="flex items-start justify-center gap-7">
 
-              {/* AVATAR DO USUÁRIO */}
+          {/* COLUNA CENTRAL */}
 
-              <div className="relative shrink-0">
-                <div className="h-14 w-14 overflow-hidden rounded-full border-2 border-[#ff78b9]/30 bg-[#ff78b9] font-black text-lg text-[#190d16] shadow-[0_0_25px_rgba(255,120,185,0.12)] sm:h-16 sm:w-16">
-                  {currentUser?.avatar_url ? (
-                    <img
-                      src={
-                        currentUser.avatar_url
-                      }
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      {getInitial(
-                        currentUser
+          <div className="w-full max-w-[680px]">
+
+            {/* CREATE POST */}
+
+            <div className="mb-7 w-full">
+              <button
+                type="button"
+                onClick={() =>
+                  setComposerOpen(true)
+                }
+                className="group w-full overflow-hidden rounded-[26px] border border-[#ff78b9]/15 bg-gradient-to-br from-[#ff78b9]/[0.09] via-white/[0.035] to-[#c63dff]/[0.05] p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition duration-300 hover:border-[#ff78b9]/35 hover:shadow-[0_20px_70px_rgba(255,120,185,0.08)] sm:p-6"
+              >
+                <div className="flex items-center gap-4">
+
+                  {/* AVATAR */}
+
+                  <div className="relative shrink-0">
+                    <div className="h-14 w-14 overflow-hidden rounded-full border-2 border-[#ff78b9]/30 bg-[#ff78b9] font-black text-lg text-[#190d16] shadow-[0_0_25px_rgba(255,120,185,0.12)] sm:h-16 sm:w-16">
+                      {currentUser?.avatar_url ? (
+                        <img
+                          src={
+                            currentUser.avatar_url
+                          }
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          {getInitial(
+                            currentUser
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
 
-                <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#100c11] bg-[#ff78b9] text-[#190d16]">
-                  <span className="text-base leading-none">
-                    +
-                  </span>
-                </span>
-              </div>
-
-              {/* TEXTO */}
-
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-black text-white sm:text-lg">
-                  Compartilhe alguma coisa
-                </p>
-
-                <p className="mt-1 text-sm leading-5 text-white/40">
-                  Uma ideia, uma descoberta,
-                  uma história...
-                </p>
-              </div>
-
-              {/* INDICADOR */}
-
-              <div className="hidden shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-white/45 transition group-hover:border-[#ff78b9]/25 group-hover:bg-[#ff78b9]/[0.08] group-hover:text-[#ff78b9] sm:flex">
-                Publicar
-              </div>
-            </div>
-
-            {/* LINHA INFERIOR */}
-
-            <div className="mt-5 border-t border-white/[0.07] pt-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-white/25">
-                  O que está passando pela sua
-                  cabeça?
-                </span>
-
-                <span className="text-xs font-semibold text-[#ff78b9]/50 transition group-hover:text-[#ff78b9]">
-                  Criar publicação →
-                </span>
-              </div>
-            </div>
-          </button>
-        </div>
-
-        {/* ERROR */}
-
-        {error && (
-          <div className="mb-6 rounded-2xl border border-red-400/15 bg-red-400/[0.05] px-5 py-4">
-            <p className="text-sm font-semibold text-red-300">
-              {error}
-            </p>
-
-            <button
-              type="button"
-              onClick={() =>
-                loadFeed()
-              }
-              className="mt-2 text-xs font-bold text-red-300 underline underline-offset-2"
-            >
-              Tentar novamente
-            </button>
-          </div>
-        )}
-
-        {/* LOADING */}
-
-        {loading ? (
-          <div className="mx-auto w-full max-w-[680px] space-y-5">
-            {[1, 2, 3].map(
-              (item) => (
-                <div
-                  key={item}
-                  className="animate-pulse rounded-[26px] border border-white/[0.06] bg-white/[0.025] p-6"
-                >
-                  <div className="flex gap-3">
-                    <div className="h-11 w-11 rounded-full bg-white/[0.06]" />
-
-                    <div className="flex-1">
-                      <div className="h-3 w-32 rounded bg-white/[0.06]" />
-
-                      <div className="mt-2 h-2 w-20 rounded bg-white/[0.04]" />
-                    </div>
+                    <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#100c11] bg-[#ff78b9] text-[#190d16]">
+                      <span className="text-base leading-none">
+                        +
+                      </span>
+                    </span>
                   </div>
 
-                  <div className="mt-5 h-4 w-4/5 rounded bg-white/[0.05]" />
+                  {/* TEXTO */}
 
-                  <div className="mt-3 h-4 w-3/5 rounded bg-white/[0.04]" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base font-black text-white sm:text-lg">
+                      Compartilhe alguma coisa
+                    </p>
 
-                  <div className="mt-5 h-32 rounded-2xl bg-white/[0.04]" />
+                    <p className="mt-1 text-sm leading-5 text-white/40">
+                      Uma ideia, uma descoberta,
+                      uma história...
+                    </p>
+                  </div>
+
+                  {/* INDICADOR */}
+
+                  <div className="hidden shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-white/45 transition group-hover:border-[#ff78b9]/25 group-hover:bg-[#ff78b9]/[0.08] group-hover:text-[#ff78b9] sm:flex">
+                    Publicar
+                  </div>
                 </div>
-              )
+
+                {/* LINHA INFERIOR */}
+
+                <div className="mt-5 border-t border-white/[0.07] pt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-white/25">
+                      O que está passando pela sua
+                      cabeça?
+                    </span>
+
+                    <span className="text-xs font-semibold text-[#ff78b9]/50 transition group-hover:text-[#ff78b9]">
+                      Criar publicação →
+                    </span>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* ERROR */}
+
+            {error && (
+              <div className="mb-6 rounded-2xl border border-red-400/15 bg-red-400/[0.05] px-5 py-4">
+                <p className="text-sm font-semibold text-red-300">
+                  {error}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    loadFeed()
+                  }
+                  className="mt-2 text-xs font-bold text-red-300 underline underline-offset-2"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            )}
+
+            {/* LOADING */}
+
+            {loading ? (
+              <div className="w-full space-y-5">
+                {[1, 2, 3].map(
+                  (item) => (
+                    <div
+                      key={item}
+                      className="animate-pulse rounded-[26px] border border-white/[0.06] bg-white/[0.025] p-6"
+                    >
+                      <div className="flex gap-3">
+                        <div className="h-11 w-11 rounded-full bg-white/[0.06]" />
+
+                        <div className="flex-1">
+                          <div className="h-3 w-32 rounded bg-white/[0.06]" />
+
+                          <div className="mt-2 h-2 w-20 rounded bg-white/[0.04]" />
+                        </div>
+                      </div>
+
+                      <div className="mt-5 h-4 w-4/5 rounded bg-white/[0.05]" />
+
+                      <div className="mt-3 h-4 w-3/5 rounded bg-white/[0.04]" />
+
+                      <div className="mt-5 h-32 rounded-2xl bg-white/[0.04]" />
+                    </div>
+                  )
+                )}
+              </div>
+            ) : posts.length ===
+              0 ? (
+              /* EMPTY */
+
+              <div className="flex min-h-[55vh] items-center justify-center">
+                <div className="max-w-md text-center">
+
+                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05]">
+                    <CloudIcon />
+                  </div>
+
+                  <h2 className="mt-6 text-xl font-black text-white">
+                    O Feed está quieto.
+                  </h2>
+
+                  <p className="mt-2 text-sm leading-6 text-white/35">
+                    Ainda não há publicações por
+                    aqui. Quando os escritores
+                    começarem a postar, elas
+                    aparecerão aqui.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              /* POSTS */
+
+              <div className="w-full space-y-5">
+                {posts.map((post) => (
+                  <FeedPost
+                    key={post.id}
+                    post={post}
+                    onPostUpdated={
+                      updatePost
+                    }
+                  />
+                ))}
+              </div>
             )}
           </div>
-        ) : posts.length ===
-          0 ? (
-          /* EMPTY */
 
-          <div className="flex min-h-[55vh] items-center justify-center">
-            <div className="max-w-md text-center">
+          {/* =================================================
+              PRÓXIMAS ATTS
+          ================================================= */}
 
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05]">
-                <CloudIcon />
-              </div>
-
-              <h2 className="mt-6 text-xl font-black text-white">
-                O Feed está quieto.
-              </h2>
-
-              <p className="mt-2 text-sm leading-6 text-white/35">
-                Ainda não há publicações por
-                aqui. Quando os escritores
-                começarem a postar, elas
-                aparecerão aqui.
-              </p>
-            </div>
-          </div>
-        ) : (
-          /* POSTS */
-
-          <div className="mx-auto w-full max-w-[680px] space-y-5">
-            {posts.map((post) => (
-              <FeedPost
-                key={post.id}
-                post={post}
-                onPostUpdated={
-                  updatePost
-                }
-              />
-            ))}
-          </div>
-        )}
+          <UpcomingUpdatesCard />
+        </div>
       </div>
 
       {/* =====================================================
