@@ -87,7 +87,9 @@ export default function PublicProfilePage() {
   const [posts, setPosts] = useState<NookPost[]>([]);
 
   const [activeTab, setActiveTab] = useState<Tab>('stories');
+
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -102,7 +104,7 @@ export default function PublicProfilePage() {
       setError('');
 
       try {
-        const encodedUsername = encodeURIComponent(username);
+        const encodedUsername = encodeURIComponent(username!);
 
         const response = await fetch(
           `/api/public-profile/${encodedUsername}`,
@@ -390,6 +392,7 @@ export default function PublicProfilePage() {
                       </div>
 
                       <div className="p-5">
+
                         <h3 className="line-clamp-2 text-lg font-black text-white">
                           {story.title}
                         </h3>
@@ -416,6 +419,7 @@ export default function PublicProfilePage() {
                           </span>
 
                         </div>
+
                       </div>
                     </button>
                   ))}
@@ -468,6 +472,7 @@ export default function PublicProfilePage() {
                           )}
 
                           <div className="min-w-0 flex-1">
+
                             <p className="truncate text-sm font-black text-white">
                               {getDisplayName(user)}
                             </p>
@@ -479,6 +484,7 @@ export default function PublicProfilePage() {
                                 post.created_at
                               )}
                             </p>
+
                           </div>
 
                           {post.pinned && (
