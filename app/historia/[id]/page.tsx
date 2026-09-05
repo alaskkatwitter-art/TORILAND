@@ -72,7 +72,9 @@ export default function HistoriaPage() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data?.error || "Não foi possível carregar a história.");
+          throw new Error(
+            data?.error || "Não foi possível carregar a história."
+          );
         }
 
         setStory(data.story || data);
@@ -127,14 +129,20 @@ export default function HistoriaPage() {
     try {
       setLiking(true);
 
-      const response = await fetch(`/api/stories/${story.id}/like`, {
-        method: "POST",
-      });
+      const response = await fetch(
+        `/api/stories/${story.id}/like`,
+        {
+          method: "POST",
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || "Não foi possível curtir a história.");
+        throw new Error(
+          data?.error ||
+            "Não foi possível curtir a história."
+        );
       }
 
       setStory((previous) => {
@@ -155,7 +163,10 @@ export default function HistoriaPage() {
         };
       });
     } catch (err) {
-      console.error("Erro ao curtir história:", err);
+      console.error(
+        "Erro ao curtir história:",
+        err
+      );
     } finally {
       setLiking(false);
     }
@@ -167,6 +178,7 @@ export default function HistoriaPage() {
         <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-6">
           <div className="text-center">
             <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-pink-400/20 border-t-pink-400" />
+
             <p className="text-sm text-white/50">
               Carregando história...
             </p>
@@ -181,14 +193,17 @@ export default function HistoriaPage() {
       <main className="min-h-screen bg-[#0b0710] text-white">
         <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-6">
           <div className="text-center">
-            <div className="mb-4 text-5xl">☁️</div>
+            <div className="mb-4 text-5xl">
+              ☁️
+            </div>
 
             <h1 className="mb-2 text-2xl font-semibold">
               História não encontrada
             </h1>
 
             <p className="mb-6 text-sm text-white/50">
-              {error || "Essa história não existe ou não está disponível."}
+              {error ||
+                "Essa história não existe ou não está disponível."}
             </p>
 
             <button
@@ -208,9 +223,10 @@ export default function HistoriaPage() {
     Boolean(currentUserId) &&
     currentUserId === story.author_id;
 
-  const publishedChapters = story.chapters?.filter(
-    (chapter) => chapter.published
-  ) || [];
+  const publishedChapters =
+    story.chapters?.filter(
+      (chapter) => chapter.published
+    ) || [];
 
   const firstChapter = publishedChapters[0];
 
@@ -249,7 +265,10 @@ export default function HistoriaPage() {
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <div className="text-center">
-                    <div className="mb-3 text-6xl">☁️</div>
+                    <div className="mb-3 text-6xl">
+                      ☁️
+                    </div>
+
                     <p className="px-8 text-sm text-white/30">
                       Esta história ainda não possui uma capa.
                     </p>
@@ -284,7 +303,9 @@ export default function HistoriaPage() {
               <button
                 type="button"
                 onClick={() =>
-                  router.push(`/perfil/${story.author?.id}`)
+                  router.push(
+                    `/perfil/${story.author?.id}`
+                  )
                 }
                 className="mb-6 flex w-fit items-center gap-3 text-left"
               >
@@ -321,18 +342,19 @@ export default function HistoriaPage() {
               </p>
             )}
 
-            {story.tags && story.tags.length > 0 && (
-              <div className="mb-8 flex flex-wrap gap-2">
-                {story.tags.map((tag) => (
-                  <span
-                    key={tag.id}
-                    className="rounded-full border border-pink-400/10 bg-pink-500/5 px-3 py-1.5 text-xs text-pink-200/70"
-                  >
-                    #{tag.name}
-                  </span>
-                ))}
-              </div>
-            )}
+            {story.tags &&
+              story.tags.length > 0 && (
+                <div className="mb-8 flex flex-wrap gap-2">
+                  {story.tags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="rounded-full border border-pink-400/10 bg-pink-500/5 px-3 py-1.5 text-xs text-pink-200/70"
+                    >
+                      #{tag.name}
+                    </span>
+                  ))}
+                </div>
+              )}
 
             <div className="flex flex-wrap gap-3">
               {firstChapter && (
@@ -340,7 +362,7 @@ export default function HistoriaPage() {
                   type="button"
                   onClick={() =>
                     router.push(
-                      `/historia/${story.id}/capitulo/${firstChapter.id}`
+                      `/capitulo/${firstChapter.id}`
                     )
                   }
                   className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-pink-500/10 transition hover:bg-pink-400"
@@ -359,7 +381,9 @@ export default function HistoriaPage() {
                     : "border-white/10 bg-white/5 text-white/70 hover:border-pink-400/30 hover:text-white"
                 }`}
               >
-                {story.liked ? "♥ Curtido" : "♡ Curtir"}{" "}
+                {story.liked
+                  ? "♥ Curtido"
+                  : "♡ Curtir"}{" "}
                 <span className="ml-1 text-white/40">
                   {story.likes || 0}
                 </span>
@@ -420,7 +444,9 @@ export default function HistoriaPage() {
 
           {publishedChapters.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center">
-              <div className="mb-3 text-4xl">📖</div>
+              <div className="mb-3 text-4xl">
+                📖
+              </div>
 
               <h3 className="mb-2 font-medium text-white/70">
                 Ainda não existem capítulos
@@ -452,7 +478,7 @@ export default function HistoriaPage() {
                   type="button"
                   onClick={() =>
                     router.push(
-                      `/historia/${story.id}/capitulo/${chapter.id}`
+                      `/capitulo/${chapter.id}`
                     )
                   }
                   className="group flex w-full items-center justify-between gap-5 rounded-2xl border border-white/5 bg-white/[0.025] px-5 py-5 text-left transition hover:border-pink-400/20 hover:bg-pink-500/[0.04]"
