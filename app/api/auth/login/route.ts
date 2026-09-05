@@ -178,16 +178,9 @@ export async function POST(request: Request) {
       error
     );
 
-    return NextResponse.json(
-      {
-        error:
-          'Não foi possível realizar o login.',
-        debug:
-          error instanceof Error
-            ? error.message
-            : String(error),
-      },
-      { status: 500 }
-    );
-  }
-}
+   return NextResponse.json(
+  {
+    error: 'TESTE NOOKLIE 123',
+  },
+  { status: 500 }
+);
