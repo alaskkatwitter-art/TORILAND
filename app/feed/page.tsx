@@ -1005,8 +1005,7 @@ function UpcomingUpdatesContent({
                         </div>
 
                         <p className="mt-0.5 truncate text-[10px] text-white/45">
-                          {update.story_title ||
-                            update.storyTitle}
+                          {update.story_title}
                           {' · '}
                           Cap.{' '}
                           {
