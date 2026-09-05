@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SECRET_KEY!;
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(
+  supabaseUrl,
+  supabaseKey
+);
 
 type RouteContext = {
   params: Promise<{
@@ -24,6 +28,7 @@ function createSlug(text: string) {
 
 async function getSessionUserId() {
   const cookieStore = await cookies();
+
   const sessionToken =
     cookieStore.get('toriland_session')?.value;
 
@@ -31,11 +36,23 @@ async function getSessionUserId() {
     return null;
   }
 
-  const { data: session, error } = await supabase
-    .from('auth_sessions')
-    .select('user_id, expires_at')
-    .eq('token', sessionToken)
-    .maybeSingle();
+  /*
+   * Mantemos a mesma lógica de sessão usada
+   * pelo restante do projeto.
+   *
+   * O token é armazenado como hash.
+   */
+  const tokenHash = crypto
+    .createHash('sha256')
+    .update(sessionToken)
+    .digest('hex');
+
+  const { data: session, error } =
+    await supabase
+      .from('auth_sessions')
+      .select('user_id, expires_at')
+      .eq('token_hash', tokenHash)
+      .maybeSingle();
 
   if (error || !session) {
     return null;
@@ -43,12 +60,133 @@ async function getSessionUserId() {
 
   if (
     session.expires_at &&
-    new Date(session.expires_at).getTime() <= Date.now()
+    new Date(session.expires_at).getTime() <=
+      Date.now()
   ) {
     return null;
   }
 
   return session.user_id;
+}
+
+/*
+ * ======================================================
+ * LIBERA CAPÍTULOS AGENDADOS
+ * ======================================================
+ *
+ * Quando alguém acessa uma história depois que o horário
+ * programado passou, liberamos os capítulos vencidos.
+ *
+ * Isso também funciona como uma camada de segurança:
+ * mesmo que o cron ainda não tenha rodado, o capítulo
+ * não fica preso como "agendado" depois da hora.
+ */
+async function publishDueScheduledChapters(
+  storyId: string
+) {
+  const now = new Date().toISOString();
+
+  const { data: schedules, error: scheduleError } =
+    await supabase
+      .from('scheduled_chapters')
+      .select(`
+        id,
+        chapter_id,
+        scheduled_for
+      `)
+      .eq('scheduled_for', '<=', now);
+
+  if (scheduleError) {
+    console.error(
+      'Erro ao buscar capítulos agendados:',
+      scheduleError
+    );
+
+    return;
+  }
+
+  if (!schedules || schedules.length === 0) {
+    return;
+  }
+
+  for (const schedule of schedules) {
+    /*
+     * Confere se o capítulo pertence à história que
+     * estamos acessando.
+     */
+    const { data: chapter, error: chapterError } =
+      await supabase
+        .from('chapters')
+        .select('id, story_id, published')
+        .eq('id', schedule.chapter_id)
+        .maybeSingle();
+
+    if (chapterError) {
+      console.error(
+        'Erro ao verificar capítulo agendado:',
+        chapterError
+      );
+
+      continue;
+    }
+
+    if (!chapter) {
+      /*
+       * Se o capítulo não existe mais, limpa o agendamento.
+       */
+      await supabase
+        .from('scheduled_chapters')
+        .delete()
+        .eq('id', schedule.id);
+
+      continue;
+    }
+
+    /*
+     * Só libera capítulos dessa história.
+     */
+    if (chapter.story_id !== storyId) {
+      continue;
+    }
+
+    /*
+     * Publica o capítulo.
+     */
+    const { error: publishError } =
+      await supabase
+        .from('chapters')
+        .update({
+          published: true,
+        })
+        .eq('id', chapter.id)
+        .eq('story_id', storyId);
+
+    if (publishError) {
+      console.error(
+        'Erro ao publicar capítulo agendado:',
+        publishError
+      );
+
+      continue;
+    }
+
+    /*
+     * Depois de publicado, o agendamento deixa de ser
+     * necessário.
+     */
+    const { error: deleteScheduleError } =
+      await supabase
+        .from('scheduled_chapters')
+        .delete()
+        .eq('id', schedule.id);
+
+    if (deleteScheduleError) {
+      console.error(
+        'Erro ao remover agendamento:',
+        deleteScheduleError
+      );
+    }
+  }
 }
 
 export async function GET(
@@ -60,33 +198,40 @@ export async function GET(
 
     if (!id) {
       return NextResponse.json(
-        { error: 'ID da história não informado.' },
-        { status: 400 }
+        {
+          error: 'ID da história não informado.',
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    const currentUserId = await getSessionUserId();
+    const currentUserId =
+      await getSessionUserId();
 
-    // =========================
+    // ======================================================
     // HISTÓRIA
-    // =========================
+    // ======================================================
 
-    const { data: story, error: storyError } =
-      await supabase
-        .from('stories')
-        .select(`
-          id,
-          author_id,
-          title,
-          description,
-          cover_url,
-          status,
-          rating,
-          created_at,
-          updated_at
-        `)
-        .eq('id', id)
-        .maybeSingle();
+    const {
+      data: story,
+      error: storyError,
+    } = await supabase
+      .from('stories')
+      .select(`
+        id,
+        author_id,
+        title,
+        description,
+        cover_url,
+        status,
+        rating,
+        created_at,
+        updated_at
+      `)
+      .eq('id', id)
+      .maybeSingle();
 
     if (storyError) {
       console.error(
@@ -95,33 +240,49 @@ export async function GET(
       );
 
       return NextResponse.json(
-        { error: 'Erro ao buscar história.' },
-        { status: 500 }
+        {
+          error: 'Erro ao buscar história.',
+        },
+        {
+          status: 500,
+        }
       );
     }
 
     if (!story) {
       return NextResponse.json(
-        { error: 'História não encontrada.' },
-        { status: 404 }
+        {
+          error: 'História não encontrada.',
+        },
+        {
+          status: 404,
+        }
       );
     }
 
-    // =========================
-    // AUTOR
-    // =========================
+    // ======================================================
+    // LIBERA CAPÍTULOS QUE JÁ CHEGARAM NA DATA/HORA
+    // ======================================================
 
-    const { data: author, error: authorError } =
-      await supabase
-        .from('profiles')
-        .select(`
-          id,
-          username,
-          display_name,
-          avatar_url
-        `)
-        .eq('id', story.author_id)
-        .maybeSingle();
+    await publishDueScheduledChapters(id);
+
+    // ======================================================
+    // AUTOR
+    // ======================================================
+
+    const {
+      data: author,
+      error: authorError,
+    } = await supabase
+      .from('profiles')
+      .select(`
+        id,
+        username,
+        display_name,
+        avatar_url
+      `)
+      .eq('id', story.author_id)
+      .maybeSingle();
 
     if (authorError) {
       console.error(
@@ -130,26 +291,47 @@ export async function GET(
       );
     }
 
-    // =========================
+    // ======================================================
     // CAPÍTULOS
-    // =========================
+    // ======================================================
 
-    const { data: chapters, error: chaptersError } =
-      await supabase
-        .from('chapters')
-        .select(`
-          id,
-          story_id,
-          chapter_number,
-          title,
-          published,
-          created_at
-        `)
-        .eq('story_id', id)
-        .eq('published', true)
-        .order('chapter_number', {
+    /*
+     * Autor pode enxergar os próprios capítulos agendados.
+     * Leitores só recebem capítulos publicados.
+     */
+    const isOwner =
+      currentUserId === story.author_id;
+
+    let chaptersQuery = supabase
+      .from('chapters')
+      .select(`
+        id,
+        story_id,
+        chapter_number,
+        title,
+        published,
+        created_at
+      `)
+      .eq('story_id', id);
+
+    if (!isOwner) {
+      chaptersQuery =
+        chaptersQuery.eq(
+          'published',
+          true
+        );
+    }
+
+    const {
+      data: chapters,
+      error: chaptersError,
+    } =
+      await chaptersQuery.order(
+        'chapter_number',
+        {
           ascending: true,
-        });
+        }
+      );
 
     if (chaptersError) {
       console.error(
@@ -158,35 +340,118 @@ export async function GET(
       );
 
       return NextResponse.json(
-        { error: 'Erro ao buscar capítulos.' },
-        { status: 500 }
+        {
+          error:
+            'Erro ao buscar capítulos.',
+        },
+        {
+          status: 500,
+        }
       );
     }
 
-    const storyChapters = chapters || [];
+    const storyChapters =
+      chapters || [];
 
-    // =========================
+    // ======================================================
+    // AGENDAMENTOS
+    // ======================================================
+
+    /*
+     * Só precisamos enviar informações de agendamento
+     * para o próprio autor.
+     *
+     * Para leitores, esses dados simplesmente não existem
+     * na resposta.
+     */
+    let schedules: any[] = [];
+
+    if (isOwner) {
+      const chapterIds =
+        storyChapters.map(
+          (chapter) => chapter.id
+        );
+
+      if (chapterIds.length > 0) {
+        const {
+          data: scheduledChapters,
+          error: schedulesError,
+        } = await supabase
+          .from('scheduled_chapters')
+          .select(`
+            id,
+            chapter_id,
+            scheduled_for,
+            created_at,
+            updated_at
+          `)
+          .in(
+            'chapter_id',
+            chapterIds
+          );
+
+        if (schedulesError) {
+          console.error(
+            'Erro ao buscar agendamentos:',
+            schedulesError
+          );
+        } else {
+          schedules =
+            scheduledChapters || [];
+        }
+      }
+    }
+
+    /*
+     * Adiciona a informação de agendamento
+     * aos capítulos do autor.
+     */
+    const chaptersWithSchedule =
+      storyChapters.map(
+        (chapter) => {
+          const schedule =
+            schedules.find(
+              (item) =>
+                item.chapter_id ===
+                chapter.id
+            );
+
+          return {
+            ...chapter,
+            scheduled_for:
+              schedule?.scheduled_for ||
+              null,
+            is_scheduled:
+              !!schedule &&
+              !chapter.published,
+          };
+        }
+      );
+
+    // ======================================================
     // TAGS
-    // =========================
+    // ======================================================
 
-    const { data: storyTags, error: tagsError } =
-      await supabase
-        .from('story_tags')
-        .select(`
-          tag_id,
-          tags (
+    const {
+      data: storyTags,
+      error: tagsError,
+    } = await supabase
+      .from('story_tags')
+      .select(`
+        tag_id,
+        tags (
+          id,
+          name,
+          slug,
+          category_id,
+          tag_categories (
             id,
             name,
-            slug,
-            category_id,
-            tag_categories (
-              id,
-              name,
-              slug
-            )
+            slug
           )
-        `)
-        .eq('story_id', id);
+        )
+      `)
+      .eq('story_id', id);
 
     if (tagsError) {
       console.error(
@@ -203,11 +468,12 @@ export async function GET(
           return null;
         }
 
-        const category = Array.isArray(
-          tag.tag_categories
-        )
-          ? tag.tag_categories[0]
-          : tag.tag_categories;
+        const category =
+          Array.isArray(
+            tag.tag_categories
+          )
+            ? tag.tag_categories[0]
+            : tag.tag_categories;
 
         return {
           id: tag.id,
@@ -221,18 +487,20 @@ export async function GET(
       })
       .filter(Boolean);
 
-    // =========================
+    // ======================================================
     // CURTIDAS
-    // =========================
+    // ======================================================
 
-    const { count: likesCount, error: likesError } =
-      await supabase
-        .from('story_likes')
-        .select('*', {
-          count: 'exact',
-          head: true,
-        })
-        .eq('story_id', id);
+    const {
+      count: likesCount,
+      error: likesError,
+    } = await supabase
+      .from('story_likes')
+      .select('*', {
+        count: 'exact',
+        head: true,
+      })
+      .eq('story_id', id);
 
     if (likesError) {
       console.error(
@@ -241,34 +509,68 @@ export async function GET(
       );
     }
 
-    // =========================
+    // ======================================================
     // USUÁRIO CURTIU?
-    // =========================
+    // ======================================================
 
     let liked = false;
 
     if (currentUserId) {
-      const { data: like } = await supabase
-        .from('story_likes')
-        .select('story_id')
-        .eq('story_id', id)
-        .eq('user_id', currentUserId)
-        .maybeSingle();
+      const { data: like } =
+        await supabase
+          .from('story_likes')
+          .select('story_id')
+          .eq('story_id', id)
+          .eq(
+            'user_id',
+            currentUserId
+          )
+          .maybeSingle();
 
       liked = !!like;
     }
 
-    return NextResponse.json({
-      story: {
-        ...story,
-        author: author || null,
-        tags,
-        chapters: storyChapters,
-        likes: likesCount || 0,
-        liked,
+    // ======================================================
+    // RESPOSTA
+    // ======================================================
+
+    return NextResponse.json(
+      {
+        story: {
+          ...story,
+          author:
+            author || null,
+          tags,
+
+          /*
+           * Para leitores:
+           * apenas capítulos publicados.
+           *
+           * Para o autor:
+           * também aparecem os agendados.
+           */
+          chapters:
+            chaptersWithSchedule,
+
+          likes:
+            likesCount || 0,
+
+          liked,
+        },
+
+        chapters:
+          chaptersWithSchedule,
       },
-      chapters: storyChapters,
-    });
+      {
+        status: 200,
+        headers: {
+          'Cache-Control':
+            'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
+    );
   } catch (error) {
     console.error(
       'Erro inesperado na API da história:',
@@ -276,8 +578,17 @@ export async function GET(
     );
 
     return NextResponse.json(
-      { error: 'Erro interno do servidor.' },
-      { status: 500 }
+      {
+        error:
+          'Erro interno do servidor.',
+      },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control':
+            'no-store, no-cache, must-revalidate',
+        },
+      }
     );
   }
 }
@@ -290,49 +601,64 @@ export async function PUT(
   request: Request,
   context: RouteContext
 ) {
-  let uploadedFilePath: string | null = null;
+  let uploadedFilePath: string | null =
+    null;
 
   try {
-    const { id } = await context.params;
+    const { id } =
+      await context.params;
 
     if (!id) {
       return NextResponse.json(
-        { error: 'ID da história não informado.' },
-        { status: 400 }
+        {
+          error:
+            'ID da história não informado.',
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    // =========================
+    // ======================================================
     // AUTENTICAÇÃO
-    // =========================
+    // ======================================================
 
-    const userId = await getSessionUserId();
+    const userId =
+      await getSessionUserId();
 
     if (!userId) {
       return NextResponse.json(
-        { error: 'Você precisa estar logado.' },
-        { status: 401 }
+        {
+          error:
+            'Você precisa estar logado.',
+        },
+        {
+          status: 401,
+        }
       );
     }
 
-    // =========================
+    // ======================================================
     // VERIFICA DONO DA HISTÓRIA
-    // =========================
+    // ======================================================
 
-    const { data: existingStory, error: existingError } =
-      await supabase
-        .from('stories')
-        .select(`
-          id,
-          author_id,
-          title,
-          description,
-          cover_url,
-          status,
-          rating
-        `)
-        .eq('id', id)
-        .maybeSingle();
+    const {
+      data: existingStory,
+      error: existingError,
+    } = await supabase
+      .from('stories')
+      .select(`
+        id,
+        author_id,
+        title,
+        description,
+        cover_url,
+        status,
+        rating
+      `)
+      .eq('id', id)
+      .maybeSingle();
 
     if (existingError) {
       console.error(
@@ -341,40 +667,57 @@ export async function PUT(
       );
 
       return NextResponse.json(
-        { error: 'Erro ao buscar história.' },
-        { status: 500 }
+        {
+          error:
+            'Erro ao buscar história.',
+        },
+        {
+          status: 500,
+        }
       );
     }
 
     if (!existingStory) {
       return NextResponse.json(
-        { error: 'História não encontrada.' },
-        { status: 404 }
+        {
+          error:
+            'História não encontrada.',
+        },
+        {
+          status: 404,
+        }
       );
     }
 
-    if (existingStory.author_id !== userId) {
+    if (
+      existingStory.author_id !==
+      userId
+    ) {
       return NextResponse.json(
         {
           error:
             'Você não tem permissão para editar esta história.',
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
-    // =========================
+    // ======================================================
     // FORM DATA
-    // =========================
+    // ======================================================
 
-    const formData = await request.formData();
+    const formData =
+      await request.formData();
 
     const title = String(
       formData.get('title') || ''
     ).trim();
 
     const description = String(
-      formData.get('description') || ''
+      formData.get('description') ||
+        ''
     ).trim();
 
     const status = String(
@@ -393,16 +736,22 @@ export async function PUT(
       formData.get('tags') || ''
     );
 
-    const cover = formData.get('cover');
+    const cover =
+      formData.get('cover');
 
-    // =========================
+    // ======================================================
     // VALIDAÇÕES
-    // =========================
+    // ======================================================
 
     if (!title) {
       return NextResponse.json(
-        { error: 'O título é obrigatório.' },
-        { status: 400 }
+        {
+          error:
+            'O título é obrigatório.',
+        },
+        {
+          status: 400,
+        }
       );
     }
 
@@ -412,7 +761,9 @@ export async function PUT(
           error:
             'O título pode ter no máximo 150 caracteres.',
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -422,7 +773,9 @@ export async function PUT(
           error:
             'A sinopse pode ter no máximo 5000 caracteres.',
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -436,19 +789,29 @@ export async function PUT(
       '18',
     ];
 
-    if (!allowedRatings.includes(rating)) {
+    if (
+      !allowedRatings.includes(
+        rating
+      )
+    ) {
       return NextResponse.json(
-        { error: 'Classificação inválida.' },
-        { status: 400 }
+        {
+          error:
+            'Classificação inválida.',
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    // =========================
+    // ======================================================
     // CAPA
-    // =========================
+    // ======================================================
 
     let coverUrl =
-      existingStory.cover_url || null;
+      existingStory.cover_url ||
+      null;
 
     if (
       cover instanceof File &&
@@ -461,46 +824,63 @@ export async function PUT(
         'image/gif',
       ];
 
-      if (!allowedTypes.includes(cover.type)) {
+      if (
+        !allowedTypes.includes(
+          cover.type
+        )
+      ) {
         return NextResponse.json(
           {
             error:
               'A capa precisa ser JPG, PNG, WEBP ou GIF.',
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
-      if (cover.size > 10 * 1024 * 1024) {
+      if (
+        cover.size >
+        10 * 1024 * 1024
+      ) {
         return NextResponse.json(
           {
             error:
               'A capa pode ter no máximo 10 MB.',
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
       const extension =
-        cover.type === 'image/jpeg'
+        cover.type ===
+        'image/jpeg'
           ? 'jpg'
-          : cover.type === 'image/png'
+          : cover.type ===
+            'image/png'
           ? 'png'
-          : cover.type === 'image/webp'
+          : cover.type ===
+            'image/webp'
           ? 'webp'
           : 'gif';
 
       uploadedFilePath =
         `${userId}/${crypto.randomUUID()}.${extension}`;
 
-      const { error: uploadError } =
+      const {
+        error: uploadError,
+      } =
         await supabase.storage
           .from('story-covers')
           .upload(
             uploadedFilePath,
             cover,
             {
-              contentType: cover.type,
+              contentType:
+                cover.type,
               upsert: false,
             }
           );
@@ -512,49 +892,65 @@ export async function PUT(
         );
 
         return NextResponse.json(
-          { error: 'Não foi possível enviar a capa.' },
-          { status: 500 }
+          {
+            error:
+              'Não foi possível enviar a capa.',
+          },
+          {
+            status: 500,
+          }
         );
       }
 
       const {
         data: publicUrlData,
-      } = supabase.storage
-        .from('story-covers')
-        .getPublicUrl(uploadedFilePath);
+      } =
+        supabase.storage
+          .from('story-covers')
+          .getPublicUrl(
+            uploadedFilePath
+          );
 
-      coverUrl = publicUrlData.publicUrl;
+      coverUrl =
+        publicUrlData.publicUrl;
     }
 
-    // =========================
+    // ======================================================
     // ATUALIZA HISTÓRIA
-    // =========================
+    // ======================================================
 
-    const { data: updatedStory, error: updateError } =
-      await supabase
-        .from('stories')
-        .update({
-          title,
-          description: description || null,
-          cover_url: coverUrl,
-          status: status || null,
-          rating: rating || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .eq('author_id', userId)
-        .select(`
-          id,
-          author_id,
-          title,
-          description,
-          cover_url,
-          status,
-          rating,
-          created_at,
-          updated_at
-        `)
-        .single();
+    const {
+      data: updatedStory,
+      error: updateError,
+    } = await supabase
+      .from('stories')
+      .update({
+        title,
+        description:
+          description || null,
+        cover_url: coverUrl,
+        status: status || null,
+        rating: rating || null,
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq(
+        'author_id',
+        userId
+      )
+      .select(`
+        id,
+        author_id,
+        title,
+        description,
+        cover_url,
+        status,
+        rating,
+        created_at,
+        updated_at
+      `)
+      .single();
 
     if (updateError) {
       console.error(
@@ -565,50 +961,64 @@ export async function PUT(
       if (uploadedFilePath) {
         await supabase.storage
           .from('story-covers')
-          .remove([uploadedFilePath]);
+          .remove([
+            uploadedFilePath,
+          ]);
       }
 
       return NextResponse.json(
-        { error: 'Não foi possível atualizar a história.' },
-        { status: 500 }
+        {
+          error:
+            'Não foi possível atualizar a história.',
+        },
+        {
+          status: 500,
+        }
       );
     }
 
-    // =========================
+    // ======================================================
     // ORGANIZA TAGS
-    // =========================
+    // ======================================================
 
     let finalTags = tagsText
       .split(',')
-      .map((tag) => tag.trim())
+      .map((tag) =>
+        tag.trim()
+      )
       .filter(Boolean);
 
-    const uniqueTags: string[] = [];
+    const uniqueTags: string[] =
+      [];
 
     for (const tag of finalTags) {
-      const normalized = tag.toLowerCase();
+      const normalized =
+        tag.toLowerCase();
 
       if (
         !uniqueTags.some(
           (existing) =>
-            existing.toLowerCase() === normalized
+            existing.toLowerCase() ===
+            normalized
         )
       ) {
         uniqueTags.push(tag);
       }
     }
 
-    finalTags = uniqueTags.slice(0, 30);
+    finalTags =
+      uniqueTags.slice(0, 30);
 
-    // =========================
+    // ======================================================
     // REMOVE TAGS ANTIGAS
-    // =========================
+    // ======================================================
 
-    const { error: deleteTagsError } =
-      await supabase
-        .from('story_tags')
-        .delete()
-        .eq('story_id', id);
+    const {
+      error: deleteTagsError,
+    } = await supabase
+      .from('story_tags')
+      .delete()
+      .eq('story_id', id);
 
     if (deleteTagsError) {
       console.error(
@@ -621,18 +1031,23 @@ export async function PUT(
           error:
             'A história foi atualizada, mas houve um erro ao atualizar as tags.',
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
-    // =========================
+    // ======================================================
     // PREPARA TAGS
-    // =========================
+    // ======================================================
 
-    const tagsToInsert: string[] = [];
+    const tagsToInsert: string[] =
+      [];
 
     if (genre) {
-      tagsToInsert.push(genre);
+      tagsToInsert.push(
+        genre
+      );
     }
 
     for (const tag of finalTags) {
@@ -647,14 +1062,16 @@ export async function PUT(
       }
     }
 
-    // =========================
+    // ======================================================
     // CATEGORIAS
-    // =========================
+    // ======================================================
 
-    const { data: categories, error: categoriesError } =
-      await supabase
-        .from('tag_categories')
-        .select('id, slug');
+    const {
+      data: categories,
+      error: categoriesError,
+    } = await supabase
+      .from('tag_categories')
+      .select('id, slug');
 
     if (categoriesError) {
       console.error(
@@ -667,34 +1084,44 @@ export async function PUT(
           error:
             'História atualizada, mas não foi possível atualizar as tags.',
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
-    const categoryMap = new Map(
-      (categories || []).map((category) => [
-        category.slug,
-        category.id,
-      ])
-    );
+    const categoryMap =
+      new Map(
+        (categories || []).map(
+          (category) => [
+            category.slug,
+            category.id,
+          ]
+        )
+      );
 
-    // =========================
+    // ======================================================
     // CRIA/RECUPERA TAGS
-    // =========================
+    // ======================================================
 
-    const tagIds: string[] = [];
+    const tagIds: string[] =
+      [];
 
     for (const tagName of tagsToInsert) {
-      const slug = createSlug(tagName);
+      const slug =
+        createSlug(tagName);
 
       if (!slug) continue;
 
-      let { data: existingTag } =
-        await supabase
-          .from('tags')
-          .select('id, category_id')
-          .eq('slug', slug)
-          .maybeSingle();
+      let {
+        data: existingTag,
+      } = await supabase
+        .from('tags')
+        .select(
+          'id, category_id'
+        )
+        .eq('slug', slug)
+        .maybeSingle();
 
       if (!existingTag) {
         const isGenre =
@@ -702,56 +1129,78 @@ export async function PUT(
           tagName.toLowerCase() ===
             genre.toLowerCase();
 
-        const categoryId = isGenre
-          ? categoryMap.get('genre') || null
-          : categoryMap.get('freeform') || null;
+        const categoryId =
+          isGenre
+            ? categoryMap.get(
+                'genre'
+              ) || null
+            : categoryMap.get(
+                'freeform'
+              ) || null;
 
-        const { data: newTag, error: createTagError } =
-          await supabase
-            .from('tags')
-            .insert({
-              name: tagName,
-              slug,
-              category_id: categoryId,
-              created_by: userId,
-            })
-            .select('id, category_id')
-            .single();
+        const {
+          data: newTag,
+          error: createTagError,
+        } = await supabase
+          .from('tags')
+          .insert({
+            name: tagName,
+            slug,
+            category_id:
+              categoryId,
+            created_by:
+              userId,
+          })
+          .select(
+            'id, category_id'
+          )
+          .single();
 
         if (createTagError) {
-          // Pode acontecer se outro processo criou
-          // a mesma tag simultaneamente.
-          const { data: retryTag } =
-            await supabase
-              .from('tags')
-              .select('id, category_id')
-              .eq('slug', slug)
-              .maybeSingle();
+          const {
+            data: retryTag,
+          } = await supabase
+            .from('tags')
+            .select(
+              'id, category_id'
+            )
+            .eq(
+              'slug',
+              slug
+            )
+            .maybeSingle();
 
           if (!retryTag) {
             console.error(
               'Erro ao criar tag:',
               createTagError
             );
+
             continue;
           }
 
-          existingTag = retryTag;
+          existingTag =
+            retryTag;
         } else {
-          existingTag = newTag;
+          existingTag =
+            newTag;
         }
       }
 
       if (existingTag?.id) {
-        tagIds.push(existingTag.id);
+        tagIds.push(
+          existingTag.id
+        );
       }
     }
 
-    // =========================
+    // ======================================================
     // RELACIONA TAGS À HISTÓRIA
-    // =========================
+    // ======================================================
 
-    if (tagIds.length > 0) {
+    if (
+      tagIds.length > 0
+    ) {
       const rows = [
         ...new Set(tagIds),
       ].map((tagId) => ({
@@ -759,10 +1208,11 @@ export async function PUT(
         tag_id: tagId,
       }));
 
-      const { error: insertTagsError } =
-        await supabase
-          .from('story_tags')
-          .insert(rows);
+      const {
+        error: insertTagsError,
+      } = await supabase
+        .from('story_tags')
+        .insert(rows);
 
       if (insertTagsError) {
         console.error(
@@ -775,19 +1225,22 @@ export async function PUT(
             error:
               'História atualizada, mas houve um erro ao salvar as tags.',
           },
-          { status: 500 }
+          {
+            status: 500,
+          }
         );
       }
     }
 
-    // =========================
+    // ======================================================
     // RETORNO
-    // =========================
+    // ======================================================
 
     return NextResponse.json({
       success: true,
       story: updatedStory,
-      message: 'História atualizada com sucesso.',
+      message:
+        'História atualizada com sucesso.',
     });
   } catch (error) {
     console.error(
@@ -799,15 +1252,22 @@ export async function PUT(
       try {
         await supabase.storage
           .from('story-covers')
-          .remove([uploadedFilePath]);
+          .remove([
+            uploadedFilePath,
+          ]);
       } catch {
         // ignora erro de limpeza
       }
     }
 
     return NextResponse.json(
-      { error: 'Erro interno do servidor.' },
-      { status: 500 }
+      {
+        error:
+          'Erro interno do servidor.',
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
