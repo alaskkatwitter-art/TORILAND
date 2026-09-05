@@ -36,9 +36,6 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Procura a conta pelo username.
-     */
     const { data: account, error: accountError } =
       await supabase
         .from('auth_accounts')
@@ -62,9 +59,6 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Username inexistente.
-     */
     if (!account) {
       return NextResponse.json(
         {
@@ -74,9 +68,6 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Confere a senha.
-     */
     const passwordIsValid = await bcrypt.compare(
       password,
       account.password_hash
@@ -91,31 +82,19 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Cria um token de sessão aleatório.
-     */
     const sessionToken = crypto
       .randomBytes(32)
       .toString('hex');
 
-    /*
-     * No banco guardamos somente o hash do token.
-     */
     const tokenHash = crypto
       .createHash('sha256')
       .update(sessionToken)
       .digest('hex');
 
-    /*
-     * Sessão válida por 30 dias.
-     */
     const expiresAt = new Date(
       Date.now() + SESSION_SECONDS * 1000
     ).toISOString();
 
-    /*
-     * Salva a sessão no banco.
-     */
     const { error: sessionError } = await supabase
       .from('auth_sessions')
       .insert({
@@ -143,9 +122,6 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Cria a resposta.
-     */
     const response = NextResponse.json(
       {
         message: 'Login realizado com sucesso.',
@@ -158,9 +134,6 @@ export async function POST(request: Request) {
       { status: 200 }
     );
 
-    /*
-     * Cria o cookie que o /api/auth/me procura.
-     */
     response.cookies.set({
       name: 'toriland_session',
       value: sessionToken,
@@ -178,9 +151,16 @@ export async function POST(request: Request) {
       error
     );
 
-   return NextResponse.json(
-  {
-    error: 'TESTE NOOKLIE 123',
-  },
-  { status: 500 }
-);
+    return NextResponse.json(
+      {
+        error:
+          'Não foi possível realizar o login.',
+        debug:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+      { status: 500 }
+    );
+  }
+}
