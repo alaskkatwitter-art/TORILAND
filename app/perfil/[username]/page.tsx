@@ -78,6 +78,14 @@ type ProfileResponse = {
   error?: string;
 };
 
+type FollowResponse = {
+  followers_count?: number;
+  is_following?: boolean;
+  is_self?: boolean;
+  following?: boolean;
+  error?: string;
+};
+
 type Tab = 'stories' | 'nook';
 
 const LIKE_REACTION = '❤️';
@@ -155,6 +163,7 @@ function cleanUrl(url: string) {
 }
 
 function isSpotifyUrl(url: string) {
+  SPOTIFY_URL_REGEX.lastIndex = 0;
   return SPOTIFY_URL_REGEX.test(url);
 }
 
@@ -267,6 +276,58 @@ function CloseIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="m6 6 12 12M18 6 6 18"
+      />
+    </svg>
+  );
+}
+
+function FollowIcon({
+  following = false,
+}: {
+  following?: boolean;
+}) {
+  if (following) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="m5 12 4 4L19 6"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15 19a6 6 0 0 0-12 0"
+      />
+      <circle
+        cx="9"
+        cy="7"
+        r="3"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19 8v6M16 11h6"
       />
     </svg>
   );
@@ -1117,6 +1178,18 @@ export default function PublicProfilePage() {
   const [error, setError] =
     useState('');
 
+  const [followersCount, setFollowersCount] =
+    useState(0);
+
+  const [isFollowing, setIsFollowing] =
+    useState(false);
+
+  const [isSelf, setIsSelf] =
+    useState(false);
+
+  const [followLoading, setFollowLoading] =
+    useState(false);
+
   useEffect(() => {
     if (!username) {
       setLoading(false);
@@ -1168,6 +1241,42 @@ export default function PublicProfilePage() {
             ? data.posts
             : []
         );
+
+        try {
+          const followResponse = await fetch(
+            `/api/follows?user_id=${encodeURIComponent(
+              data.user.id
+            )}`,
+            {
+              cache: 'no-store',
+            }
+          );
+
+          const followData: FollowResponse =
+            await followResponse.json();
+
+          if (followResponse.ok) {
+            setFollowersCount(
+              typeof followData.followers_count ===
+                'number'
+                ? followData.followers_count
+                : 0
+            );
+
+            setIsFollowing(
+              followData.is_following === true
+            );
+
+            setIsSelf(
+              followData.is_self === true
+            );
+          }
+        } catch (followError) {
+          console.error(
+            'Erro ao carregar seguidores:',
+            followError
+          );
+        }
       } catch (err) {
         console.error(
           'Erro ao carregar perfil público:',
@@ -1184,6 +1293,97 @@ export default function PublicProfilePage() {
 
     loadProfile();
   }, [username]);
+
+  async function toggleFollow() {
+    if (!user || followLoading || isSelf) {
+      return;
+    }
+
+    const previousFollowing =
+      isFollowing;
+
+    const previousFollowers =
+      followersCount;
+
+    const nextFollowing =
+      !previousFollowing;
+
+    const nextFollowers =
+      nextFollowing
+        ? previousFollowers + 1
+        : Math.max(
+            0,
+            previousFollowers - 1
+          );
+
+    setIsFollowing(nextFollowing);
+    setFollowersCount(nextFollowers);
+    setFollowLoading(true);
+
+    try {
+      const response = await fetch(
+        '/api/follows',
+        {
+          method: nextFollowing
+            ? 'POST'
+            : 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            following_id: user.id,
+          }),
+        }
+      );
+
+      const data: FollowResponse =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Não foi possível alterar o follow.'
+        );
+      }
+
+      if (
+        typeof data.following ===
+        'boolean'
+      ) {
+        setIsFollowing(data.following);
+      }
+
+      if (
+        typeof data.followers_count ===
+        'number'
+      ) {
+        setFollowersCount(
+          data.followers_count
+        );
+      }
+    } catch (error) {
+      console.error(
+        'Erro ao seguir usuário:',
+        error
+      );
+
+      setIsFollowing(
+        previousFollowing
+      );
+
+      setFollowersCount(
+        previousFollowers
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível alterar o follow.'
+      );
+    } finally {
+      setFollowLoading(false);
+    }
+  }
 
   function updatePost(
     postId: string,
@@ -1290,7 +1490,7 @@ export default function PublicProfilePage() {
           </div>
 
           <div className="relative px-5 pb-7 sm:px-8">
-            <div className="-mt-14 flex items-end justify-between">
+            <div className="-mt-14 flex items-end justify-between gap-4">
               <div className="relative">
                 {user.avatar_url ? (
                   <img
@@ -1307,15 +1507,38 @@ export default function PublicProfilePage() {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() =>
-                  router.push('/perfil')
-                }
-                className="mb-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
-              >
-                Meu perfil
-              </button>
+              {isSelf ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push('/perfil')
+                  }
+                  className="mb-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
+                >
+                  Meu perfil
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={toggleFollow}
+                  disabled={followLoading}
+                  className={`mb-2 flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isFollowing
+                      ? 'border border-white/15 bg-white/5 text-white hover:bg-white/10'
+                      : 'bg-white text-black hover:bg-white/90'
+                  }`}
+                >
+                  <FollowIcon
+                    following={isFollowing}
+                  />
+
+                  {followLoading
+                    ? 'Aguarde...'
+                    : isFollowing
+                      ? 'Seguindo'
+                      : 'Seguir'}
+                </button>
+              )}
             </div>
 
             <div className="mt-5">
@@ -1326,6 +1549,18 @@ export default function PublicProfilePage() {
               <p className="mt-1 text-sm font-semibold text-white/40">
                 @{user.username}
               </p>
+
+              <div className="mt-4 flex items-center gap-4 text-sm">
+                <span className="font-bold text-white">
+                  {followersCount}
+                </span>
+
+                <span className="text-white/40">
+                  {followersCount === 1
+                    ? 'seguidor'
+                    : 'seguidores'}
+                </span>
+              </div>
 
               {user.bio ? (
                 <p className="mt-5 max-w-2xl whitespace-pre-wrap text-sm leading-7 text-white/70">
