@@ -37,10 +37,7 @@ async function getSessionUserId() {
   }
 
   /*
-   * Mantemos a mesma lógica de sessão usada
-   * pelo restante do projeto.
-   *
-   * O token é armazenado como hash.
+   * O token da sessão é armazenado como hash.
    */
   const tokenHash = crypto
     .createHash('sha256')
@@ -77,24 +74,25 @@ async function getSessionUserId() {
  * Quando alguém acessa uma história depois que o horário
  * programado passou, liberamos os capítulos vencidos.
  *
- * Isso também funciona como uma camada de segurança:
- * mesmo que o cron ainda não tenha rodado, o capítulo
- * não fica preso como "agendado" depois da hora.
+ * Isso permite que o capítulo seja liberado mesmo que
+ * ainda não exista um cron executando no servidor.
  */
 async function publishDueScheduledChapters(
   storyId: string
 ) {
   const now = new Date().toISOString();
 
-  const { data: schedules, error: scheduleError } =
-    await supabase
-      .from('scheduled_chapters')
-      .select(`
-        id,
-        chapter_id,
-        scheduled_for
-      `)
-      .eq('scheduled_for', '<=', now);
+  const {
+    data: schedules,
+    error: scheduleError,
+  } = await supabase
+    .from('scheduled_chapters')
+    .select(`
+      id,
+      chapter_id,
+      scheduled_for
+    `)
+    .lte('scheduled_for', now);
 
   if (scheduleError) {
     console.error(
@@ -111,15 +109,20 @@ async function publishDueScheduledChapters(
 
   for (const schedule of schedules) {
     /*
-     * Confere se o capítulo pertence à história que
-     * estamos acessando.
+     * Confere se o capítulo ainda existe.
      */
-    const { data: chapter, error: chapterError } =
-      await supabase
-        .from('chapters')
-        .select('id, story_id, published')
-        .eq('id', schedule.chapter_id)
-        .maybeSingle();
+    const {
+      data: chapter,
+      error: chapterError,
+    } = await supabase
+      .from('chapters')
+      .select(`
+        id,
+        story_id,
+        published
+      `)
+      .eq('id', schedule.chapter_id)
+      .maybeSingle();
 
     if (chapterError) {
       console.error(
@@ -132,7 +135,8 @@ async function publishDueScheduledChapters(
 
     if (!chapter) {
       /*
-       * Se o capítulo não existe mais, limpa o agendamento.
+       * Se o capítulo foi apagado, remove também
+       * o agendamento órfão.
        */
       await supabase
         .from('scheduled_chapters')
@@ -143,23 +147,37 @@ async function publishDueScheduledChapters(
     }
 
     /*
-     * Só libera capítulos dessa história.
+     * Só libera capítulos da história que está sendo
+     * acessada.
      */
     if (chapter.story_id !== storyId) {
       continue;
     }
 
     /*
+     * Se já estiver publicado, basta remover o agendamento.
+     */
+    if (chapter.published) {
+      await supabase
+        .from('scheduled_chapters')
+        .delete()
+        .eq('id', schedule.id);
+
+      continue;
+    }
+
+    /*
      * Publica o capítulo.
      */
-    const { error: publishError } =
-      await supabase
-        .from('chapters')
-        .update({
-          published: true,
-        })
-        .eq('id', chapter.id)
-        .eq('story_id', storyId);
+    const {
+      error: publishError,
+    } = await supabase
+      .from('chapters')
+      .update({
+        published: true,
+      })
+      .eq('id', chapter.id)
+      .eq('story_id', storyId);
 
     if (publishError) {
       console.error(
@@ -171,14 +189,15 @@ async function publishDueScheduledChapters(
     }
 
     /*
-     * Depois de publicado, o agendamento deixa de ser
+     * Depois de publicado, o agendamento não é mais
      * necessário.
      */
-    const { error: deleteScheduleError } =
-      await supabase
-        .from('scheduled_chapters')
-        .delete()
-        .eq('id', schedule.id);
+    const {
+      error: deleteScheduleError,
+    } = await supabase
+      .from('scheduled_chapters')
+      .delete()
+      .eq('id', schedule.id);
 
     if (deleteScheduleError) {
       console.error(
@@ -188,6 +207,12 @@ async function publishDueScheduledChapters(
     }
   }
 }
+
+/*
+ * ======================================================
+ * GET - HISTÓRIA
+ * ======================================================
+ */
 
 export async function GET(
   request: Request,
@@ -296,7 +321,9 @@ export async function GET(
     // ======================================================
 
     /*
-     * Autor pode enxergar os próprios capítulos agendados.
+     * O autor pode enxergar os próprios capítulos
+     * agendados.
+     *
      * Leitores só recebem capítulos publicados.
      */
     const isOwner =
@@ -358,11 +385,8 @@ export async function GET(
     // ======================================================
 
     /*
-     * Só precisamos enviar informações de agendamento
-     * para o próprio autor.
-     *
-     * Para leitores, esses dados simplesmente não existem
-     * na resposta.
+     * Somente o próprio autor recebe informações
+     * sobre agendamentos.
      */
     let schedules: any[] = [];
 
@@ -403,7 +427,7 @@ export async function GET(
     }
 
     /*
-     * Adiciona a informação de agendamento
+     * Adiciona informações de agendamento
      * aos capítulos do autor.
      */
     const chaptersWithSchedule =
@@ -516,16 +540,17 @@ export async function GET(
     let liked = false;
 
     if (currentUserId) {
-      const { data: like } =
-        await supabase
-          .from('story_likes')
-          .select('story_id')
-          .eq('story_id', id)
-          .eq(
-            'user_id',
-            currentUserId
-          )
-          .maybeSingle();
+      const {
+        data: like,
+      } = await supabase
+        .from('story_likes')
+        .select('story_id')
+        .eq('story_id', id)
+        .eq(
+          'user_id',
+          currentUserId
+        )
+        .maybeSingle();
 
       liked = !!like;
     }
@@ -541,20 +566,10 @@ export async function GET(
           author:
             author || null,
           tags,
-
-          /*
-           * Para leitores:
-           * apenas capítulos publicados.
-           *
-           * Para o autor:
-           * também aparecem os agendados.
-           */
           chapters:
             chaptersWithSchedule,
-
           likes:
             likesCount || 0,
-
           liked,
         },
 
@@ -593,9 +608,11 @@ export async function GET(
   }
 }
 
-// ======================================================
-// EDITAR HISTÓRIA
-// ======================================================
+/*
+ * ======================================================
+ * PUT - EDITAR HISTÓRIA
+ * ======================================================
+ */
 
 export async function PUT(
   request: Request,
@@ -1111,7 +1128,9 @@ export async function PUT(
       const slug =
         createSlug(tagName);
 
-      if (!slug) continue;
+      if (!slug) {
+        continue;
+      }
 
       let {
         data: existingTag,
