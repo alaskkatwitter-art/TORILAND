@@ -36,6 +36,9 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+     * Procura a conta pelo username.
+     */
     const { data: account, error: accountError } =
       await supabase
         .from('auth_accounts')
@@ -53,12 +56,14 @@ export async function POST(request: Request) {
         {
           error:
             'Não foi possível verificar sua conta.',
-          debug: accountError.message,
         },
         { status: 500 }
       );
     }
 
+    /*
+     * Username inexistente.
+     */
     if (!account) {
       return NextResponse.json(
         {
@@ -68,6 +73,9 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+     * Confere a senha salva no cadastro.
+     */
     const passwordIsValid = await bcrypt.compare(
       password,
       account.password_hash
@@ -82,22 +90,38 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+     * Cria um token de sessão completamente aleatório.
+     */
     const sessionToken = crypto
       .randomBytes(32)
       .toString('hex');
 
+    /*
+     * No banco guardamos somente o hash do token.
+     */
     const tokenHash = crypto
       .createHash('sha256')
       .update(sessionToken)
       .digest('hex');
 
+    /*
+     * Sessão válida por 30 dias.
+     */
     const expiresAt = new Date(
       Date.now() + SESSION_SECONDS * 1000
     ).toISOString();
 
+    /*
+     * Salva a sessão no banco.
+     *
+     * A tabela auth_sessions possui uma coluna id
+     * obrigatória, então geramos um UUID para ela.
+     */
     const { error: sessionError } = await supabase
       .from('auth_sessions')
       .insert({
+        id: crypto.randomUUID(),
         user_id: account.id,
         token_hash: tokenHash,
         expires_at: expiresAt,
@@ -122,6 +146,9 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+     * Cria a resposta.
+     */
     const response = NextResponse.json(
       {
         message: 'Login realizado com sucesso.',
@@ -134,6 +161,9 @@ export async function POST(request: Request) {
       { status: 200 }
     );
 
+    /*
+     * Cria o cookie que o /api/auth/me procura.
+     */
     response.cookies.set({
       name: 'toriland_session',
       value: sessionToken,
