@@ -16,6 +16,16 @@ type Profile = {
   avatar_url: string | null;
 };
 
+type CurrentUser = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  cover_url: string | null;
+  theme_color: string | null;
+};
+
 type Media = {
   id: string;
   post_id: string;
@@ -213,7 +223,7 @@ function formatPostDateTime(date: string) {
   )}`;
 }
 
-function getInitial(profile: Profile | null) {
+function getInitial(profile: Profile | CurrentUser | null) {
   if (!profile) {
     return '?';
   }
@@ -255,7 +265,7 @@ function Avatar({
   profile,
   size = 'normal',
 }: {
-  profile: Profile | null;
+  profile: Profile | CurrentUser | null;
   size?: 'small' | 'normal';
 }) {
   const sizeClass =
@@ -1325,6 +1335,13 @@ export default function FeedPage() {
     useState<Post[]>([]);
 
   const [
+    currentUser,
+    setCurrentUser,
+  ] = useState<CurrentUser | null>(
+    null
+  );
+
+  const [
     loading,
     setLoading,
   ] = useState(true);
@@ -1339,14 +1356,53 @@ export default function FeedPage() {
     setError,
   ] = useState('');
 
-  /* =======================================================
-     COMPOSITOR DE PUBLICAÇÃO
-  ======================================================= */
-
   const [
     composerOpen,
     setComposerOpen,
   ] = useState(false);
+
+  /* =======================================================
+     USUÁRIO LOGADO
+  ======================================================= */
+
+  const loadCurrentUser =
+    useCallback(async () => {
+      try {
+        const response =
+          await fetch(
+            '/api/auth/me',
+            {
+              cache: 'no-store',
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (
+          response.ok &&
+          data.authenticated &&
+          data.user
+        ) {
+          setCurrentUser(
+            data.user
+          );
+        } else {
+          setCurrentUser(null);
+        }
+      } catch (error) {
+        console.error(
+          'Erro ao carregar usuário:',
+          error
+        );
+
+        setCurrentUser(null);
+      }
+    }, []);
+
+  /* =======================================================
+     CARREGAR FEED
+  ======================================================= */
 
   const loadFeed =
     useCallback(
@@ -1400,8 +1456,12 @@ export default function FeedPage() {
     );
 
   useEffect(() => {
+    loadCurrentUser();
     loadFeed();
-  }, [loadFeed]);
+  }, [
+    loadCurrentUser,
+    loadFeed,
+  ]);
 
   function updatePost(
     postId: string,
@@ -1477,29 +1537,82 @@ export default function FeedPage() {
           </button>
         </header>
 
-        {/* CREATE POST */}
+        {/* =================================================
+            CREATE POST
+        ================================================= */}
 
-        <div className="mx-auto mb-6 w-full max-w-[680px]">
+        <div className="mx-auto mb-7 w-full max-w-[680px]">
           <button
             type="button"
             onClick={() =>
               setComposerOpen(true)
             }
-            className="group flex w-full items-center gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.025] p-3 text-left shadow-[0_15px_50px_rgba(0,0,0,0.16)] transition hover:border-[#ff78b9]/25 hover:bg-[#ff78b9]/[0.035]"
+            className="group w-full overflow-hidden rounded-[26px] border border-[#ff78b9]/15 bg-gradient-to-br from-[#ff78b9]/[0.09] via-white/[0.035] to-[#c63dff]/[0.05] p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition duration-300 hover:border-[#ff78b9]/35 hover:shadow-[0_20px_70px_rgba(255,120,185,0.08)] sm:p-6"
           >
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#ff78b9]/20 bg-[#ff78b9]/[0.08] text-2xl font-light text-[#ff78b9] transition-transform group-hover:scale-105">
-              +
-            </span>
+            <div className="flex items-center gap-4">
 
-            <span className="min-w-0">
-              <span className="block text-sm font-bold text-white/75">
-                Compartilhe alguma coisa
-              </span>
+              {/* AVATAR DO USUÁRIO */}
 
-              <span className="mt-0.5 block text-xs text-white/30">
-                Uma ideia, uma descoberta, uma história...
-              </span>
-            </span>
+              <div className="relative shrink-0">
+                <div className="h-14 w-14 overflow-hidden rounded-full border-2 border-[#ff78b9]/30 bg-[#ff78b9] font-black text-lg text-[#190d16] shadow-[0_0_25px_rgba(255,120,185,0.12)] sm:h-16 sm:w-16">
+                  {currentUser?.avatar_url ? (
+                    <img
+                      src={
+                        currentUser.avatar_url
+                      }
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      {getInitial(
+                        currentUser
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#100c11] bg-[#ff78b9] text-[#190d16]">
+                  <span className="text-base leading-none">
+                    +
+                  </span>
+                </span>
+              </div>
+
+              {/* TEXTO */}
+
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-black text-white sm:text-lg">
+                  Compartilhe alguma coisa
+                </p>
+
+                <p className="mt-1 text-sm leading-5 text-white/40">
+                  Uma ideia, uma descoberta,
+                  uma história...
+                </p>
+              </div>
+
+              {/* INDICADOR */}
+
+              <div className="hidden shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-white/45 transition group-hover:border-[#ff78b9]/25 group-hover:bg-[#ff78b9]/[0.08] group-hover:text-[#ff78b9] sm:flex">
+                Publicar
+              </div>
+            </div>
+
+            {/* LINHA INFERIOR */}
+
+            <div className="mt-5 border-t border-white/[0.07] pt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-white/25">
+                  O que está passando pela sua
+                  cabeça?
+                </span>
+
+                <span className="text-xs font-semibold text-[#ff78b9]/50 transition group-hover:text-[#ff78b9]">
+                  Criar publicação →
+                </span>
+              </div>
+            </div>
           </button>
         </div>
 
