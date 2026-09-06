@@ -1,3 +1,4 @@
+```tsx
 'use client';
 
 import React, {
@@ -98,23 +99,6 @@ const ALLOWED_MEDIA_TYPES = [
 ];
 
 function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return '—';
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return '—';
-  }
-
-  return date.toLocaleString('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
-}
-
-function formatShortDate(value: string | null | undefined) {
   if (!value) {
     return '—';
   }
@@ -464,9 +448,7 @@ export default function EditarHistoriaPage() {
       }
 
       selection.removeAllRanges();
-      selection.addRange(
-        range
-      );
+      selection.addRange(range);
 
       editorRef.current.focus();
     } catch {
@@ -651,13 +633,11 @@ export default function EditarHistoriaPage() {
           storyChapter?.scheduled_for ??
           null;
 
-        setChapter(
-          {
-            ...loadedChapter,
-            scheduled_for:
-              resolvedScheduledFor,
-          }
-        );
+        setChapter({
+          ...loadedChapter,
+          scheduled_for:
+            resolvedScheduledFor,
+        });
 
         setChapterTitle(
           loadedChapter.title || ''
@@ -716,13 +696,8 @@ export default function EditarHistoriaPage() {
           loadedChapter.id
         );
 
-        const nextQuery =
-          nextParams.toString();
-
         const nextUrl =
-          nextQuery
-            ? `/editar-historia/${id}?${nextQuery}`
-            : `/editar-historia/${id}`;
+          `/editar-historia/${id}?${nextParams.toString()}`;
 
         if (
           window.location.pathname +
@@ -786,23 +761,6 @@ export default function EditarHistoriaPage() {
       }, 0);
     }
   }, [showLinkBox]);
-
-  useEffect(() => {
-    return () => {
-      chapterMedia.forEach(
-        (media) => {
-          if (
-            !media.existing &&
-            media.url.startsWith('blob:')
-          ) {
-            URL.revokeObjectURL(
-              media.url
-            );
-          }
-        }
-      );
-    };
-  }, [chapterMedia]);
 
   function selectChapter(
     chapterId: string
@@ -1194,6 +1152,24 @@ export default function EditarHistoriaPage() {
 
     syncEditorBody();
     saveSelection();
+  }
+
+  function setAlignment(
+    alignment:
+      | 'left'
+      | 'center'
+      | 'right'
+  ) {
+    const command =
+      alignment === 'left'
+        ? 'justifyLeft'
+        : alignment === 'center'
+          ? 'justifyCenter'
+          : 'justifyRight';
+
+    executeCommand(
+      command
+    );
   }
 
   function addLink() {
@@ -1684,6 +1660,12 @@ export default function EditarHistoriaPage() {
               'lazy'
             );
 
+            image.style.maxWidth =
+              '100%';
+
+            image.style.height =
+              'auto';
+
             element.replaceWith(
               image
             );
@@ -1851,14 +1833,6 @@ export default function EditarHistoriaPage() {
             media.id
         );
 
-      /*
-       * A API atual precisa primeiro receber os arquivos
-       * para gerar as URLs reais. Por isso, quando existem
-       * novas mídias, fazemos uma primeira gravação técnica
-       * como rascunho e, depois, a gravação definitiva.
-       *
-       * O capítulo nunca é publicado nessa primeira etapa.
-       */
       if (
         pending.length > 0
       ) {
@@ -1992,9 +1966,6 @@ export default function EditarHistoriaPage() {
         setMediaUploading(false);
       }
 
-      /*
-       * Gravação definitiva.
-       */
       const formData =
         new FormData();
 
@@ -2067,12 +2038,6 @@ export default function EditarHistoriaPage() {
       const savedChapter =
         data.chapter;
 
-      /*
-       * A API pode não devolver scheduled_for enquanto
-       * ele estiver armazenado na tabela de agendamento.
-       * Por isso preservamos o valor que o usuário acabou
-       * de escolher quando estamos agendando.
-       */
       const resolvedScheduledFor =
         finalStatus === 'scheduled'
           ? data.scheduled_for ??
@@ -2221,8 +2186,6 @@ export default function EditarHistoriaPage() {
       }
     } catch (err: unknown) {
       console.error(err);
-
-      setMediaUploading(false);
 
       setError(
         err instanceof Error
@@ -2431,7 +2394,7 @@ export default function EditarHistoriaPage() {
     <main className="min-h-screen bg-[#09070a] text-white">
       <style jsx global>{`
         .chapter-editor {
-          min-height: 620px;
+          min-height: 900px;
           outline: none;
           white-space: pre-wrap;
           word-break: break-word;
@@ -2489,7 +2452,7 @@ export default function EditarHistoriaPage() {
         .chapter-media-placeholder {
           display: block;
           width: 100%;
-          max-width: 680px;
+          max-width: 720px;
           margin: 1.5rem auto;
           padding: 0.5rem;
           border-radius: 0.9rem;
@@ -2552,10 +2515,36 @@ export default function EditarHistoriaPage() {
           margin: 2rem 0;
           border-color: rgba(255, 255, 255, 0.12);
         }
+
+        .editor-toolbar-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 38px;
+          height: 38px;
+          padding: 0 11px;
+          border-radius: 9px;
+          color: rgb(209, 213, 219);
+          font-size: 13px;
+          transition: background 0.15s ease,
+            color 0.15s ease;
+        }
+
+        .editor-toolbar-button:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: white;
+        }
+
+        .editor-toolbar-divider {
+          width: 1px;
+          height: 24px;
+          margin: 0 4px;
+          background: rgba(255, 255, 255, 0.1);
+        }
       `}</style>
 
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0b090c]/95 backdrop-blur">
-        <div className="mx-auto max-w-[1500px] px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+        <div className="mx-auto max-w-[1550px] px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <button
             type="button"
             onClick={() =>
@@ -2601,7 +2590,7 @@ export default function EditarHistoriaPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1500px] px-4 sm:px-6 py-6">
+      <div className="mx-auto max-w-[1550px] px-4 sm:px-6 py-6">
         {error && (
           <div className="mb-5 rounded-xl border border-red-400/20 bg-red-500/[0.07] px-4 py-3 text-sm text-red-200">
             {error}
@@ -2615,7 +2604,7 @@ export default function EditarHistoriaPage() {
         )}
 
         {!chapter ? (
-          <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)_320px]">
+          <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)_350px]">
             <aside className="lg:sticky lg:top-24 lg:self-start">
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
                 <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
@@ -2657,7 +2646,7 @@ export default function EditarHistoriaPage() {
             <section>
               <div className="mb-7">
                 <p className="text-xs uppercase tracking-[0.18em] text-pink-300/70">
-                  Configurações da obra
+                  Editar obra
                 </p>
 
                 <h1 className="mt-2 text-3xl font-semibold">
@@ -2665,7 +2654,7 @@ export default function EditarHistoriaPage() {
                 </h1>
 
                 <p className="mt-2 text-sm text-gray-500">
-                  Edite as informações da obra ou escolha um capítulo para começar a escrever.
+                  Edite as informações da obra ou escolha um capítulo para editar.
                 </p>
               </div>
 
@@ -2677,7 +2666,7 @@ export default function EditarHistoriaPage() {
               >
                 <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
                   <h2 className="text-base font-medium">
-                    Informações
+                    Informações da obra
                   </h2>
 
                   <div className="mt-5">
@@ -2907,10 +2896,7 @@ export default function EditarHistoriaPage() {
                     </h2>
 
                     <p className="mt-1 text-xs text-gray-600">
-                      {
-                        story.chapters
-                          .length
-                      }{' '}
+                      {story.chapters.length}{' '}
                       {story.chapters
                         .length === 1
                         ? 'capítulo'
@@ -2928,17 +2914,11 @@ export default function EditarHistoriaPage() {
                   ) : (
                     story.chapters.map(
                       (item) => (
-                        <button
+                        <div
                           key={
                             item.id
                           }
-                          type="button"
-                          onClick={() =>
-                            selectChapter(
-                              item.id
-                            )
-                          }
-                          className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-left hover:border-pink-400/30 hover:bg-pink-500/[0.04] transition"
+                          className="rounded-xl border border-white/10 bg-black/20 p-3"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -2984,7 +2964,19 @@ export default function EditarHistoriaPage() {
                               )}
                             </p>
                           )}
-                        </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              selectChapter(
+                                item.id
+                              )
+                            }
+                            className="mt-3 w-full rounded-lg bg-pink-500/10 px-3 py-2 text-xs font-medium text-pink-200 hover:bg-pink-500/20 transition"
+                          >
+                            EDITAR CAPÍTULO
+                          </button>
+                        </div>
                       )
                     )
                   )}
@@ -2993,7 +2985,7 @@ export default function EditarHistoriaPage() {
             </aside>
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
+          <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
             <aside className="lg:sticky lg:top-24 lg:self-start space-y-4">
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
                 <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
@@ -3049,7 +3041,7 @@ export default function EditarHistoriaPage() {
                   </span>
                 </div>
 
-                <div className="mt-3 max-h-[420px] overflow-y-auto space-y-2 pr-1">
+                <div className="mt-3 max-h-[500px] overflow-y-auto space-y-2 pr-1">
                   {story.chapters.map(
                     (item) => (
                       <button
@@ -3069,21 +3061,23 @@ export default function EditarHistoriaPage() {
                             : 'border-white/10 bg-black/20 hover:bg-white/[0.04]'
                         }`}
                       >
-                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
-                          Capítulo{' '}
-                          {
-                            item.chapter_number
-                          }
-                        </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                              Capítulo{' '}
+                              {
+                                item.chapter_number
+                              }
+                            </p>
 
-                        <p className="mt-1 truncate text-sm text-gray-200">
-                          {item.title ||
-                            'Sem título'}
-                        </p>
+                            <p className="mt-1 truncate text-sm text-gray-200">
+                              {item.title ||
+                                'Sem título'}
+                            </p>
+                          </div>
 
-                        <div className="mt-2 flex flex-wrap gap-1">
                           <span
-                            className={`rounded-full border px-2 py-1 text-[8px] ${getStatusClass(
+                            className={`shrink-0 rounded-full border px-2 py-1 text-[8px] ${getStatusClass(
                               item.is_scheduled
                                 ? 'scheduled'
                                 : item.publication_status ||
@@ -3106,7 +3100,7 @@ export default function EditarHistoriaPage() {
 
                         {item.scheduled_for && (
                           <p className="mt-2 text-[10px] text-violet-300/60">
-                            {formatShortDate(
+                            {formatDate(
                               item.scheduled_for
                             )}
                           </p>
@@ -3120,7 +3114,7 @@ export default function EditarHistoriaPage() {
 
             <section className="min-w-0">
               {loadingChapter ? (
-                <div className="min-h-[500px] flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.02]">
+                <div className="min-h-[700px] flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.02]">
                   <p className="text-sm text-gray-500">
                     Carregando capítulo...
                   </p>
@@ -3135,7 +3129,7 @@ export default function EditarHistoriaPage() {
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.18em] text-pink-300/70">
-                        Capítulo{' '}
+                        Editando capítulo{' '}
                         {
                           chapter.chapter_number
                         }
@@ -3157,24 +3151,15 @@ export default function EditarHistoriaPage() {
                         {chapter.original_published_at && (
                           <span className="text-xs text-gray-600">
                             Original:{' '}
-                            {formatShortDate(
+                            {formatDate(
                               chapter.original_published_at
-                            )}
-                          </span>
-                        )}
-
-                        {chapter.republished_at && (
-                          <span className="text-xs text-gray-600">
-                            Republicado:{' '}
-                            {formatShortDate(
-                              chapter.republished_at
                             )}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() =>
@@ -3213,23 +3198,25 @@ export default function EditarHistoriaPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:p-5">
-                    <input
-                      value={
-                        chapterTitle
-                      }
-                      onChange={(event) =>
-                        setChapterTitle(
-                          event.target.value
-                        )
-                      }
-                      maxLength={150}
-                      className="w-full border-none bg-transparent px-2 py-3 text-2xl sm:text-3xl font-semibold text-white outline-none placeholder:text-gray-700"
-                      placeholder="Título do capítulo"
-                    />
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden">
+                    <div className="border-b border-white/10 bg-black/20 px-3 sm:px-6 py-3">
+                      <input
+                        value={
+                          chapterTitle
+                        }
+                        onChange={(event) =>
+                          setChapterTitle(
+                            event.target.value
+                          )
+                        }
+                        maxLength={150}
+                        className="w-full border-none bg-transparent px-2 py-3 text-2xl sm:text-3xl font-semibold text-white outline-none placeholder:text-gray-700"
+                        placeholder="Título do capítulo"
+                      />
+                    </div>
 
                     {previewMode ? (
-                      <article className="chapter-preview mt-4 min-h-[620px] px-2 sm:px-8 py-6 text-[17px] leading-8 text-gray-200">
+                      <article className="chapter-preview min-h-[900px] px-4 sm:px-12 lg:px-20 py-10 text-[17px] leading-8 text-gray-200">
                         <div
                           dangerouslySetInnerHTML={{
                             __html:
@@ -3256,7 +3243,7 @@ export default function EditarHistoriaPage() {
                       </article>
                     ) : (
                       <>
-                        <div className="sticky top-[61px] z-20 mt-2 border-y border-white/10 bg-[#0d0a0e]/95 backdrop-blur">
+                        <div className="sticky top-[61px] z-30 border-b border-white/10 bg-[#0d0a0e]/98 backdrop-blur">
                           <div className="flex flex-wrap items-center gap-1 p-2">
                             <button
                               type="button"
@@ -3271,7 +3258,7 @@ export default function EditarHistoriaPage() {
                                   'bold'
                                 )
                               }
-                              className="h-9 min-w-9 rounded-lg px-3 text-sm font-bold text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
+                              className="editor-toolbar-button font-bold"
                               title="Negrito"
                             >
                               B
@@ -3290,7 +3277,7 @@ export default function EditarHistoriaPage() {
                                   'italic'
                                 )
                               }
-                              className="h-9 min-w-9 rounded-lg px-3 text-sm italic text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
+                              className="editor-toolbar-button italic"
                               title="Itálico"
                             >
                               I
@@ -3309,13 +3296,78 @@ export default function EditarHistoriaPage() {
                                   'underline'
                                 )
                               }
-                              className="h-9 min-w-9 rounded-lg px-3 text-sm underline text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
+                              className="editor-toolbar-button underline"
                               title="Sublinhado"
                             >
                               U
                             </button>
 
-                            <span className="mx-1 h-6 w-px bg-white/10" />
+                            <span className="editor-toolbar-divider" />
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setAlignment(
+                                  'left'
+                                )
+                              }
+                              className="editor-toolbar-button"
+                              title="Alinhar à esquerda"
+                            >
+                              <span className="text-lg">
+                                ≡
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setAlignment(
+                                  'center'
+                                )
+                              }
+                              className="editor-toolbar-button"
+                              title="Centralizar"
+                            >
+                              <span className="text-lg">
+                                ≡
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setAlignment(
+                                  'right'
+                                )
+                              }
+                              className="editor-toolbar-button"
+                              title="Alinhar à direita"
+                            >
+                              <span className="text-lg">
+                                ≡
+                              </span>
+                            </button>
+
+                            <span className="editor-toolbar-divider" />
 
                             <button
                               type="button"
@@ -3331,7 +3383,8 @@ export default function EditarHistoriaPage() {
                                   'h2'
                                 )
                               }
-                              className="h-9 rounded-lg px-3 text-xs font-semibold text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
+                              className="editor-toolbar-button text-xs font-semibold"
+                              title="Título"
                             >
                               Título
                             </button>
@@ -3350,47 +3403,13 @@ export default function EditarHistoriaPage() {
                                   'blockquote'
                                 )
                               }
-                              className="h-9 rounded-lg px-3 text-xs text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
+                              className="editor-toolbar-button text-xs"
+                              title="Citação"
                             >
                               Citação
                             </button>
 
-                            <button
-                              type="button"
-                              onMouseDown={(
-                                event
-                              ) => {
-                                event.preventDefault();
-                                saveSelection();
-                              }}
-                              onClick={
-                                addHorizontalRule
-                              }
-                              className="h-9 rounded-lg px-3 text-xs text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
-                            >
-                              Separador
-                            </button>
-
-                            <span className="mx-1 h-6 w-px bg-white/10" />
-
-                            <button
-                              type="button"
-                              onMouseDown={(
-                                event
-                              ) => {
-                                event.preventDefault();
-                                saveSelection();
-                              }}
-                              onClick={() =>
-                                setShowLinkBox(
-                                  (current) =>
-                                    !current
-                                )
-                              }
-                              className="h-9 rounded-lg px-3 text-xs text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
-                            >
-                              Adicionar link
-                            </button>
+                            <span className="editor-toolbar-divider" />
 
                             <button
                               type="button"
@@ -3403,7 +3422,8 @@ export default function EditarHistoriaPage() {
                               onClick={
                                 handleMediaButtonClick
                               }
-                              className="h-9 rounded-lg px-3 text-xs text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar imagem ou GIF"
                             >
                               Imagem / GIF
                             </button>
@@ -3421,17 +3441,53 @@ export default function EditarHistoriaPage() {
                               className="hidden"
                             />
 
-                            <span className="ml-auto text-[11px] text-gray-600">
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setShowLinkBox(
+                                  (current) =>
+                                    !current
+                                )
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar link"
+                            >
+                              Link
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={
+                                addHorizontalRule
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar separador"
+                            >
+                              Separador
+                            </button>
+
+                            <span className="ml-auto px-2 text-[11px] text-gray-600">
                               {
                                 chapterMedia.length
                               }
-                              /{MAX_MEDIA}{' '}
-                              mídias
+                              /{MAX_MEDIA}
                             </span>
                           </div>
 
                           {showLinkBox && (
-                            <div className="border-t border-white/10 p-2">
+                            <div className="border-t border-white/10 p-3">
                               <div className="flex flex-col gap-2 sm:flex-row">
                                 <input
                                   ref={
@@ -3488,7 +3544,7 @@ export default function EditarHistoriaPage() {
                                   }
                                   className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-medium hover:bg-pink-400 transition"
                                 >
-                                  Inserir
+                                  Inserir link
                                 </button>
                               </div>
                             </div>
@@ -3519,7 +3575,7 @@ export default function EditarHistoriaPage() {
                           onFocus={
                             saveSelection
                           }
-                          className="chapter-editor mt-2 px-2 sm:px-8 py-8 text-[17px] leading-8 text-gray-200"
+                          className="chapter-editor px-5 sm:px-12 lg:px-20 py-12 text-[17px] leading-8 text-gray-200"
                           spellCheck
                         />
                       </>
@@ -3808,3 +3864,4 @@ export default function EditarHistoriaPage() {
     </main>
   );
 }
+```
