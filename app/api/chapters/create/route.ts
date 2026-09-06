@@ -7,67 +7,123 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY!
 );
 
-export async function POST(request: Request) {
-  try {
-    const cookie = request.headers.get('cookie') || '';
+const MAX_TITLE_LENGTH = 150;
+const MAX_BODY_LENGTH = 500000;
 
-    const sessionMatch = cookie.match(
-      /(?:^|;\s*)toriland_session=([^;]+)/
+type PublicationStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'published'
+  | 'unpublished';
+
+function noCacheHeaders() {
+  return {
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+  };
+}
+
+async function getAuthenticatedUser(request: Request) {
+  const cookie = request.headers.get('cookie') || '';
+
+  const sessionMatch = cookie.match(
+    /(?:^|;\s*)toriland_session=([^;]+)/
+  );
+
+  if (!sessionMatch) {
+    return null;
+  }
+
+  const sessionToken = sessionMatch[1];
+
+  const tokenHash = crypto
+    .createHash('sha256')
+    .update(sessionToken)
+    .digest('hex');
+
+  const { data: session, error } = await supabase
+    .from('auth_sessions')
+    .select('id, user_id, expires_at')
+    .eq('token_hash', tokenHash)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      'Erro ao verificar sessão:',
+      error
     );
 
-    if (!sessionMatch) {
-      return NextResponse.json(
-        { error: 'Você precisa estar logado.' },
-        { status: 401 }
-      );
-    }
+    throw new Error(
+      'Não foi possível verificar sua sessão.'
+    );
+  }
 
-    const sessionToken = sessionMatch[1];
+  if (!session) {
+    return null;
+  }
 
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(sessionToken)
-      .digest('hex');
+  if (
+    session.expires_at &&
+    new Date(session.expires_at) < new Date()
+  ) {
+    return null;
+  }
 
-    const { data: session, error: sessionError } =
-      await supabase
-        .from('auth_sessions')
-        .select('id, user_id, expires_at')
-        .eq('token_hash', tokenHash)
-        .maybeSingle();
+  return session.user_id;
+}
 
-    if (sessionError) {
-      console.error(
-        'Erro ao verificar sessão:',
-        sessionError
-      );
+function normalizePublicationStatus(
+  value: unknown,
+  scheduledFor: Date | null
+): PublicationStatus {
+  if (
+    value === 'draft' ||
+    value === 'scheduled' ||
+    value === 'published' ||
+    value === 'unpublished'
+  ) {
+    return value;
+  }
 
+  if (scheduledFor) {
+    return 'scheduled';
+  }
+
+  return 'published';
+}
+
+export async function POST(request: Request) {
+  try {
+    const userId = await getAuthenticatedUser(request);
+
+    if (!userId) {
       return NextResponse.json(
         {
-          error: 'Não foi possível verificar sua sessão.',
+          error: 'Você precisa estar logado.',
         },
-        { status: 500 }
+        {
+          status: 401,
+          headers: noCacheHeaders(),
+        }
       );
     }
 
-    if (!session) {
+    let data: Record<string, unknown>;
+
+    try {
+      data = await request.json();
+    } catch {
       return NextResponse.json(
-        { error: 'Sessão inválida ou expirada.' },
-        { status: 401 }
+        {
+          error: 'Dados inválidos.',
+        },
+        {
+          status: 400,
+          headers: noCacheHeaders(),
+        }
       );
     }
-
-    if (
-      session.expires_at &&
-      new Date(session.expires_at) < new Date()
-    ) {
-      return NextResponse.json(
-        { error: 'Sessão inválida ou expirada.' },
-        { status: 401 }
-      );
-    }
-
-    const data = await request.json();
 
     const storyId =
       typeof data.story_id === 'string'
@@ -84,69 +140,115 @@ export async function POST(request: Request) {
         ? data.body.trim()
         : '';
 
-    const publishMode =
-      data.publish_mode === 'schedule'
-        ? 'schedule'
-        : 'now';
+    const authorNotes =
+      typeof data.author_notes === 'string'
+        ? data.author_notes.trim()
+        : '';
 
-    const scheduledFor =
+    const scheduledForRaw =
       typeof data.scheduled_for === 'string'
-        ? data.scheduled_for
-        : null;
+        ? data.scheduled_for.trim()
+        : '';
+
+    const scheduledDate = scheduledForRaw
+      ? new Date(scheduledForRaw)
+      : null;
 
     if (!storyId) {
       return NextResponse.json(
-        { error: 'História não encontrada.' },
-        { status: 400 }
+        {
+          error: 'História não encontrada.',
+        },
+        {
+          status: 400,
+          headers: noCacheHeaders(),
+        }
       );
     }
 
     if (!title) {
       return NextResponse.json(
-        { error: 'Digite um título para o capítulo.' },
-        { status: 400 }
+        {
+          error:
+            'Digite um título para o capítulo.',
+        },
+        {
+          status: 400,
+          headers: noCacheHeaders(),
+        }
       );
     }
 
-    if (!chapterBody) {
-      return NextResponse.json(
-        { error: 'Escreva o conteúdo do capítulo.' },
-        { status: 400 }
-      );
-    }
-
-    if (title.length > 150) {
+    if (title.length > MAX_TITLE_LENGTH) {
       return NextResponse.json(
         {
           error:
             'O título pode ter no máximo 150 caracteres.',
         },
-        { status: 400 }
+        {
+          status: 400,
+          headers: noCacheHeaders(),
+        }
       );
     }
 
-    let scheduledDate: Date | null = null;
+    if (!chapterBody) {
+      return NextResponse.json(
+        {
+          error:
+            'Escreva o conteúdo do capítulo.',
+        },
+        {
+          status: 400,
+          headers: noCacheHeaders(),
+        }
+      );
+    }
 
-    if (publishMode === 'schedule') {
-      if (!scheduledFor) {
-        return NextResponse.json(
-          {
-            error:
-              'Escolha uma data e horário para agendar o capítulo.',
-          },
-          { status: 400 }
-        );
-      }
+    if (chapterBody.length > MAX_BODY_LENGTH) {
+      return NextResponse.json(
+        {
+          error:
+            'O conteúdo do capítulo é muito grande.',
+        },
+        {
+          status: 400,
+          headers: noCacheHeaders(),
+        }
+      );
+    }
 
-      scheduledDate = new Date(scheduledFor);
+    if (authorNotes.length > 5000) {
+      return NextResponse.json(
+        {
+          error:
+            'As notas do autor podem ter no máximo 5000 caracteres.',
+        },
+        {
+          status: 400,
+          headers: noCacheHeaders(),
+        }
+      );
+    }
 
-      if (Number.isNaN(scheduledDate.getTime())) {
+    /*
+     * Valida a data de agendamento antes de
+     * criar qualquer registro.
+     */
+    if (scheduledForRaw) {
+      if (
+        !scheduledDate ||
+        Number.isNaN(scheduledDate.getTime())
+      ) {
         return NextResponse.json(
           {
             error:
               'A data de publicação escolhida é inválida.',
           },
-          { status: 400 }
+          {
+            status: 400,
+            headers: noCacheHeaders(),
+          }
         );
       }
 
@@ -154,9 +256,12 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error:
-              'A data de publicação precisa ser no futuro.',
+              'A data de publicação precisa estar no futuro.',
           },
-          { status: 400 }
+          {
+            status: 400,
+            headers: noCacheHeaders(),
+          }
         );
       }
     }
@@ -183,40 +288,53 @@ export async function POST(request: Request) {
           error:
             'Não foi possível verificar a história.',
         },
-        { status: 500 }
+        {
+          status: 500,
+          headers: noCacheHeaders(),
+        }
       );
     }
 
     if (!story) {
       return NextResponse.json(
-        { error: 'História não encontrada.' },
-        { status: 404 }
+        {
+          error: 'História não encontrada.',
+        },
+        {
+          status: 404,
+          headers: noCacheHeaders(),
+        }
       );
     }
 
-    if (story.author_id !== session.user_id) {
+    if (story.author_id !== userId) {
       return NextResponse.json(
         {
           error:
             'Você não pode adicionar capítulos a esta história.',
         },
-        { status: 403 }
+        {
+          status: 403,
+          headers: noCacheHeaders(),
+        }
       );
     }
 
     /*
      * Descobre o próximo número do capítulo.
      */
-    const { data: lastChapter, error: lastChapterError } =
-      await supabase
-        .from('chapters')
-        .select('chapter_number')
-        .eq('story_id', storyId)
-        .order('chapter_number', {
-          ascending: false,
-        })
-        .limit(1)
-        .maybeSingle();
+    const {
+      data: lastChapter,
+      error: lastChapterError,
+    } = await supabase
+      .from('chapters')
+      .select('chapter_number')
+      .eq('story_id', storyId)
+      .order('chapter_number', {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle();
 
     if (lastChapterError) {
       console.error(
@@ -229,7 +347,10 @@ export async function POST(request: Request) {
           error:
             'Não foi possível verificar os capítulos.',
         },
-        { status: 500 }
+        {
+          status: 500,
+          headers: noCacheHeaders(),
+        }
       );
     }
 
@@ -238,23 +359,62 @@ export async function POST(request: Request) {
       : 1;
 
     /*
-     * Cria o capítulo.
+     * Determina o estado inicial.
      *
-     * IMPORTANTE:
-     * O campo correto é "title", e não "tittle".
+     * Se houver uma data futura:
+     * scheduled
+     *
+     * Caso contrário:
+     * published
      */
-    const { data: chapter, error: chapterError } =
-      await supabase
-        .from('chapters')
-        .insert({
-          story_id: storyId,
-          chapter_number: chapterNumber,
-          title,
-          body: chapterBody,
-          published: publishMode === 'now',
-        })
-        .select()
-        .single();
+    const publicationStatus =
+      normalizePublicationStatus(
+        data.publication_status,
+        scheduledDate
+      );
+
+    /*
+     * Um capítulo agendado não pode ser
+     * marcado como publicado imediatamente.
+     */
+    const isScheduled =
+      publicationStatus === 'scheduled';
+
+    const isPublished =
+      publicationStatus === 'published';
+
+    /*
+     * Para o primeiro lançamento, a data
+     * original de publicação é registrada
+     * somente quando ele realmente é publicado.
+     */
+    const originalPublishedAt = isPublished
+      ? new Date().toISOString()
+      : null;
+
+    /*
+     * Cria o capítulo.
+     */
+    const {
+      data: chapter,
+      error: chapterError,
+    } = await supabase
+      .from('chapters')
+      .insert({
+        story_id: storyId,
+        chapter_number: chapterNumber,
+        title,
+        body: chapterBody,
+        published: isPublished,
+        publication_status: publicationStatus,
+        author_notes: authorNotes || null,
+        original_published_at:
+          originalPublishedAt,
+        republished_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
 
     if (chapterError) {
       console.error(
@@ -268,26 +428,30 @@ export async function POST(request: Request) {
             'Não foi possível criar o capítulo.',
           details: chapterError.message,
         },
-        { status: 500 }
+        {
+          status: 500,
+          headers: noCacheHeaders(),
+        }
       );
     }
 
     /*
-     * Se for agendamento, cria o registro
-     * na tabela scheduled_chapters.
+     * Se o capítulo foi agendado,
+     * cria o registro em scheduled_chapters.
      */
     if (
-      publishMode === 'schedule' &&
+      isScheduled &&
       scheduledDate
     ) {
-      const { error: scheduleError } =
-        await supabase
-          .from('scheduled_chapters')
-          .insert({
-            chapter_id: chapter.id,
-            scheduled_for:
-              scheduledDate.toISOString(),
-          });
+      const {
+        error: scheduleError,
+      } = await supabase
+        .from('scheduled_chapters')
+        .insert({
+          chapter_id: chapter.id,
+          scheduled_for:
+            scheduledDate.toISOString(),
+        });
 
       if (scheduleError) {
         console.error(
@@ -296,9 +460,9 @@ export async function POST(request: Request) {
         );
 
         /*
-         * Se o agendamento falhar, remove
-         * o capítulo para não deixar registro
-         * incompleto no banco.
+         * Rollback manual:
+         * se o agendamento falhar,
+         * não deixamos o capítulo órfão.
          */
         await supabase
           .from('chapters')
@@ -309,23 +473,53 @@ export async function POST(request: Request) {
           {
             error:
               'Não foi possível agendar o capítulo.',
-            details: scheduleError.message,
+            details:
+              scheduleError.message,
           },
-          { status: 500 }
+          {
+            status: 500,
+            headers: noCacheHeaders(),
+          }
         );
       }
+    }
+
+    /*
+     * Se não for agendado, garante que não
+     * exista nenhum agendamento relacionado.
+     */
+    if (!isScheduled) {
+      await supabase
+        .from('scheduled_chapters')
+        .delete()
+        .eq('chapter_id', chapter.id);
     }
 
     return NextResponse.json(
       {
         success: true,
+
         chapter,
-        scheduled:
-          publishMode === 'schedule',
+
+        scheduled: isScheduled,
+
+        published: isPublished,
+
+        publication_status:
+          publicationStatus,
+
         scheduled_for:
           scheduledDate?.toISOString() || null,
+
+        original_published_at:
+          originalPublishedAt,
+
+        republished_at: null,
       },
-      { status: 201 }
+      {
+        status: 201,
+        headers: noCacheHeaders(),
+      }
     );
   } catch (error) {
     console.error(
@@ -335,9 +529,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: 'Erro ao criar o capítulo.',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Erro ao criar o capítulo.',
       },
-      { status: 500 }
+      {
+        status: 500,
+        headers: noCacheHeaders(),
+      }
     );
   }
 }
