@@ -36,11 +36,21 @@ const supabase = createClient(
   }
 );
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+const ALLOWED_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+];
+
 async function getAuthenticatedUser(
   request: NextRequest
 ): Promise<AuthUser | null> {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
+    const cookieHeader =
+      request.headers.get('cookie') || '';
 
     const authResponse = await fetch(
       new URL('/api/auth/me', request.url),
@@ -59,7 +69,10 @@ async function getAuthenticatedUser(
 
     const data = await authResponse.json();
 
-    if (!data?.authenticated || !data?.user?.id) {
+    if (
+      !data?.authenticated ||
+      !data?.user?.id
+    ) {
       return null;
     }
 
@@ -75,7 +88,9 @@ GET — BUSCAR STORIES
 =========================================================
 */
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest
+) {
   try {
     const currentUser =
       await getAuthenticatedUser(request);
@@ -92,24 +107,29 @@ export async function GET(request: NextRequest) {
     }
 
     /*
-     * Primeiro removemos Stories expirados.
-     *
-     * Isso evita que Stories antigos continuem aparecendo
-     * mesmo que ainda estejam registrados no banco.
+     * Remove Stories expirados.
      */
     await supabase
       .from('stories')
       .delete()
-      .lt('expires_at', new Date().toISOString());
+      .lt(
+        'expires_at',
+        new Date().toISOString()
+      );
 
     /*
-     * Buscamos os usuários que o usuário atual segue.
+     * Usuários que o usuário atual segue.
      */
-    const { data: follows, error: followsError } =
-      await supabase
-        .from('follows')
-        .select('following_id')
-        .eq('follower_id', currentUser.id);
+    const {
+      data: follows,
+      error: followsError,
+    } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq(
+        'follower_id',
+        currentUser.id
+      );
 
     if (followsError) {
       console.error(
@@ -119,7 +139,8 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(
         {
-          error: 'Não foi possível carregar os Stories.',
+          error:
+            'Não foi possível carregar os Stories.',
         },
         {
           status: 500,
@@ -127,13 +148,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const followingIds = (follows || []).map(
-      (follow) => follow.following_id
-    );
+    const followingIds =
+      (follows || []).map(
+        (follow) =>
+          follow.following_id
+      );
 
     /*
-     * O próprio usuário também pode visualizar
-     * seus próprios Stories.
+     * O próprio usuário também aparece.
      */
     const userIds = Array.from(
       new Set([
@@ -142,33 +164,41 @@ export async function GET(request: NextRequest) {
       ])
     );
 
-    const { data: stories, error: storiesError } =
-      await supabase
-        .from('stories')
-        .select(
-          `
+    const {
+      data: stories,
+      error: storiesError,
+    } = await supabase
+      .from('stories')
+      .select(
+        `
+          id,
+          user_id,
+          media_url,
+          media_type,
+          created_at,
+          expires_at,
+          user:profiles!stories_user_id_fkey (
             id,
-            user_id,
-            media_url,
-            media_type,
-            created_at,
-            expires_at,
-            user:profiles!stories_user_id_fkey (
-              id,
-              username,
-              display_name,
-              avatar_url
-            )
-          `
-        )
-        .in('user_id', userIds)
-        .gt(
-          'expires_at',
-          new Date().toISOString()
-        )
-        .order('created_at', {
+            username,
+            display_name,
+            avatar_url
+          )
+        `
+      )
+      .in(
+        'user_id',
+        userIds
+      )
+      .gt(
+        'expires_at',
+        new Date().toISOString()
+      )
+      .order(
+        'created_at',
+        {
           ascending: true,
-        });
+        }
+      );
 
     if (storiesError) {
       console.error(
@@ -178,7 +208,8 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(
         {
-          error: 'Não foi possível carregar os Stories.',
+          error:
+            'Não foi possível carregar os Stories.',
         },
         {
           status: 500,
@@ -190,7 +221,9 @@ export async function GET(request: NextRequest) {
       ((stories || []) as StoryRow[]).map(
         (story) => ({
           ...story,
-          user: Array.isArray(story.user)
+          user: Array.isArray(
+            story.user
+          )
             ? story.user[0] || null
             : story.user || null,
         })
@@ -198,7 +231,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        stories: normalizedStories,
+        stories:
+          normalizedStories,
       },
       {
         status: 200,
@@ -212,7 +246,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        error: 'Erro interno do servidor.',
+        error:
+          'Erro interno do servidor.',
       },
       {
         status: 500,
@@ -223,11 +258,13 @@ export async function GET(request: NextRequest) {
 
 /*
 =========================================================
-POST — CRIAR STORY
+POST — PUBLICAR STORY
 =========================================================
 */
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest
+) {
   try {
     const currentUser =
       await getAuthenticatedUser(request);
@@ -243,24 +280,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const formData =
+      await request.formData();
 
-    const mediaUrl =
-      typeof body?.mediaUrl === 'string'
-        ? body.mediaUrl.trim()
-        : '';
+    const file =
+      formData.get('file');
 
-    const mediaType =
-      body?.mediaType === 'gif'
-        ? 'gif'
-        : body?.mediaType === 'video'
-          ? 'video'
-          : 'image';
-
-    if (!mediaUrl) {
+    if (!(file instanceof File)) {
       return NextResponse.json(
         {
-          error: 'A mídia do Story é obrigatória.',
+          error:
+            'Nenhuma imagem foi enviada.',
         },
         {
           status: 400,
@@ -268,45 +298,159 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        {
+          error:
+            'A imagem ou GIF deve ter no máximo 5 MB.',
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      !ALLOWED_TYPES.includes(
+        file.type
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'Formato não permitido. Use JPG, PNG, WEBP ou GIF.',
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const extension =
+      file.name
+        .split('.')
+        .pop()
+        ?.toLowerCase() ||
+      'jpg';
+
+    const mediaType =
+      file.type ===
+      'image/gif'
+        ? 'gif'
+        : 'image';
+
+    const fileName =
+      `${crypto.randomUUID()}.${extension}`;
+
+    const storagePath =
+      `${currentUser.id}/${fileName}`;
+
     /*
-     * Um usuário pode ter vários Stories ativos.
+     * Envia o arquivo para:
      *
-     * Cada Story dura 24 horas.
+     * Storage → stories → user_id → arquivo
      */
-    const expiresAt = new Date(
-      Date.now() + 24 * 60 * 60 * 1000
-    ).toISOString();
+    const {
+      error: uploadError,
+    } = await supabase.storage
+      .from('stories')
+      .upload(
+        storagePath,
+        file,
+        {
+          contentType:
+            file.type,
+          cacheControl:
+            '3600',
+          upsert: false,
+        }
+      );
 
-    const { data: story, error } =
-      await supabase
-        .from('stories')
-        .insert({
-          user_id: currentUser.id,
-          media_url: mediaUrl,
-          media_type: mediaType,
-          expires_at: expiresAt,
-        })
-        .select(
-          `
-            id,
-            user_id,
-            media_url,
-            media_type,
-            created_at,
-            expires_at
-          `
-        )
-        .single();
-
-    if (error) {
+    if (uploadError) {
       console.error(
-        'Erro ao criar Story:',
-        error
+        'Erro ao fazer upload do Story:',
+        uploadError
       );
 
       return NextResponse.json(
         {
-          error: 'Não foi possível publicar o Story.',
+          error:
+            'Não foi possível enviar a imagem.',
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    const {
+      data: publicUrlData,
+    } =
+      supabase.storage
+        .from('stories')
+        .getPublicUrl(
+          storagePath
+        );
+
+    const mediaUrl =
+      publicUrlData.publicUrl;
+
+    /*
+     * Story expira depois de 24 horas.
+     */
+    const expiresAt =
+      new Date(
+        Date.now() +
+          24 * 60 * 60 * 1000
+      ).toISOString();
+
+    const {
+      data: story,
+      error: storyError,
+    } = await supabase
+      .from('stories')
+      .insert({
+        user_id:
+          currentUser.id,
+        media_url:
+          mediaUrl,
+        media_type:
+          mediaType,
+        expires_at:
+          expiresAt,
+      })
+      .select(
+        `
+          id,
+          user_id,
+          media_url,
+          media_type,
+          created_at,
+          expires_at
+        `
+      )
+      .single();
+
+    if (storyError) {
+      console.error(
+        'Erro ao salvar Story:',
+        storyError
+      );
+
+      /*
+       * Se o registro não puder ser salvo,
+       * tentamos remover o arquivo enviado.
+       */
+      await supabase.storage
+        .from('stories')
+        .remove([
+          storagePath,
+        ]);
+
+      return NextResponse.json(
+        {
+          error:
+            'Não foi possível publicar o Story.',
         },
         {
           status: 500,
@@ -330,7 +474,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        error: 'Erro interno do servidor.',
+        error:
+          'Erro interno do servidor.',
       },
       {
         status: 500,
@@ -363,17 +508,20 @@ export async function DELETE(
       );
     }
 
-    const body = await request.json();
+    const body =
+      await request.json();
 
     const storyId =
-      typeof body?.storyId === 'string'
+      typeof body?.storyId ===
+      'string'
         ? body.storyId.trim()
         : '';
 
     if (!storyId) {
       return NextResponse.json(
         {
-          error: 'Story não informado.',
+          error:
+            'Story não informado.',
         },
         {
           status: 400,
@@ -381,21 +529,85 @@ export async function DELETE(
       );
     }
 
-    const { error } = await supabase
+    /*
+     * Buscamos primeiro a URL para
+     * conseguir apagar também o arquivo
+     * do Storage.
+     */
+    const {
+      data: story,
+      error: findError,
+    } = await supabase
       .from('stories')
-      .delete()
-      .eq('id', storyId)
-      .eq('user_id', currentUser.id);
+      .select(
+        'id, user_id, media_url'
+      )
+      .eq(
+        'id',
+        storyId
+      )
+      .eq(
+        'user_id',
+        currentUser.id
+      )
+      .maybeSingle();
 
-    if (error) {
+    if (findError) {
       console.error(
-        'Erro ao excluir Story:',
-        error
+        'Erro ao localizar Story:',
+        findError
       );
 
       return NextResponse.json(
         {
-          error: 'Não foi possível excluir o Story.',
+          error:
+            'Não foi possível localizar o Story.',
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (!story) {
+      return NextResponse.json(
+        {
+          error:
+            'Story não encontrado.',
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    /*
+     * Apaga o registro.
+     */
+    const {
+      error: deleteError,
+    } = await supabase
+      .from('stories')
+      .delete()
+      .eq(
+        'id',
+        storyId
+      )
+      .eq(
+        'user_id',
+        currentUser.id
+      );
+
+    if (deleteError) {
+      console.error(
+        'Erro ao excluir Story:',
+        deleteError
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            'Não foi possível excluir o Story.',
         },
         {
           status: 500,
@@ -419,7 +631,8 @@ export async function DELETE(
 
     return NextResponse.json(
       {
-        error: 'Erro interno do servidor.',
+        error:
+          'Erro interno do servidor.',
       },
       {
         status: 500,
