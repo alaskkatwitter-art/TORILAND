@@ -83,11 +83,11 @@ type UserStory = {
   user_id: string;
   media_url: string;
   media_type?: 'image' | 'gif' | 'video';
+  thought?: string | null;
   created_at: string;
   expires_at?: string;
   user: StoryUser;
 };
-
 const LIKE_REACTION = '❤️';
 
 const SPOTIFY_URL_REGEX =
