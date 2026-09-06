@@ -1,4 +1,3 @@
-```tsx
 'use client';
 
 import {
@@ -120,9 +119,12 @@ export default function CapituloPage() {
         setLoading(true);
         setError('');
 
-      const response = await fetch('/api/chapters/' + id, {
-  cache: 'no-store',
-});
+        const response = await fetch(
+          '/api/chapters/' + id,
+          {
+            cache: 'no-store',
+          }
+        );
 
         const text = await response.text();
 
@@ -152,6 +154,7 @@ export default function CapituloPage() {
         }
 
         setChapter(data.chapter);
+
         setMedia(
           Array.isArray(data.media)
             ? data.media
@@ -193,7 +196,7 @@ export default function CapituloPage() {
 
       try {
         const response = await fetch(
-          `/api/stories/${storyId}`,
+          '/api/stories/' + storyId,
           {
             cache: 'no-store',
           }
@@ -220,7 +223,7 @@ export default function CapituloPage() {
     async function loadComments() {
       try {
         const response = await fetch(
-          `/api/comments?chapter_id=${id}`,
+          '/api/comments?chapter_id=' + id,
           {
             cache: 'no-store',
           }
@@ -246,9 +249,12 @@ export default function CapituloPage() {
 
     async function loadStickers() {
       try {
-        const response = await fetch('/api/stickers', {
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          '/api/stickers',
+          {
+            cache: 'no-store',
+          }
+        );
 
         if (!response.ok) {
           return;
@@ -337,10 +343,13 @@ export default function CapituloPage() {
 
       formData.append('file', file);
 
-      const response = await fetch('/api/stickers', {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await fetch(
+        '/api/stickers',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const data = await response.json();
 
@@ -399,22 +408,25 @@ export default function CapituloPage() {
     try {
       setSendingComment(true);
 
-      const response = await fetch('/api/comments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chapter_id: id,
-          body:
-            commentText.trim() || ' ',
-          selected_text:
-            selectedText || null,
-          start_offset: selectionOffset,
-          sticker_id:
-            selectedSticker?.id || null,
-        }),
-      });
+      const response = await fetch(
+        '/api/comments',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chapter_id: id,
+            body:
+              commentText.trim() || ' ',
+            selected_text:
+              selectedText || null,
+            start_offset: selectionOffset,
+            sticker_id:
+              selectedSticker?.id || null,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -494,7 +506,10 @@ export default function CapituloPage() {
         return;
       }
 
-      const key = `${comment.start_offset}-${comment.selected_text.length}`;
+      const key =
+        String(comment.start_offset) +
+        '-' +
+        String(comment.selected_text.length);
 
       const current =
         groups.get(key) || [];
@@ -668,111 +683,30 @@ export default function CapituloPage() {
   return (
     <main className="min-h-screen bg-[#0d0d0d] text-white">
 
-      <style>{`
-        .chapter-content {
-          max-width: 100%;
-          overflow-wrap: anywhere;
-        }
-
-        .chapter-content p {
-          margin-bottom: 1.5rem;
-        }
-
-        .chapter-content h1,
-        .chapter-content h2,
-        .chapter-content h3 {
-          color: white;
-          font-family: inherit;
-          font-weight: 700;
-          line-height: 1.3;
-          margin-top: 2rem;
-          margin-bottom: 1rem;
-        }
-
-        .chapter-content h1 {
-          font-size: 2rem;
-        }
-
-        .chapter-content h2 {
-          font-size: 1.6rem;
-        }
-
-        .chapter-content h3 {
-          font-size: 1.3rem;
-        }
-
-        .chapter-content strong {
-          font-weight: 700;
-        }
-
-        .chapter-content em {
-          font-style: italic;
-        }
-
-        .chapter-content u {
-          text-decoration: underline;
-        }
-
-        .chapter-content blockquote {
-          margin: 1.5rem 0;
-          padding-left: 1rem;
-          border-left: 3px solid #ff4f9a;
-          color: #b5b5b5;
-          font-style: italic;
-        }
-
-        .chapter-content a {
-          color: #ff4f9a;
-          text-decoration: underline;
-        }
-
-        .chapter-content hr {
-          border: 0;
-          border-top: 1px solid rgba(255, 255, 255, 0.12);
-          margin: 2rem 0;
-        }
-
-        .chapter-content img {
-          max-width: 100%;
-          height: auto;
-          border-radius: 1rem;
-          margin: 1.5rem auto;
-        }
-
-        .chapter-content figure {
-          margin: 1.5rem 0;
-        }
-
-        .chapter-content figcaption {
-          text-align: center;
-          color: #666;
-          font-size: 0.8rem;
-        }
-
-        .chapter-content ul {
-          list-style: disc;
-          padding-left: 1.5rem;
-          margin: 1rem 0;
-        }
-
-        .chapter-content ol {
-          list-style: decimal;
-          padding-left: 1.5rem;
-          margin: 1rem 0;
-        }
-
-        .chapter-content div[style*="text-align: center"] {
-          text-align: center;
-        }
-
-        .chapter-content div[style*="text-align: right"] {
-          text-align: right;
-        }
-
-        .chapter-content div[style*="text-align: left"] {
-          text-align: left;
-        }
-      `}</style>
+      <style>
+        {[
+          '.chapter-content { max-width: 100%; overflow-wrap: anywhere; }',
+          '.chapter-content p { margin-bottom: 1.5rem; }',
+          '.chapter-content h1, .chapter-content h2, .chapter-content h3 { color: white; font-family: inherit; font-weight: 700; line-height: 1.3; margin-top: 2rem; margin-bottom: 1rem; }',
+          '.chapter-content h1 { font-size: 2rem; }',
+          '.chapter-content h2 { font-size: 1.6rem; }',
+          '.chapter-content h3 { font-size: 1.3rem; }',
+          '.chapter-content strong { font-weight: 700; }',
+          '.chapter-content em { font-style: italic; }',
+          '.chapter-content u { text-decoration: underline; }',
+          '.chapter-content blockquote { margin: 1.5rem 0; padding-left: 1rem; border-left: 3px solid #ff4f9a; color: #b5b5b5; font-style: italic; }',
+          '.chapter-content a { color: #ff4f9a; text-decoration: underline; }',
+          '.chapter-content hr { border: 0; border-top: 1px solid rgba(255,255,255,0.12); margin: 2rem 0; }',
+          '.chapter-content img { max-width: 100%; height: auto; border-radius: 1rem; margin: 1.5rem auto; }',
+          '.chapter-content figure { margin: 1.5rem 0; }',
+          '.chapter-content figcaption { text-align: center; color: #666; font-size: 0.8rem; }',
+          '.chapter-content ul { list-style: disc; padding-left: 1.5rem; margin: 1rem 0; }',
+          '.chapter-content ol { list-style: decimal; padding-left: 1.5rem; margin: 1rem 0; }',
+          '.chapter-content div[style*="text-align: center"] { text-align: center; }',
+          '.chapter-content div[style*="text-align: right"] { text-align: right; }',
+          '.chapter-content div[style*="text-align: left"] { text-align: left; }',
+        ].join('\n')}
+      </style>
 
       <div className="max-w-3xl mx-auto px-5 py-8">
 
@@ -784,7 +718,7 @@ export default function CapituloPage() {
             type="button"
             onClick={() =>
               router.push(
-                `/historia/${chapter.story_id}`
+                '/historia/' + (chapter.story_id || '')
               )
             }
             className="
@@ -1126,12 +1060,15 @@ export default function CapituloPage() {
                                   sticker
                                 )
                               }
-                              className={`aspect-square rounded-xl overflow-hidden border transition ${
-                                selectedSticker?.id ===
-                                sticker.id
-                                  ? 'border-[#ff4f9a] ring-2 ring-[#ff4f9a]/30'
-                                  : 'border-white/10 hover:border-[#ff4f9a]/50'
-                              }`}
+                              className={
+                                'aspect-square rounded-xl overflow-hidden border transition ' +
+                                (
+                                  selectedSticker?.id ===
+                                  sticker.id
+                                    ? 'border-[#ff4f9a] ring-2 ring-[#ff4f9a]/30'
+                                    : 'border-white/10 hover:border-[#ff4f9a]/50'
+                                )
+                              }
                             >
                               <img
                                 src={
@@ -1354,7 +1291,9 @@ export default function CapituloPage() {
                   >
                     {activeCommentGroup[0]
                       ?.selected_text
-                      ? `“${activeCommentGroup[0].selected_text}”`
+                      ? '“' +
+                        activeCommentGroup[0].selected_text +
+                        '”'
                       : 'Trecho comentado'}
                   </p>
                 </div>
@@ -1768,7 +1707,8 @@ export default function CapituloPage() {
               type="button"
               onClick={() =>
                 router.push(
-                  `/capitulo/${previousChapter.id}`
+                  '/capitulo/' +
+                  previousChapter.id
                 )
               }
               className="
@@ -1817,7 +1757,8 @@ export default function CapituloPage() {
               type="button"
               onClick={() =>
                 router.push(
-                  `/capitulo/${nextChapter.id}`
+                  '/capitulo/' +
+                  nextChapter.id
                 )
               }
               className="
@@ -1984,15 +1925,18 @@ export default function CapituloPage() {
 
                           if (!isCurrent) {
                             router.push(
-                              `/capitulo/${item.id}`
+                              '/capitulo/' + item.id
                             );
                           }
                         }}
-                        className={`w-full text-left px-4 py-4 rounded-xl border transition ${
-                          isCurrent
-                            ? 'bg-[#ff4f9a]/10 border-[#ff4f9a]/50'
-                            : 'bg-white/5 border-white/10 hover:border-[#ff4f9a]/40'
-                        }`}
+                        className={
+                          'w-full text-left px-4 py-4 rounded-xl border transition ' +
+                          (
+                            isCurrent
+                              ? 'bg-[#ff4f9a]/10 border-[#ff4f9a]/50'
+                              : 'bg-white/5 border-white/10 hover:border-[#ff4f9a]/40'
+                          )
+                        }
                       >
 
                         <div
@@ -2004,11 +1948,14 @@ export default function CapituloPage() {
                         >
 
                           <span
-                            className={`text-xs font-semibold ${
-                              isCurrent
-                                ? 'text-[#ff4f9a]'
-                                : 'text-gray-500'
-                            }`}
+                            className={
+                              'text-xs font-semibold ' +
+                              (
+                                isCurrent
+                                  ? 'text-[#ff4f9a]'
+                                  : 'text-gray-500'
+                              )
+                            }
                           >
                             {item.chapter_number}
                           </span>
@@ -2020,11 +1967,14 @@ export default function CapituloPage() {
                           >
 
                             <p
-                              className={`font-semibold truncate ${
-                                isCurrent
-                                  ? 'text-[#ff4f9a]'
-                                  : 'text-white'
-                              }`}
+                              className={
+                                'font-semibold truncate ' +
+                                (
+                                  isCurrent
+                                    ? 'text-[#ff4f9a]'
+                                    : 'text-white'
+                                )
+                              }
                             >
                               {item.title}
                             </p>
@@ -2070,4 +2020,3 @@ export default function CapituloPage() {
     </main>
   );
 }
-```
