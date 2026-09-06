@@ -4,10 +4,11 @@ import {
   useEffect,
   useRef,
   useState,
-  type ReactNode,
-  type TouchEvent,
 } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import {
+  useParams,
+  useRouter,
+} from 'next/navigation';
 
 type User = {
   id: string;
@@ -16,14 +17,6 @@ type User = {
   bio: string | null;
   avatar_url: string | null;
   cover_url: string | null;
-  theme_color: string | null;
-};
-
-type Profile = {
-  id: string;
-  username: string;
-  display_name: string | null;
-  avatar_url: string | null;
 };
 
 type Story = {
@@ -49,38 +42,24 @@ type PostMedia = {
   created_at?: string;
 };
 
-type Comment = {
-  id: string;
-  post_id: string;
-  author_id: string;
-  content: string;
-  parent_id: string | null;
-  created_at: string;
-  updated_at: string;
-  author: Profile | null;
-};
-
 type NookPost = {
   id: string;
   user_id: string;
-  body: string | null;
+  body: string;
   image_url: string | null;
   story_id: string | null;
   pinned: boolean;
   created_at: string;
   updated_at: string;
-  author: Profile | null;
-  media: PostMedia[];
-  reaction_counts: Record<string, number>;
-  user_reactions: string[];
-  comments_count: number;
+  media?: PostMedia[];
 };
 
 type ReadingListItem = {
   id: string;
+  list_id: string;
   story_id: string;
   added_at: string;
-  story?: Story | null;
+  story: Story | null;
 };
 
 type ReadingList = {
@@ -100,33 +79,16 @@ type FicClub = {
   name: string;
   description: string | null;
   created_at: string;
-  story?: Story | null;
-  member_count?: number;
-  is_member?: boolean;
+  member_count: number;
+  story: Story | null;
 };
 
 type ProfileResponse = {
   user?: User;
   stories?: Story[];
   posts?: NookPost[];
-  error?: string;
-};
-
-type FollowResponse = {
-  followers_count?: number;
-  is_following?: boolean;
-  is_self?: boolean;
-  following?: boolean;
-  error?: string;
-};
-
-type ReadingListsResponse = {
-  lists?: ReadingList[];
-  error?: string;
-};
-
-type FicClubsResponse = {
-  clubs?: FicClub[];
+  reading_lists?: ReadingList[];
+  fic_clubs?: FicClub[];
   error?: string;
 };
 
@@ -136,62 +98,22 @@ type Tab =
   | 'lists'
   | 'clubs';
 
-const TABS: Tab[] = [
+const TAB_ORDER: Tab[] = [
   'stories',
   'nook',
   'lists',
   'clubs',
 ];
 
-const LIKE_REACTION = '❤️';
-
-const URL_REGEX = new RegExp(
-  'https?://[^\\s<]+',
-  'g'
-);
-
-const SPOTIFY_URL_REGEX = new RegExp(
-  'https?://(?:open\\.)?spotify\\.com/(?:intl-[a-zA-Z-]+/)?(?:track|album|playlist|artist|episode|show)/[A-Za-z0-9]+(?:\\?[^\\s<]+)?',
-  'g'
-);
-
 function formatDate(value: string) {
   try {
-    return new Date(value).toLocaleDateString(
-      'pt-BR',
-      {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      }
-    );
-  } catch {
-    return '';
-  }
-}
-
-function formatDateTime(value: string) {
-  try {
-    const date = new Date(value);
-
-    const datePart = date.toLocaleDateString(
-      'pt-BR',
-      {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      }
-    );
-
-    const timePart = date.toLocaleTimeString(
-      'en-US',
-      {
-        hour: 'numeric',
-        minute: '2-digit',
-      }
-    );
-
-    return `${datePart} • ${timePart}`;
+    return new Date(
+      value
+    ).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
   } catch {
     return '';
   }
@@ -204,33 +126,7 @@ function getDisplayName(user: User) {
   );
 }
 
-function getInitial(
-  profile: Profile | User | null
-) {
-  if (!profile) return '?';
-
-  return (
-    profile.display_name?.trim() ||
-    profile.username
-  )
-    .charAt(0)
-    .toUpperCase();
-}
-
-function cleanUrl(url: string) {
-  return url.replace(
-    /[.,!?;:)\]}]+$/g,
-    ''
-  );
-}
-
-function isSpotifyUrl(url: string) {
-  SPOTIFY_URL_REGEX.lastIndex = 0;
-
-  return SPOTIFY_URL_REGEX.test(url);
-}
-
-function getStoryFandom(story: Story) {
+function getFandom(story: Story) {
   return (
     story.main_fandom?.trim() ||
     story.fandom?.trim() ||
@@ -239,1115 +135,23 @@ function getStoryFandom(story: Story) {
   );
 }
 
-function isStoryInProgress(
-  status: string | null
-) {
-  if (!status) return false;
-
-  const normalized = status
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase();
-
-  return (
-    normalized.includes('ANDAMENTO') ||
-    normalized.includes('EM ANDAMENTO') ||
-    normalized.includes('ONGOING')
-  );
-}
-
-function CloudIcon({
-  filled = false,
-}: {
-  filled?: boolean;
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill={filled ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M7.5 19.5h9a4 4 0 0 0 .4-7.98A6 6 0 0 0 5.3 9.8 4.5 4.5 0 0 0 7.5 19.5Z"
-      />
-    </svg>
-  );
-}
-
-function CommentIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H8l-4 2v-5.2A7.5 7.5 0 1 1 20 11.5Z"
-      />
-    </svg>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M8 12h8"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="m13 7 5 5-5 5"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M18 12H7a3 3 0 0 0-3 3v1"
-      />
-    </svg>
-  );
-}
-
-function SendIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="m21 3-7.5 18-3.5-7-7-3.5L21 3Z"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M10 14 21 3"
-      />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="m6 6 12 12M18 6 6 18"
-      />
-    </svg>
-  );
-}
-
-function FollowIcon({
-  following = false,
-}: {
-  following?: boolean;
-}) {
-  if (following) {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        className="h-4 w-4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="m5 12 4 4L19 6"
-        />
-      </svg>
-    );
+function isOngoing(status: string | null) {
+  if (!status) {
+    return false;
   }
 
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15 19a6 6 0 0 0-12 0"
-      />
-      <circle
-        cx="9"
-        cy="7"
-        r="3"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19 8v6M16 11h6"
-      />
-    </svg>
-  );
-}
-
-function ListIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M5 6h14M5 12h14M5 18h9"
-      />
-    </svg>
-  );
-}
-
-function ClubIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M16 20a4 4 0 0 0-8 0"
-      />
-      <circle
-        cx="12"
-        cy="8"
-        r="3"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19 20a3.5 3.5 0 0 0-2.5-3.36M17 5.2a3 3 0 0 1 0 5.6M5 20a3.5 3.5 0 0 1 2.5-3.36M7 5.2a3 3 0 0 0 0 5.6"
-      />
-    </svg>
-  );
-}
-
-function ChevronIcon({
-  direction = 'right',
-}: {
-  direction?: 'left' | 'right';
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d={
-          direction === 'left'
-            ? 'm15 18-6-6 6-6'
-            : 'm9 18 6-6-6-6'
-        }
-      />
-    </svg>
-  );
-}
-
-function SpotifyPreview({
-  url,
-}: {
-  url: string;
-}) {
-  const [data, setData] = useState<{
-    title?: string;
-    thumbnail_url?: string;
-    author_name?: string;
-  } | null>(null);
-
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
-      try {
-        const response = await fetch(
-          `/api/spotify/oembed?url=${encodeURIComponent(
-            url
-          )}`,
-          {
-            cache: 'no-store',
-          }
-        );
-
-        if (!response.ok) {
-          return;
-        }
-
-        const result = await response.json();
-
-        if (active) {
-          setData(result);
-        }
-      } catch {
-        // preview opcional
-      }
-    }
-
-    load();
-
-    return () => {
-      active = false;
-    };
-  }, [url]);
-
-  if (!data) {
-    return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noreferrer noopener"
-        className="mt-3 block rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-[#ff9aca] transition hover:bg-white/[0.07]"
-      >
-        Abrir no Spotify
-      </a>
-    );
-  }
+  const normalized =
+    status
+      .trim()
+      .toLowerCase();
 
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer noopener"
-      className="mt-3 flex overflow-hidden rounded-2xl border border-white/10 bg-[#101010] transition hover:border-[#ff78b9]/40"
-    >
-      {data.thumbnail_url ? (
-        <img
-          src={data.thumbnail_url}
-          alt=""
-          className="h-24 w-24 shrink-0 object-cover"
-        />
-      ) : (
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center bg-[#191919] text-xs text-white/40">
-          Spotify
-        </div>
-      )}
-
-      <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3">
-        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#8fe36b]">
-          Spotify
-        </span>
-
-        <p className="mt-1 truncate text-sm font-bold text-white">
-          {data.title || 'Música no Spotify'}
-        </p>
-
-        {data.author_name && (
-          <p className="mt-1 truncate text-xs text-white/45">
-            {data.author_name}
-          </p>
-        )}
-      </div>
-    </a>
-  );
-}
-
-function PostBody({
-  body,
-}: {
-  body: string | null;
-}) {
-  if (!body) {
-    return null;
-  }
-
-  const matches = Array.from(
-    body.matchAll(URL_REGEX)
-  );
-
-  if (matches.length === 0) {
-    return (
-      <div className="mt-4 whitespace-pre-wrap break-words text-[15px] leading-7 text-white/85">
-        {body}
-      </div>
-    );
-  }
-
-  const elements: ReactNode[] = [];
-
-  let lastIndex = 0;
-
-  matches.forEach((match, index) => {
-    const rawUrl = match[0];
-    const url = cleanUrl(rawUrl);
-    const start = match.index ?? 0;
-
-    if (start > lastIndex) {
-      elements.push(
-        <span key={`text-${index}`}>
-          {body.slice(lastIndex, start)}
-        </span>
-      );
-    }
-
-    if (isSpotifyUrl(url)) {
-      elements.push(
-        <span
-          key={`spotify-${index}`}
-          className="block"
-        >
-          <SpotifyPreview url={url} />
-        </span>
-      );
-    } else {
-      elements.push(
-        <a
-          key={`url-${index}`}
-          href={url}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="break-all text-[#ff9aca] underline decoration-[#ff9aca]/40 underline-offset-2 transition hover:text-[#ffb2d3]"
-        >
-          {url}
-        </a>
-      );
-    }
-
-    lastIndex =
-      start + rawUrl.length;
-  });
-
-  if (lastIndex < body.length) {
-    elements.push(
-      <span key="text-final">
-        {body.slice(lastIndex)}
-      </span>
-    );
-  }
-
-  return (
-    <div className="mt-4 whitespace-pre-wrap break-words text-[15px] leading-7 text-white/85">
-      {elements}
-    </div>
-  );
-}
-
-function Avatar({
-  profile,
-  size = 'md',
-}: {
-  profile: Profile | User | null;
-  size?: 'sm' | 'md';
-}) {
-  const classes =
-    size === 'sm'
-      ? 'h-9 w-9'
-      : 'h-11 w-11';
-
-  if (profile?.avatar_url) {
-    return (
-      <img
-        src={profile.avatar_url}
-        alt=""
-        className={`${classes} shrink-0 rounded-full object-cover`}
-      />
-    );
-  }
-
-  return (
-    <div
-      className={`${classes} flex shrink-0 items-center justify-center rounded-full bg-[#241c24] font-black text-white/40`}
-    >
-      {getInitial(profile)}
-    </div>
-  );
-}
-
-function CommentItem({
-  comment,
-  replies,
-  onReply,
-}: {
-  comment: Comment;
-  replies: Comment[];
-  onReply: (comment: Comment) => void;
-}) {
-  return (
-    <div>
-      <div className="flex gap-3">
-        <Avatar
-          profile={comment.author}
-          size="sm"
-        />
-
-        <div className="min-w-0 flex-1">
-          <div className="rounded-2xl bg-white/[0.04] px-4 py-3">
-            <p className="text-sm font-bold text-white">
-              {comment.author?.display_name ||
-                comment.author?.username ||
-                'Usuário'}
-            </p>
-
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-white/75">
-              {comment.content}
-            </p>
-          </div>
-
-          <div className="mt-1 flex items-center gap-3 px-1">
-            <span className="text-[11px] text-white/25">
-              {formatDateTime(
-                comment.created_at
-              )}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => onReply(comment)}
-              className="text-[11px] font-bold text-white/40 transition hover:text-[#ff78b9]"
-            >
-              Responder
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {replies.length > 0 && (
-        <div className="ml-12 mt-3 space-y-3 border-l border-white/10 pl-4">
-          {replies.map((reply) => (
-            <CommentItem
-              key={reply.id}
-              comment={reply}
-              replies={[]}
-              onReply={onReply}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PublicPost({
-  post,
-  owner,
-  onUpdate,
-}: {
-  post: NookPost;
-  owner: User;
-  onUpdate: (
-    postId: string,
-    changes: Partial<NookPost>
-  ) => void;
-}) {
-  const [commentsOpen, setCommentsOpen] =
-    useState(false);
-
-  const [comments, setComments] =
-    useState<Comment[]>([]);
-
-  const [commentsLoading, setCommentsLoading] =
-    useState(false);
-
-  const [commentText, setCommentText] =
-    useState('');
-
-  const [replyingTo, setReplyingTo] =
-    useState<Comment | null>(null);
-
-  const [sendingComment, setSendingComment] =
-    useState(false);
-
-  const [liking, setLiking] =
-    useState(false);
-
-  const [shareMessage, setShareMessage] =
-    useState('');
-
-  const liked =
-    post.user_reactions?.includes(
-      LIKE_REACTION
-    ) || false;
-
-  const likeCount =
-    post.reaction_counts?.[
-      LIKE_REACTION
-    ] || 0;
-
-  async function loadComments() {
-    setCommentsLoading(true);
-
-    try {
-      const response = await fetch(
-        `/api/nook-comments?post_id=${encodeURIComponent(
-          post.id
-        )}`,
-        {
-          cache: 'no-store',
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setComments(
-          Array.isArray(data.comments)
-            ? data.comments
-            : []
-        );
-      }
-    } catch (error) {
-      console.error(
-        'Erro ao carregar comentários:',
-        error
-      );
-    } finally {
-      setCommentsLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (commentsOpen) {
-      loadComments();
-    }
-  }, [commentsOpen, post.id]);
-
-  async function toggleLike() {
-    if (liking) {
-      return;
-    }
-
-    setLiking(true);
-
-    const previousLiked = liked;
-    const previousCount = likeCount;
-
-    const nextLiked = !liked;
-
-    const nextCount = nextLiked
-      ? likeCount + 1
-      : Math.max(0, likeCount - 1);
-
-    onUpdate(post.id, {
-      user_reactions: nextLiked
-        ? Array.from(
-            new Set([
-              ...(post.user_reactions || []),
-              LIKE_REACTION,
-            ])
-          )
-        : (post.user_reactions || []).filter(
-            (reaction) =>
-              reaction !== LIKE_REACTION
-          ),
-
-      reaction_counts: {
-        ...(post.reaction_counts || {}),
-        [LIKE_REACTION]: nextCount,
-      },
-    });
-
-    try {
-      const response = await fetch(
-        '/api/nook-posts/reactions',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            post_id: post.id,
-            emoji: LIKE_REACTION,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            'Não foi possível alterar a reação.'
-        );
-      }
-
-      if (
-        typeof data.reacted === 'boolean'
-      ) {
-        onUpdate(post.id, {
-          user_reactions: data.reacted
-            ? Array.from(
-                new Set([
-                  ...(post.user_reactions || []).filter(
-                    (reaction) =>
-                      reaction !== LIKE_REACTION
-                  ),
-                  LIKE_REACTION,
-                ])
-              )
-            : (post.user_reactions || []).filter(
-                (reaction) =>
-                  reaction !== LIKE_REACTION
-              ),
-
-          reaction_counts: {
-            ...(post.reaction_counts || {}),
-            [LIKE_REACTION]:
-              typeof data.count === 'number'
-                ? data.count
-                : nextCount,
-          },
-        });
-      }
-    } catch (error) {
-      console.error(
-        'Erro ao curtir post:',
-        error
-      );
-
-      onUpdate(post.id, {
-        user_reactions: previousLiked
-          ? Array.from(
-              new Set([
-                ...(post.user_reactions || []).filter(
-                  (reaction) =>
-                    reaction !== LIKE_REACTION
-                ),
-                LIKE_REACTION,
-              ])
-            )
-          : (post.user_reactions || []).filter(
-              (reaction) =>
-                reaction !== LIKE_REACTION
-            ),
-
-        reaction_counts: {
-          ...(post.reaction_counts || {}),
-          [LIKE_REACTION]: previousCount,
-        },
-      });
-    } finally {
-      setLiking(false);
-    }
-  }
-
-  async function submitComment() {
-    const content = commentText.trim();
-
-    if (!content || sendingComment) {
-      return;
-    }
-
-    if (content.length > 2000) {
-      alert(
-        'O comentário pode ter no máximo 2000 caracteres.'
-      );
-      return;
-    }
-
-    setSendingComment(true);
-
-    try {
-      const response = await fetch(
-        '/api/nook-comments',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            post_id: post.id,
-            content,
-            parent_id:
-              replyingTo?.id || null,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            'Não foi possível publicar o comentário.'
-        );
-      }
-
-      if (data.comment) {
-        setComments((current) => [
-          ...current,
-          data.comment,
-        ]);
-
-        onUpdate(post.id, {
-          comments_count:
-            (post.comments_count || 0) + 1,
-        });
-      }
-
-      setCommentText('');
-      setReplyingTo(null);
-      setCommentsOpen(true);
-    } catch (error) {
-      console.error(
-        'Erro ao enviar comentário:',
-        error
-      );
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível publicar o comentário.'
-      );
-    } finally {
-      setSendingComment(false);
-    }
-  }
-
-  async function sharePost() {
-    const url = `${window.location.origin}/perfil/${encodeURIComponent(
-      owner.username
-    )}`;
-
-    try {
-      if (
-        navigator.share &&
-        typeof navigator.share === 'function'
-      ) {
-        await navigator.share({
-          title: `Publicação de ${
-            owner.display_name ||
-            owner.username
-          }`,
-          url,
-        });
-
-        return;
-      }
-
-      await navigator.clipboard.writeText(url);
-
-      setShareMessage('Link copiado.');
-
-      setTimeout(() => {
-        setShareMessage('');
-      }, 2000);
-    } catch {
-      // compartilhamento cancelado
-    }
-  }
-
-  const commentsByParent =
-    new Map<string | null, Comment[]>();
-
-  for (const comment of comments) {
-    const key = comment.parent_id || null;
-
-    if (!commentsByParent.has(key)) {
-      commentsByParent.set(key, []);
-    }
-
-    commentsByParent
-      .get(key)!
-      .push(comment);
-  }
-
-  const rootComments =
-    commentsByParent.get(null) || [];
-
-  return (
-    <article className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]">
-      <div className="p-5 sm:p-6">
-        <div className="flex items-center gap-3">
-          <Avatar profile={owner} />
-
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-black text-white">
-              {getDisplayName(owner)}
-            </p>
-
-            <p className="text-xs text-white/35">
-              @{owner.username}
-              {' · '}
-              {formatDateTime(post.created_at)}
-            </p>
-          </div>
-
-          {post.pinned && (
-            <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/35">
-              Fixada
-            </span>
-          )}
-        </div>
-
-        <PostBody body={post.body} />
-
-        {post.image_url && (
-          <div className="mt-5 overflow-hidden rounded-2xl border border-white/10">
-            <img
-              src={post.image_url}
-              alt=""
-              className="max-h-[600px] w-full object-cover"
-            />
-          </div>
-        )}
-
-        {post.media &&
-          post.media.length > 0 && (
-            <div
-              className={`mt-5 grid gap-2 ${
-                post.media.length === 1
-                  ? 'grid-cols-1'
-                  : 'grid-cols-2'
-              }`}
-            >
-              {post.media
-                .slice(0, 4)
-                .map((media) => (
-                  <div
-                    key={media.id}
-                    className="overflow-hidden rounded-2xl border border-white/10 bg-black"
-                  >
-                    <img
-                      src={media.media_url}
-                      alt=""
-                      className="max-h-[500px] min-h-[180px] w-full object-cover"
-                    />
-                  </div>
-                ))}
-            </div>
-          )}
-
-        <div className="mt-5 flex items-center border-t border-white/10 pt-3">
-          <button
-            type="button"
-            onClick={toggleLike}
-            disabled={liking}
-            className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-              liked
-                ? 'text-[#ff78b9]'
-                : 'text-white/40 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            <CloudIcon filled={liked} />
-
-            <span>{likeCount}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              setCommentsOpen(
-                (current) => !current
-              )
-            }
-            className={`ml-1 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-              commentsOpen
-                ? 'text-white'
-                : 'text-white/40 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            <CommentIcon />
-
-            <span>
-              {post.comments_count || 0}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={sharePost}
-            className="ml-1 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-white/40 transition hover:bg-white/5 hover:text-white"
-          >
-            <ShareIcon />
-
-            <span className="hidden sm:inline">
-              Compartilhar
-            </span>
-          </button>
-
-          {shareMessage && (
-            <span className="ml-2 text-xs text-[#ff9aca]">
-              {shareMessage}
-            </span>
-          )}
-        </div>
-
-        {commentsOpen && (
-          <div className="mt-3 border-t border-white/10 pt-4">
-            {replyingTo && (
-              <div className="mb-3 flex items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">
-                    Respondendo a
-                  </p>
-
-                  <p className="mt-1 truncate text-sm text-white/60">
-                    {replyingTo.author
-                      ?.display_name ||
-                      replyingTo.author
-                        ?.username ||
-                      'Usuário'}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setReplyingTo(null)
-                  }
-                  className="rounded-full p-2 text-white/40 transition hover:bg-white/5 hover:text-white"
-                  aria-label="Cancelar resposta"
-                >
-                  <CloseIcon />
-                </button>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <Avatar
-                profile={null}
-                size="sm"
-              />
-
-              <div className="min-w-0 flex-1">
-                <textarea
-                  value={commentText}
-                  onChange={(event) =>
-                    setCommentText(
-                      event.target.value
-                    )
-                  }
-                  placeholder={
-                    replyingTo
-                      ? 'Escreva sua resposta...'
-                      : 'Escreva um comentário...'
-                  }
-                  maxLength={2000}
-                  rows={3}
-                  className="w-full resize-none rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/40"
-                />
-
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-[11px] text-white/25">
-                    {commentText.length}/2000
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={submitComment}
-                    disabled={
-                      sendingComment ||
-                      !commentText.trim()
-                    }
-                    className="flex items-center gap-2 rounded-xl bg-[#ff78b9] px-4 py-2 text-xs font-black text-[#180d15] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <SendIcon />
-
-                    {sendingComment
-                      ? 'Enviando...'
-                      : 'Enviar'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-5 space-y-4">
-              {commentsLoading ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-5 text-center text-sm text-white/35">
-                  Carregando comentários...
-                </div>
-              ) : rootComments.length ===
-                0 ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-5 text-center text-sm text-white/35">
-                  Ainda não há comentários.
-                </div>
-              ) : (
-                rootComments.map((comment) => (
-                  <CommentItem
-                    key={comment.id}
-                    comment={comment}
-                    replies={
-                      commentsByParent.get(
-                        comment.id
-                      ) || []
-                    }
-                    onReply={setReplyingTo}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </article>
-  );
-}
-
-function EmptyState({
-  icon,
-  title,
-  description,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-[#151015] px-6 py-14 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-white/40">
-        {icon}
-      </div>
-
-      <h2 className="mt-5 text-lg font-black">
-        {title}
-      </h2>
-
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/40">
-        {description}
-      </p>
-    </div>
+    normalized.includes(
+      'andamento'
+    ) ||
+    normalized.includes(
+      'ongoing'
+    )
   );
 }
 
@@ -1358,8 +162,8 @@ function StoryCard({
   story: Story;
   onOpen: () => void;
 }) {
-  const fandom = getStoryFandom(story);
-  const inProgress = isStoryInProgress(
+  const fandom = getFandom(story);
+  const ongoing = isOngoing(
     story.status
   );
 
@@ -1367,286 +171,106 @@ function StoryCard({
     <button
       type="button"
       onClick={onOpen}
-      className="group flex w-full overflow-hidden rounded-2xl border border-white/10 bg-[#151015] text-left transition hover:border-white/20 hover:bg-[#191419]"
+      className="group w-full overflow-hidden rounded-3xl border border-white/10 bg-[#151015] text-left transition hover:border-[#ff78b9]/30 hover:bg-[#181218]"
     >
-      <div className="relative h-32 w-24 shrink-0 overflow-hidden bg-[#211a21] sm:h-40 sm:w-28">
-        {story.cover_url ? (
-          <img
-            src={story.cover_url}
-            alt=""
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-2xl font-black text-white/20">
-            +
-          </div>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1 p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="line-clamp-2 text-base font-black text-white sm:text-lg">
-            {story.title}
-          </h3>
-
-          {story.status && (
-            <span
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${
-                inProgress
-                  ? 'border border-[#ff78b9]/40 bg-gradient-to-r from-[#ff4f9a] via-[#ff78b9] to-[#ffb3d8] text-[#180d15] shadow-[0_0_18px_rgba(255,120,185,0.45)]'
-                  : 'border border-white/10 bg-white/5 text-white/45'
-              }`}
-            >
-              {story.status}
-            </span>
+      <div className="flex gap-4 p-4 sm:p-5">
+        <div className="relative h-36 w-24 shrink-0 overflow-hidden rounded-2xl bg-[#211a21] sm:h-44 sm:w-28">
+          {story.cover_url ? (
+            <img
+              src={story.cover_url}
+              alt=""
+              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-3xl text-white/20">
+              📖
+            </div>
           )}
         </div>
 
-        {story.description && (
-          <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/45">
-            {story.description}
-          </p>
-        )}
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-black text-white sm:text-lg">
+            {story.title}
+          </h3>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-white/30">
-          {fandom && (
-            <span className="rounded-full border border-[#ff78b9]/20 bg-[#ff78b9]/5 px-2.5 py-1 font-bold text-[#ff9aca]">
-              {fandom}
-            </span>
+          {story.description && (
+            <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/45">
+              {story.description}
+            </p>
           )}
 
-          {story.rating && (
-            <span>
-              Classificação {story.rating}
-            </span>
-          )}
-
-          <span>
-            {formatDate(
-              story.updated_at ||
-                story.created_at
+          <div className="mt-4 space-y-2 text-xs text-white/40">
+            {fandom && (
+              <p>
+                <span className="font-bold text-white/60">
+                  Fandom:
+                </span>{' '}
+                {fandom}
+              </p>
             )}
-          </span>
+
+            {story.rating && (
+              <p>
+                <span className="font-bold text-white/60">
+                  Classificação:
+                </span>{' '}
+                {story.rating}
+              </p>
+            )}
+
+            <p>
+              <span className="font-bold text-white/60">
+                Atualizada:
+              </span>{' '}
+              {formatDate(
+                story.updated_at ||
+                  story.created_at
+              )}
+            </p>
+          </div>
+
+          {story.status && (
+            <div className="mt-4">
+              {ongoing ? (
+                <span className="inline-flex rounded-full bg-gradient-to-r from-[#ff78b9] via-[#ff9aca] to-[#b77cff] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#180d15] shadow-[0_0_20px_rgba(255,120,185,0.35)]">
+                  {story.status}
+                </span>
+              ) : (
+                <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/55">
+                  {story.status}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </button>
   );
 }
 
-function ReadingListCard({
-  list,
-  onStoryOpen,
+function EmptyState({
+  icon,
+  title,
+  description,
 }: {
-  list: ReadingList;
-  onStoryOpen: (storyId: string) => void;
-}) {
-  const items = Array.isArray(list.items)
-    ? list.items
-    : [];
-
-  return (
-    <article className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]">
-      <div className="border-b border-white/10 px-5 py-5 sm:px-6">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#ff78b9]/10 text-[#ff9aca]">
-            <ListIcon />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="text-lg font-black text-white">
-                {list.name}
-              </h3>
-
-              <span className="shrink-0 rounded-full border border-[#ff78b9]/20 bg-[#ff78b9]/5 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#ff9aca]">
-                Pública
-              </span>
-            </div>
-
-            {list.description && (
-              <p className="mt-2 text-sm leading-6 text-white/45">
-                {list.description}
-              </p>
-            )}
-
-            <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">
-              {items.length}{' '}
-              {items.length === 1
-                ? 'história'
-                : 'histórias'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {items.length > 0 ? (
-        <div className="divide-y divide-white/5">
-          {items.map((item) => {
-            const story = item.story;
-
-            if (!story) {
-              return (
-                <div
-                  key={item.id}
-                  className="px-5 py-4 text-sm text-white/30"
-                >
-                  História indisponível
-                </div>
-              );
-            }
-
-            return (
-              <button
-                type="button"
-                key={item.id}
-                onClick={() =>
-                  onStoryOpen(story.id)
-                }
-                className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-white/[0.03]"
-              >
-                <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-[#211a21]">
-                  {story.cover_url ? (
-                    <img
-                      src={story.cover_url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-xs font-black text-white/20">
-                      +
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-black text-white">
-                    {story.title}
-                  </p>
-
-                  <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-white/30">
-                    {getStoryFandom(story) && (
-                      <span>
-                        {getStoryFandom(story)}
-                      </span>
-                    )}
-
-                    {story.status && (
-                      <span>
-                        {story.status}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <ChevronIcon />
-              </button>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="px-5 py-7 text-center text-sm text-white/30">
-          Esta lista ainda não possui histórias.
-        </div>
-      )}
-    </article>
-  );
-}
-
-function FicClubCard({
-  club,
-  onStoryOpen,
-}: {
-  club: FicClub;
-  onStoryOpen: (storyId: string) => void;
+  icon: string;
+  title: string;
+  description: string;
 }) {
   return (
-    <article className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]">
-      <div className="p-5 sm:p-6">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff78b9]/20 to-[#b77cff]/20 text-[#ff9aca]">
-            <ClubIcon />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-black text-white">
-              {club.name}
-            </h3>
-
-            {club.description && (
-              <p className="mt-2 text-sm leading-6 text-white/45">
-                {club.description}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {club.story && (
-          <button
-            type="button"
-            onClick={() =>
-              onStoryOpen(
-                club.story!.id
-              )
-            }
-            className="mt-5 flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.025] p-3 text-left transition hover:bg-white/[0.05]"
-          >
-            <div className="h-16 w-12 shrink-0 overflow-hidden rounded-xl bg-[#211a21]">
-              {club.story.cover_url ? (
-                <img
-                  src={club.story.cover_url}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-xs font-black text-white/20">
-                  +
-                </div>
-              )}
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#ff9aca]">
-                Clube da fic
-              </p>
-
-              <p className="mt-1 truncate text-sm font-black text-white">
-                {club.story.title}
-              </p>
-
-              {getStoryFandom(
-                club.story
-              ) && (
-                <p className="mt-1 truncate text-xs text-white/35">
-                  {getStoryFandom(
-                    club.story
-                  )}
-                </p>
-              )}
-            </div>
-
-            <ChevronIcon />
-          </button>
-        )}
-
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-white/30">
-          {typeof club.member_count ===
-            'number' && (
-            <span>
-              {club.member_count}{' '}
-              {club.member_count === 1
-                ? 'membro'
-                : 'membros'}
-            </span>
-          )}
-
-          {club.is_member && (
-            <span className="rounded-full border border-[#61d6a4]/20 bg-[#61d6a4]/5 px-2.5 py-1 font-bold text-[#8fe3ba]">
-              Você participa
-            </span>
-          )}
-        </div>
+    <div className="rounded-3xl border border-white/10 bg-[#151015] px-6 py-14 text-center">
+      <div className="text-4xl">
+        {icon}
       </div>
-    </article>
+
+      <h2 className="mt-4 text-lg font-black">
+        {title}
+      </h2>
+
+      <p className="mt-2 text-sm text-white/40">
+        {description}
+      </p>
+    </div>
   );
 }
 
@@ -1654,12 +278,16 @@ export default function PublicProfilePage() {
   const params = useParams();
   const router = useRouter();
 
-  const usernameParam = params?.username;
+  const usernameParam =
+    params?.username;
 
   const username =
-    typeof usernameParam === 'string'
+    typeof usernameParam ===
+    'string'
       ? usernameParam
-      : Array.isArray(usernameParam)
+      : Array.isArray(
+          usernameParam
+        )
         ? usernameParam[0]
         : undefined;
 
@@ -1684,48 +312,28 @@ export default function PublicProfilePage() {
   const [loading, setLoading] =
     useState(true);
 
-  const [listsLoading, setListsLoading] =
-    useState(false);
-
-  const [clubsLoading, setClubsLoading] =
-    useState(false);
-
   const [error, setError] =
     useState('');
-
-  const [followersCount, setFollowersCount] =
-    useState(0);
-
-  const [isFollowing, setIsFollowing] =
-    useState(false);
-
-  const [isSelf, setIsSelf] =
-    useState(false);
-
-  const [followLoading, setFollowLoading] =
-    useState(false);
 
   const touchStartX =
     useRef<number | null>(null);
 
-  const touchStartY =
-    useRef<number | null>(null);
-
-  const tabIndex = TABS.indexOf(
-    activeTab
-  );
+  const activeIndex =
+    TAB_ORDER.indexOf(
+      activeTab
+    );
 
   useEffect(() => {
-    if (
-      typeof username !== 'string' ||
-      !username
-    ) {
+    if (!username) {
       setLoading(false);
-      setError('Perfil não encontrado.');
+      setError(
+        'Perfil não encontrado.'
+      );
       return;
     }
 
-    const safeUsername = username;
+    const safeUsername =
+      username;
 
     async function loadProfile() {
       setLoading(true);
@@ -1733,14 +341,17 @@ export default function PublicProfilePage() {
 
       try {
         const encodedUsername =
-          encodeURIComponent(safeUsername);
+          encodeURIComponent(
+            safeUsername
+          );
 
-        const response = await fetch(
-          `/api/public-profile/${encodedUsername}`,
-          {
-            cache: 'no-store',
-          }
-        );
+        const response =
+          await fetch(
+            `/api/public-profile/${encodedUsername}`,
+            {
+              cache: 'no-store',
+            }
+          );
 
         const data: ProfileResponse =
           await response.json();
@@ -1754,64 +365,45 @@ export default function PublicProfilePage() {
         }
 
         if (!data.user) {
-          setError('Perfil não encontrado.');
+          setError(
+            'Perfil não encontrado.'
+          );
           return;
         }
 
         setUser(data.user);
 
         setStories(
-          Array.isArray(data.stories)
+          Array.isArray(
+            data.stories
+          )
             ? data.stories
             : []
         );
 
         setPosts(
-          Array.isArray(data.posts)
+          Array.isArray(
+            data.posts
+          )
             ? data.posts
             : []
         );
 
-        try {
-          const followResponse = await fetch(
-            `/api/follows?user_id=${encodeURIComponent(
-              data.user.id
-            )}`,
-            {
-              cache: 'no-store',
-            }
-          );
+        setReadingLists(
+          Array.isArray(
+            data.reading_lists
+          )
+            ? data.reading_lists
+            : []
+        );
 
-          const followData: FollowResponse =
-            await followResponse.json();
-
-          if (followResponse.ok) {
-            setFollowersCount(
-              typeof followData.followers_count ===
-                'number'
-                ? followData.followers_count
-                : 0
-            );
-
-            setIsFollowing(
-              followData.is_following === true
-            );
-
-            setIsSelf(
-              followData.is_self === true
-            );
-          }
-        } catch (followError) {
-          console.error(
-            'Erro ao carregar seguidores:',
-            followError
-          );
-        }
-
-        await Promise.all([
-          loadReadingLists(data.user.id),
-          loadFicClubs(data.user.id),
-        ]);
+        setFicClubs(
+          Array.isArray(
+            data.fic_clubs
+          )
+            ? data.fic_clubs
+            : []
+        );
       } catch (err) {
         console.error(
           'Erro ao carregar perfil público:',
@@ -1826,268 +418,78 @@ export default function PublicProfilePage() {
       }
     }
 
-    async function loadReadingLists(
-      userId: string
-    ) {
-      setListsLoading(true);
-
-      try {
-        const response = await fetch(
-          `/api/reading-lists?user_id=${encodeURIComponent(
-            userId
-          )}&public_only=true`,
-          {
-            cache: 'no-store',
-          }
-        );
-
-        if (!response.ok) {
-          setReadingLists([]);
-          return;
-        }
-
-        const data: ReadingListsResponse =
-          await response.json();
-
-        setReadingLists(
-          Array.isArray(data.lists)
-            ? data.lists.filter(
-                (list) =>
-                  list.is_public === true
-              )
-            : []
-        );
-      } catch (listError) {
-        console.error(
-          'Erro ao carregar listas de leitura:',
-          listError
-        );
-
-        setReadingLists([]);
-      } finally {
-        setListsLoading(false);
-      }
-    }
-
-    async function loadFicClubs(
-      userId: string
-    ) {
-      setClubsLoading(true);
-
-      try {
-        const response = await fetch(
-          `/api/fic-clubs?user_id=${encodeURIComponent(
-            userId
-          )}`,
-          {
-            cache: 'no-store',
-          }
-        );
-
-        if (!response.ok) {
-          setFicClubs([]);
-          return;
-        }
-
-        const data: FicClubsResponse =
-          await response.json();
-
-        setFicClubs(
-          Array.isArray(data.clubs)
-            ? data.clubs
-            : []
-        );
-      } catch (clubError) {
-        console.error(
-          'Erro ao carregar clubes das fic:',
-          clubError
-        );
-
-        setFicClubs([]);
-      } finally {
-        setClubsLoading(false);
-      }
-    }
-
     loadProfile();
   }, [username]);
 
-  async function toggleFollow() {
-    if (!user || followLoading || isSelf) {
-      return;
-    }
-
-    const previousFollowing =
-      isFollowing;
-
-    const previousFollowers =
-      followersCount;
-
-    const nextFollowing =
-      !previousFollowing;
-
-    const nextFollowers =
-      nextFollowing
-        ? previousFollowers + 1
-        : Math.max(
-            0,
-            previousFollowers - 1
-          );
-
-    setIsFollowing(nextFollowing);
-    setFollowersCount(nextFollowers);
-    setFollowLoading(true);
-
-    try {
-      const response = await fetch(
-        '/api/follows',
-        {
-          method: nextFollowing
-            ? 'POST'
-            : 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            following_id: user.id,
-          }),
-        }
-      );
-
-      const data: FollowResponse =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            'Não foi possível alterar o follow.'
-        );
-      }
-
-      if (
-        typeof data.following ===
-        'boolean'
-      ) {
-        setIsFollowing(data.following);
-      }
-
-      if (
-        typeof data.followers_count ===
-        'number'
-      ) {
-        setFollowersCount(
-          data.followers_count
-        );
-      }
-    } catch (error) {
-      console.error(
-        'Erro ao seguir usuário:',
-        error
-      );
-
-      setIsFollowing(
-        previousFollowing
-      );
-
-      setFollowersCount(
-        previousFollowers
-      );
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível alterar o follow.'
-      );
-    } finally {
-      setFollowLoading(false);
-    }
-  }
-
-  function updatePost(
-    postId: string,
-    changes: Partial<NookPost>
+  function goToTab(
+    index: number
   ) {
-    setPosts((current) =>
-      current.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              ...changes,
-            }
-          : post
-      )
-    );
-  }
+    const safeIndex =
+      Math.max(
+        0,
+        Math.min(
+          TAB_ORDER.length - 1,
+          index
+        )
+      );
 
-  function goToTab(index: number) {
-    const safeIndex = Math.max(
-      0,
-      Math.min(TABS.length - 1, index)
+    setActiveTab(
+      TAB_ORDER[safeIndex]
     );
-
-    setActiveTab(TABS[safeIndex]);
   }
 
   function handleTouchStart(
-    event: TouchEvent<HTMLDivElement>
+    event: React.TouchEvent
   ) {
-    const touch = event.touches[0];
-
-    touchStartX.current = touch.clientX;
-    touchStartY.current = touch.clientY;
+    touchStartX.current =
+      event.touches[0]?.clientX ??
+      null;
   }
 
   function handleTouchEnd(
-    event: TouchEvent<HTMLDivElement>
+    event: React.TouchEvent
   ) {
     if (
-      touchStartX.current === null ||
-      touchStartY.current === null
+      touchStartX.current ===
+      null
     ) {
       return;
     }
 
-    const touch = event.changedTouches[0];
+    const endX =
+      event.changedTouches[0]
+        ?.clientX;
 
-    const deltaX =
-      touch.clientX -
+    if (
+      typeof endX !== 'number'
+    ) {
+      touchStartX.current =
+        null;
+      return;
+    }
+
+    const delta =
+      endX -
       touchStartX.current;
 
-    const deltaY =
-      touch.clientY -
-      touchStartY.current;
+    touchStartX.current =
+      null;
 
-    touchStartX.current = null;
-    touchStartY.current = null;
-
-    /*
-     * Só tratamos como swipe quando o movimento
-     * é claramente horizontal.
-     *
-     * Isso evita trocar de aba enquanto o usuário
-     * simplesmente está rolando a página para cima
-     * ou para baixo.
-     */
     if (
-      Math.abs(deltaX) < 55 ||
-      Math.abs(deltaX) <= Math.abs(deltaY)
+      Math.abs(delta) < 60
     ) {
       return;
     }
 
-    if (deltaX < 0) {
-      goToTab(tabIndex + 1);
+    if (delta < 0) {
+      goToTab(
+        activeIndex + 1
+      );
     } else {
-      goToTab(tabIndex - 1);
+      goToTab(
+        activeIndex - 1
+      );
     }
-  }
-
-  function openStory(storyId: string) {
-    router.push(
-      `/historia/${encodeURIComponent(
-        storyId
-      )}`
-    );
   }
 
   if (loading) {
@@ -2116,8 +518,8 @@ export default function PublicProfilePage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0d0a0d] px-5 text-white">
         <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#151015] p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
-            <CommentIcon />
+          <div className="text-5xl">
+            📖
           </div>
 
           <h1 className="mt-5 text-2xl font-black">
@@ -2131,7 +533,9 @@ export default function PublicProfilePage() {
 
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={() =>
+              router.back()
+            }
             className="mt-7 rounded-2xl bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-white/90"
           >
             Voltar
@@ -2144,9 +548,13 @@ export default function PublicProfilePage() {
   return (
     <main className="min-h-screen bg-[#0d0a0d] text-white">
       <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-5 sm:py-8">
+        {/* VOLTAR */}
+
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() =>
+            router.back()
+          }
           className="mb-4 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-white/50 transition hover:bg-white/5 hover:text-white"
         >
           <span className="text-lg">
@@ -2156,18 +564,10 @@ export default function PublicProfilePage() {
           Voltar
         </button>
 
+        {/* PERFIL */}
+
         <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015] shadow-2xl">
-          <div
-            className="relative h-44 overflow-hidden sm:h-60"
-            style={{
-              /*
-               * O theme_color NÃO é usado aqui.
-               * A cor de perfil deve permanecer privada
-               * e individual para o próprio usuário.
-               */
-              backgroundColor: '#241924',
-            }}
-          >
+          <div className="relative h-44 overflow-hidden bg-[#241924] sm:h-60">
             {user.cover_url ? (
               <img
                 src={user.cover_url}
@@ -2182,77 +582,50 @@ export default function PublicProfilePage() {
           </div>
 
           <div className="relative px-5 pb-7 sm:px-8">
-            <div className="-mt-14 flex items-end justify-between gap-4">
-              <div className="relative">
+            <div className="-mt-14 flex items-end justify-between">
+              <div>
                 {user.avatar_url ? (
                   <img
                     src={user.avatar_url}
-                    alt={getDisplayName(user)}
+                    alt={getDisplayName(
+                      user
+                    )}
                     className="h-28 w-28 rounded-full border-4 border-[#151015] bg-[#211a21] object-cover shadow-xl sm:h-32 sm:w-32"
                   />
                 ) : (
                   <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-[#151015] bg-[#211a21] text-4xl font-black text-white/40 shadow-xl sm:h-32 sm:w-32">
-                    {getDisplayName(user)
+                    {getDisplayName(
+                      user
+                    )
                       .charAt(0)
                       .toUpperCase()}
                   </div>
                 )}
               </div>
 
-              {isSelf ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push('/perfil')
-                  }
-                  className="mb-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
-                >
-                  Meu perfil
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={toggleFollow}
-                  disabled={followLoading}
-                  className={`mb-2 flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                    isFollowing
-                      ? 'border border-white/15 bg-white/5 text-white hover:bg-white/10'
-                      : 'bg-white text-black hover:bg-white/90'
-                  }`}
-                >
-                  <FollowIcon
-                    following={isFollowing}
-                  />
-
-                  {followLoading
-                    ? 'Aguarde...'
-                    : isFollowing
-                      ? 'Seguindo'
-                      : 'Seguir'}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    '/perfil'
+                  )
+                }
+                className="mb-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
+              >
+                Meu perfil
+              </button>
             </div>
 
             <div className="mt-5">
               <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
-                {getDisplayName(user)}
+                {getDisplayName(
+                  user
+                )}
               </h1>
 
               <p className="mt-1 text-sm font-semibold text-white/40">
                 @{user.username}
               </p>
-
-              <div className="mt-4 flex items-center gap-4 text-sm">
-                <span className="font-bold text-white">
-                  {followersCount}
-                </span>
-
-                <span className="text-white/40">
-                  {followersCount === 1
-                    ? 'seguidor'
-                    : 'seguidores'}
-                </span>
-              </div>
 
               {user.bio ? (
                 <p className="mt-5 max-w-2xl whitespace-pre-wrap text-sm leading-7 text-white/70">
@@ -2267,164 +640,97 @@ export default function PublicProfilePage() {
           </div>
         </section>
 
-        {/* =========================================================
-            NAVEGAÇÃO DAS 4 ABAS
-           ========================================================= */}
+        {/* ABAS */}
 
         <div className="mt-5 rounded-2xl border border-white/10 bg-[#151015] p-1.5">
           <div className="grid grid-cols-4 gap-1">
-            {TABS.map((tab) => {
-              const active =
-                activeTab === tab;
+            {TAB_ORDER.map(
+              (tab) => {
+                const labels: Record<
+                  Tab,
+                  string
+                > = {
+                  stories:
+                    'Histórias',
+                  nook: 'Mural',
+                  lists:
+                    'Listas',
+                  clubs:
+                    'Clubes',
+                };
 
-              const label =
-                tab === 'stories'
-                  ? 'Histórias'
-                  : tab === 'nook'
-                    ? 'Mural'
-                    : tab === 'lists'
-                      ? 'Listas'
-                      : 'Clubes';
-
-              return (
-                <button
-                  type="button"
-                  key={tab}
-                  onClick={() =>
-                    setActiveTab(tab)
-                  }
-                  className={`min-w-0 rounded-xl px-1.5 py-3 text-[10px] font-black uppercase tracking-wide transition sm:px-3 sm:text-xs ${
-                    active
-                      ? 'bg-white text-black'
-                      : 'text-white/40 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  <span className="hidden sm:inline">
-                    {label}
-                  </span>
-
-                  <span className="sm:hidden">
-                    {tab === 'stories'
-                      ? 'Fic'
-                      : tab === 'nook'
-                        ? 'Mural'
-                        : tab === 'lists'
-                          ? 'Listas'
-                          : 'Clubes'}
-                  </span>
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() =>
+                      setActiveTab(
+                        tab
+                      )
+                    }
+                    className={`rounded-xl px-2 py-3 text-[10px] font-black uppercase tracking-wide transition sm:px-4 sm:text-xs ${
+                      activeTab ===
+                      tab
+                        ? 'bg-white text-black'
+                        : 'text-white/45 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    {labels[tab]}
+                  </button>
+                );
+              }
+            )}
           </div>
         </div>
 
-        {/* =========================================================
-            ÁREA DESLIZÁVEL
-           ========================================================= */}
+        {/* CONTEÚDO COM SWIPE */}
 
         <div
           className="mt-5 overflow-hidden"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
+          onTouchStart={
+            handleTouchStart
+          }
+          onTouchEnd={
+            handleTouchEnd
+          }
         >
           <div
-            className="flex w-[400%] transition-transform duration-300 ease-out"
+            className="flex transition-transform duration-300 ease-out"
             style={{
+              width: '400%',
               transform: `translateX(-${
-                tabIndex * 25
+                activeIndex *
+                25
               }%)`,
             }}
           >
-            {/* =====================================================
+            {/* =================================================
                 HISTÓRIAS
-               ===================================================== */}
+            ================================================= */}
 
-            <section className="w-1/4 shrink-0 px-0">
-              {stories.length === 0 ? (
+            <section className="w-1/4 shrink-0 px-0.5">
+              {stories.length ===
+              0 ? (
                 <EmptyState
-                  icon={
-                    <span className="text-lg font-black">
-                      +
-                    </span>
-                  }
+                  icon="📚"
                   title="Nenhuma história ainda"
                   description={`${getDisplayName(user)} ainda não publicou nenhuma história.`}
                 />
               ) : (
-                <div className="w-full max-w-3xl space-y-3">
-                  {stories.map((story) => (
-                    <StoryCard
-                      key={story.id}
-                      story={story}
-                      onOpen={() =>
-                        openStory(story.id)
-                      }
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* =====================================================
-                MURAL
-               ===================================================== */}
-
-            <section className="w-1/4 shrink-0 px-0">
-              {posts.length === 0 ? (
-                <div className="mx-auto max-w-2xl">
-                  <EmptyState
-                    icon={
-                      <span className="text-lg font-black">
-                        +
-                      </span>
-                    }
-                    title="Nenhuma publicação ainda"
-                    description={`${getDisplayName(user)} ainda não publicou nada no Mural.`}
-                  />
-                </div>
-              ) : (
                 <div className="mx-auto w-full max-w-2xl space-y-4">
-                  {posts.map((post) => (
-                    <PublicPost
-                      key={post.id}
-                      post={post}
-                      owner={user}
-                      onUpdate={updatePost}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* =====================================================
-                LISTAS DE LEITURAS
-               ===================================================== */}
-
-            <section className="w-1/4 shrink-0 px-0">
-              {listsLoading ? (
-                <div className="space-y-3">
-                  {[1, 2].map((item) => (
-                    <div
-                      key={item}
-                      className="h-40 animate-pulse rounded-3xl border border-white/10 bg-[#151015]"
-                    />
-                  ))}
-                </div>
-              ) : readingLists.length === 0 ? (
-                <EmptyState
-                  icon={<ListIcon />}
-                  title="Nenhuma lista pública"
-                  description={`${getDisplayName(user)} ainda não possui listas de leitura públicas.`}
-                />
-              ) : (
-                <div className="mx-auto w-full max-w-3xl space-y-4">
-                  {readingLists.map(
-                    (list) => (
-                      <ReadingListCard
-                        key={list.id}
-                        list={list}
-                        onStoryOpen={
-                          openStory
+                  {stories.map(
+                    (story) => (
+                      <StoryCard
+                        key={
+                          story.id
+                        }
+                        story={
+                          story
+                        }
+                        onOpen={() =>
+                          router.push(
+                            `/historia/${story.id}`
+                          )
                         }
                       />
                     )
@@ -2433,99 +739,398 @@ export default function PublicProfilePage() {
               )}
             </section>
 
-            {/* =====================================================
-                CLUBES DAS FIC
-               ===================================================== */}
+            {/* =================================================
+                MURAL
+            ================================================= */}
 
-            <section className="w-1/4 shrink-0 px-0">
-              {clubsLoading ? (
-                <div className="space-y-3">
-                  {[1, 2].map((item) => (
-                    <div
-                      key={item}
-                      className="h-44 animate-pulse rounded-3xl border border-white/10 bg-[#151015]"
-                    />
-                  ))}
-                </div>
-              ) : ficClubs.length === 0 ? (
+            <section className="w-1/4 shrink-0 px-0.5">
+              {posts.length ===
+              0 ? (
                 <EmptyState
-                  icon={<ClubIcon />}
-                  title="Nenhum clube ainda"
-                  description={`${getDisplayName(user)} ainda não participa de nenhum Clube da Fic.`}
+                  icon="📝"
+                  title="Nenhuma publicação ainda"
+                  description={`${getDisplayName(user)} ainda não publicou nada no Mural.`}
                 />
               ) : (
-                <div className="mx-auto w-full max-w-3xl space-y-4">
+                <div className="mx-auto w-full max-w-2xl space-y-4">
+                  {posts.map(
+                    (post) => (
+                      <article
+                        key={
+                          post.id
+                        }
+                        className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
+                      >
+                        <div className="p-5 sm:p-6">
+                          <div className="flex items-center gap-3">
+                            {user.avatar_url ? (
+                              <img
+                                src={
+                                  user.avatar_url
+                                }
+                                alt=""
+                                className="h-11 w-11 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#241c24] font-black text-white/40">
+                                {getDisplayName(
+                                  user
+                                )
+                                  .charAt(
+                                    0
+                                  )
+                                  .toUpperCase()}
+                              </div>
+                            )}
+
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-black text-white">
+                                {getDisplayName(
+                                  user
+                                )}
+                              </p>
+
+                              <p className="text-xs text-white/35">
+                                @
+                                {
+                                  user.username
+                                }
+                                {' · '}
+                                {formatDate(
+                                  post.created_at
+                                )}
+                              </p>
+                            </div>
+
+                            {post.pinned && (
+                              <span
+                                title="Publicação fixada"
+                                className="text-sm"
+                              >
+                                📌
+                              </span>
+                            )}
+                          </div>
+
+                          {post.body && (
+                            <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-white/75">
+                              {
+                                post.body
+                              }
+                            </p>
+                          )}
+
+                          {post.image_url && (
+                            <div className="mt-5 overflow-hidden rounded-2xl border border-white/10">
+                              <img
+                                src={
+                                  post.image_url
+                                }
+                                alt=""
+                                className="max-h-[600px] w-full object-cover"
+                              />
+                            </div>
+                          )}
+
+                          {post.media &&
+                            post.media.length >
+                              0 && (
+                              <div
+                                className={`mt-5 grid gap-2 ${
+                                  post
+                                    .media
+                                    .length ===
+                                  1
+                                    ? 'grid-cols-1'
+                                    : 'grid-cols-2'
+                                }`}
+                              >
+                                {post.media
+                                  .slice(
+                                    0,
+                                    4
+                                  )
+                                  .map(
+                                    (
+                                      media
+                                    ) => (
+                                      <div
+                                        key={
+                                          media.id
+                                        }
+                                        className="overflow-hidden rounded-2xl border border-white/10 bg-black"
+                                      >
+                                        <img
+                                          src={
+                                            media.media_url
+                                          }
+                                          alt=""
+                                          className="max-h-[500px] min-h-[180px] w-full object-cover"
+                                        />
+                                      </div>
+                                    )
+                                  )}
+                              </div>
+                            )}
+                        </div>
+                      </article>
+                    )
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* =================================================
+                LISTAS DE LEITURA
+            ================================================= */}
+
+            <section className="w-1/4 shrink-0 px-0.5">
+              {readingLists.length ===
+              0 ? (
+                <EmptyState
+                  icon="🔖"
+                  title="Nenhuma lista pública"
+                  description={`${getDisplayName(user)} ainda não deixou nenhuma lista de leitura pública.`}
+                />
+              ) : (
+                <div className="mx-auto w-full max-w-2xl space-y-5">
+                  {readingLists.map(
+                    (list) => (
+                      <article
+                        key={
+                          list.id
+                        }
+                        className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
+                      >
+                        <div className="border-b border-white/10 p-5">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h2 className="text-lg font-black">
+                                {
+                                  list.name
+                                }
+                              </h2>
+
+                              {list.description && (
+                                <p className="mt-2 text-sm leading-6 text-white/45">
+                                  {
+                                    list.description
+                                  }
+                                </p>
+                              )}
+                            </div>
+
+                            <span className="shrink-0 rounded-full bg-[#ff78b9]/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-[#ff9aca]">
+                              Pública
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="divide-y divide-white/[0.06]">
+                          {list.items.length ===
+                          0 ? (
+                            <p className="p-5 text-sm text-white/30">
+                              Esta lista ainda está vazia.
+                            </p>
+                          ) : (
+                            list.items.map(
+                              (
+                                item
+                              ) => {
+                                const story =
+                                  item.story;
+
+                                if (
+                                  !story
+                                ) {
+                                  return null;
+                                }
+
+                                return (
+                                  <button
+                                    type="button"
+                                    key={
+                                      item.id
+                                    }
+                                    onClick={() =>
+                                      router.push(
+                                        `/historia/${story.id}`
+                                      )
+                                    }
+                                    className="flex w-full gap-4 p-4 text-left transition hover:bg-white/[0.03]"
+                                  >
+                                    <div className="h-20 w-14 shrink-0 overflow-hidden rounded-xl bg-[#211a21]">
+                                      {story.cover_url ? (
+                                        <img
+                                          src={
+                                            story.cover_url
+                                          }
+                                          alt=""
+                                          className="h-full w-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="flex h-full items-center justify-center text-xl text-white/20">
+                                          📖
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="min-w-0">
+                                      <h3 className="truncate text-sm font-black text-white">
+                                        {
+                                          story.title
+                                        }
+                                      </h3>
+
+                                      {story.description && (
+                                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/40">
+                                          {
+                                            story.description
+                                          }
+                                        </p>
+                                      )}
+
+                                      <p className="mt-2 text-[10px] text-white/25">
+                                        {formatDate(
+                                          item.added_at
+                                        )}
+                                      </p>
+                                    </div>
+                                  </button>
+                                );
+                              }
+                            )
+                          )}
+                        </div>
+                      </article>
+                    )
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* =================================================
+                CLUBES DAS FIC
+            ================================================= */}
+
+            <section className="w-1/4 shrink-0 px-0.5">
+              {ficClubs.length ===
+              0 ? (
+                <EmptyState
+                  icon="💬"
+                  title="Nenhum clube ainda"
+                  description={`${getDisplayName(user)} ainda não participa de nenhum Clube de FIC.`}
+                />
+              ) : (
+                <div className="mx-auto w-full max-w-2xl space-y-4">
                   {ficClubs.map(
                     (club) => (
-                      <FicClubCard
-                        key={club.id}
-                        club={club}
-                        onStoryOpen={
-                          openStory
+                      <article
+                        key={
+                          club.id
                         }
-                      />
+                        className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
+                      >
+                        <div className="p-5 sm:p-6">
+                          <div className="flex items-start gap-4">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff78b9]/20 to-[#b77cff]/20 text-xl">
+                              💬
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <h2 className="text-lg font-black">
+                                {
+                                  club.name
+                                }
+                              </h2>
+
+                              <p className="mt-1 text-xs text-[#ff78b9]/70">
+                                Clube de FIC
+                              </p>
+                            </div>
+
+                            <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[9px] font-black text-white/45">
+                              {
+                                club.member_count
+                              }{' '}
+                              {club.member_count ===
+                              1
+                                ? 'membro'
+                                : 'membros'}
+                            </span>
+                          </div>
+
+                          {club.description && (
+                            <p className="mt-5 text-sm leading-6 text-white/50">
+                              {
+                                club.description
+                              }
+                            </p>
+                          )}
+
+                          {club.story && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                router.push(
+                                  `/historia/${club.story!.id}`
+                                )
+                              }
+                              className="mt-5 flex w-full gap-3 rounded-2xl border border-white/10 bg-white/[0.025] p-3 text-left transition hover:border-[#ff78b9]/25 hover:bg-[#ff78b9]/[0.04]"
+                            >
+                              <div className="h-16 w-11 shrink-0 overflow-hidden rounded-xl bg-[#211a21]">
+                                {club.story
+                                  .cover_url ? (
+                                  <img
+                                    src={
+                                      club
+                                        .story
+                                        .cover_url
+                                    }
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full items-center justify-center text-lg text-white/20">
+                                    📖
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#ff78b9]/70">
+                                  Conversando sobre
+                                </p>
+
+                                <p className="mt-1 truncate text-sm font-black text-white">
+                                  {
+                                    club
+                                      .story
+                                      .title
+                                  }
+                                </p>
+
+                                {club.story
+                                  .description && (
+                                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/35">
+                                    {
+                                      club
+                                        .story
+                                        .description
+                                    }
+                                  </p>
+                                )}
+                              </div>
+                            </button>
+                          )}
+                        </div>
+                      </article>
                     )
                   )}
                 </div>
               )}
             </section>
           </div>
-        </div>
-
-        {/* =========================================================
-            INDICADOR DE SWIPE
-           ========================================================= */}
-
-        <div className="mt-5 flex items-center justify-center gap-2">
-          {TABS.map((tab, index) => (
-            <button
-              key={tab}
-              type="button"
-              aria-label={`Ir para aba ${
-                index + 1
-              }`}
-              onClick={() =>
-                goToTab(index)
-              }
-              className={`h-1.5 rounded-full transition-all ${
-                index === tabIndex
-                  ? 'w-7 bg-[#ff78b9]'
-                  : 'w-1.5 bg-white/20'
-              }`}
-            />
-          ))}
-        </div>
-
-        {/* =========================================================
-            SETAS NO DESKTOP
-           ========================================================= */}
-
-        <div className="mt-4 hidden items-center justify-center gap-2 sm:flex">
-          <button
-            type="button"
-            onClick={() =>
-              goToTab(tabIndex - 1)
-            }
-            disabled={tabIndex === 0}
-            className="flex items-center gap-1 rounded-xl border border-white/10 bg-[#151015] px-3 py-2 text-xs font-bold text-white/40 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-20"
-          >
-            <ChevronIcon direction="left" />
-            Anterior
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              goToTab(tabIndex + 1)
-            }
-            disabled={
-              tabIndex === TABS.length - 1
-            }
-            className="flex items-center gap-1 rounded-xl border border-white/10 bg-[#151015] px-3 py-2 text-xs font-bold text-white/40 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-20"
-          >
-            Próxima
-            <ChevronIcon />
-          </button>
         </div>
       </div>
     </main>
