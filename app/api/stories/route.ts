@@ -18,11 +18,19 @@ type StoryRow = {
   user?: AuthUser | AuthUser[] | null;
 };
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-if (!supabaseUrl || !supabaseSecretKey) {
-  throw new Error('Variáveis do Supabase não configuradas.');
+const supabaseSecretKey =
+  process.env.SUPABASE_SECRET_KEY;
+
+if (
+  !supabaseUrl ||
+  !supabaseSecretKey
+) {
+  throw new Error(
+    'Variáveis do Supabase não configuradas.'
+  );
 }
 
 const supabase = createClient(
@@ -36,7 +44,8 @@ const supabase = createClient(
   }
 );
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_SIZE =
+  5 * 1024 * 1024;
 
 const ALLOWED_TYPES = [
   'image/jpeg',
@@ -53,7 +62,10 @@ async function getAuthenticatedUser(
       request.headers.get('cookie') || '';
 
     const authResponse = await fetch(
-      new URL('/api/auth/me', request.url),
+      new URL(
+        '/api/auth/me',
+        request.url
+      ),
       {
         method: 'GET',
         headers: {
@@ -67,7 +79,8 @@ async function getAuthenticatedUser(
       return null;
     }
 
-    const data = await authResponse.json();
+    const data =
+      await authResponse.json();
 
     if (
       !data?.authenticated ||
@@ -77,7 +90,12 @@ async function getAuthenticatedUser(
     }
 
     return data.user;
-  } catch {
+  } catch (error) {
+    console.error(
+      'Erro ao verificar autenticação:',
+      error
+    );
+
     return null;
   }
 }
@@ -93,7 +111,9 @@ export async function GET(
 ) {
   try {
     const currentUser =
-      await getAuthenticatedUser(request);
+      await getAuthenticatedUser(
+        request
+      );
 
     if (!currentUser) {
       return NextResponse.json(
@@ -109,13 +129,22 @@ export async function GET(
     /*
      * Remove Stories expirados.
      */
-    await supabase
+    const {
+      error: expiredStoriesError,
+    } = await supabase
       .from('stories')
       .delete()
       .lt(
         'expires_at',
         new Date().toISOString()
       );
+
+    if (expiredStoriesError) {
+      console.error(
+        'Erro ao remover Stories expirados:',
+        expiredStoriesError
+      );
+    }
 
     /*
      * Usuários que o usuário atual segue.
@@ -125,7 +154,9 @@ export async function GET(
       error: followsError,
     } = await supabase
       .from('follows')
-      .select('following_id')
+      .select(
+        'following_id'
+      )
       .eq(
         'follower_id',
         currentUser.id
@@ -157,12 +188,13 @@ export async function GET(
     /*
      * O próprio usuário também aparece.
      */
-    const userIds = Array.from(
-      new Set([
-        currentUser.id,
-        ...followingIds,
-      ])
-    );
+    const userIds =
+      Array.from(
+        new Set([
+          currentUser.id,
+          ...followingIds,
+        ])
+      );
 
     const {
       data: stories,
@@ -203,13 +235,24 @@ export async function GET(
     if (storiesError) {
       console.error(
         'Erro ao buscar Stories:',
-        storiesError
+        {
+          message:
+            storiesError.message,
+          details:
+            storiesError.details,
+          hint:
+            storiesError.hint,
+          code:
+            storiesError.code,
+        }
       );
 
       return NextResponse.json(
         {
           error:
             'Não foi possível carregar os Stories.',
+          details:
+            storiesError.message,
         },
         {
           status: 500,
@@ -218,16 +261,17 @@ export async function GET(
     }
 
     const normalizedStories =
-      ((stories || []) as StoryRow[]).map(
-        (story) => ({
-          ...story,
-          user: Array.isArray(
+      (
+        (stories || []) as StoryRow[]
+      ).map((story) => ({
+        ...story,
+        user:
+          Array.isArray(
             story.user
           )
             ? story.user[0] || null
             : story.user || null,
-        })
-      );
+      }));
 
     return NextResponse.json(
       {
@@ -265,9 +309,17 @@ POST — PUBLICAR STORY
 export async function POST(
   request: NextRequest
 ) {
+  let uploadedStoragePath =
+    '';
+
   try {
+    /*
+     * 1. Verificar autenticação
+     */
     const currentUser =
-      await getAuthenticatedUser(request);
+      await getAuthenticatedUser(
+        request
+      );
 
     if (!currentUser) {
       return NextResponse.json(
@@ -280,6 +332,81 @@ export async function POST(
       );
     }
 
+    console.log(
+      '[STORIES] Usuário autenticado:',
+      currentUser.id
+    );
+
+    /*
+     * 2. Verificar se o usuário possui
+     *    um perfil.
+     *
+     * A tabela stories possui:
+     *
+     * user_id uuid references profiles(id)
+     *
+     * Portanto, o perfil precisa existir.
+     */
+    const {
+      data: profile,
+      error: profileError,
+    } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq(
+        'id',
+        currentUser.id
+      )
+      .maybeSingle();
+
+    if (profileError) {
+      console.error(
+        '[STORIES] Erro ao verificar perfil:',
+        {
+          message:
+            profileError.message,
+          details:
+            profileError.details,
+          hint:
+            profileError.hint,
+          code:
+            profileError.code,
+        }
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            'Não foi possível verificar seu perfil.',
+          details:
+            profileError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (!profile) {
+      console.error(
+        '[STORIES] Perfil não encontrado para o usuário:',
+        currentUser.id
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            'Seu perfil não foi encontrado. Faça login novamente.',
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * 3. Ler o arquivo
+     */
     const formData =
       await request.formData();
 
@@ -298,7 +425,13 @@ export async function POST(
       );
     }
 
-    if (file.size > MAX_FILE_SIZE) {
+    /*
+     * 4. Verificar tamanho
+     */
+    if (
+      file.size >
+      MAX_FILE_SIZE
+    ) {
       return NextResponse.json(
         {
           error:
@@ -310,6 +443,9 @@ export async function POST(
       );
     }
 
+    /*
+     * 5. Verificar formato
+     */
     if (
       !ALLOWED_TYPES.includes(
         file.type
@@ -345,10 +481,16 @@ export async function POST(
     const storagePath =
       `${currentUser.id}/${fileName}`;
 
+    uploadedStoragePath =
+      storagePath;
+
+    console.log(
+      '[STORIES] Enviando arquivo:',
+      storagePath
+    );
+
     /*
-     * Envia o arquivo para:
-     *
-     * Storage → stories → user_id → arquivo
+     * 6. Upload para Storage
      */
     const {
       error: uploadError,
@@ -368,14 +510,21 @@ export async function POST(
 
     if (uploadError) {
       console.error(
-        'Erro ao fazer upload do Story:',
-        uploadError
+        '[STORIES] Erro no upload:',
+        {
+          message:
+            uploadError.message,
+          details:
+            uploadError.name,
+        }
       );
 
       return NextResponse.json(
         {
           error:
             'Não foi possível enviar a imagem.',
+          details:
+            uploadError.message,
         },
         {
           status: 500,
@@ -383,6 +532,13 @@ export async function POST(
       );
     }
 
+    console.log(
+      '[STORIES] Upload concluído.'
+    );
+
+    /*
+     * 7. Obter URL pública
+     */
     const {
       data: publicUrlData,
     } =
@@ -395,15 +551,50 @@ export async function POST(
     const mediaUrl =
       publicUrlData.publicUrl;
 
+    if (!mediaUrl) {
+      console.error(
+        '[STORIES] URL pública não foi gerada.'
+      );
+
+      await supabase.storage
+        .from('stories')
+        .remove([
+          storagePath,
+        ]);
+
+      uploadedStoragePath =
+        '';
+
+      return NextResponse.json(
+        {
+          error:
+            'Não foi possível gerar a URL da imagem.',
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
     /*
-     * Story expira depois de 24 horas.
+     * 8. Expiração de 24 horas
      */
     const expiresAt =
       new Date(
         Date.now() +
-          24 * 60 * 60 * 1000
+          24 *
+            60 *
+            60 *
+            1000
       ).toISOString();
 
+    console.log(
+      '[STORIES] Salvando registro no banco...'
+    );
+
+    /*
+     * 9. Salvar Story no banco
+     */
     const {
       data: story,
       error: storyError,
@@ -432,25 +623,59 @@ export async function POST(
       .single();
 
     if (storyError) {
+      /*
+       * ESTE É O PONTO IMPORTANTE:
+       * agora o erro real do Supabase
+       * ficará visível nos logs.
+       */
       console.error(
-        'Erro ao salvar Story:',
-        storyError
+        '[STORIES] ERRO AO SALVAR NO BANCO:',
+        {
+          message:
+            storyError.message,
+          details:
+            storyError.details,
+          hint:
+            storyError.hint,
+          code:
+            storyError.code,
+        }
       );
 
       /*
-       * Se o registro não puder ser salvo,
-       * tentamos remover o arquivo enviado.
+       * Remove o arquivo que foi enviado,
+       * já que o registro não foi criado.
        */
-      await supabase.storage
-        .from('stories')
-        .remove([
-          storagePath,
-        ]);
+      if (
+        uploadedStoragePath
+      ) {
+        const {
+          error: cleanupError,
+        } =
+          await supabase.storage
+            .from('stories')
+            .remove([
+              uploadedStoragePath,
+            ]);
+
+        if (cleanupError) {
+          console.error(
+            '[STORIES] Erro ao limpar arquivo:',
+            cleanupError
+          );
+        }
+      }
 
       return NextResponse.json(
         {
           error:
             'Não foi possível publicar o Story.',
+          details:
+            storyError.message,
+          code:
+            storyError.code,
+          hint:
+            storyError.hint || null,
         },
         {
           status: 500,
@@ -458,6 +683,14 @@ export async function POST(
       );
     }
 
+    console.log(
+      '[STORIES] Story publicado:',
+      story?.id
+    );
+
+    /*
+     * 10. Tudo certo
+     */
     return NextResponse.json(
       {
         story,
@@ -468,14 +701,39 @@ export async function POST(
     );
   } catch (error) {
     console.error(
-      'Erro inesperado em POST /api/stories:',
+      '[STORIES] ERRO INESPERADO:',
       error
     );
+
+    /*
+     * Se alguma coisa explodir depois
+     * do upload, tenta limpar o arquivo.
+     */
+    if (
+      uploadedStoragePath
+    ) {
+      try {
+        await supabase.storage
+          .from('stories')
+          .remove([
+            uploadedStoragePath,
+          ]);
+      } catch (cleanupError) {
+        console.error(
+          '[STORIES] Erro na limpeza após exceção:',
+          cleanupError
+        );
+      }
+    }
 
     return NextResponse.json(
       {
         error:
           'Erro interno do servidor.',
+        details:
+          error instanceof Error
+            ? error.message
+            : String(error),
       },
       {
         status: 500,
@@ -495,7 +753,9 @@ export async function DELETE(
 ) {
   try {
     const currentUser =
-      await getAuthenticatedUser(request);
+      await getAuthenticatedUser(
+        request
+      );
 
     if (!currentUser) {
       return NextResponse.json(
@@ -530,9 +790,7 @@ export async function DELETE(
     }
 
     /*
-     * Buscamos primeiro a URL para
-     * conseguir apagar também o arquivo
-     * do Storage.
+     * Localiza o Story do usuário.
      */
     const {
       data: story,
@@ -555,13 +813,24 @@ export async function DELETE(
     if (findError) {
       console.error(
         'Erro ao localizar Story:',
-        findError
+        {
+          message:
+            findError.message,
+          details:
+            findError.details,
+          hint:
+            findError.hint,
+          code:
+            findError.code,
+        }
       );
 
       return NextResponse.json(
         {
           error:
             'Não foi possível localizar o Story.',
+          details:
+            findError.message,
         },
         {
           status: 500,
@@ -579,6 +848,44 @@ export async function DELETE(
           status: 404,
         }
       );
+    }
+
+    /*
+     * Extrai o caminho do Storage
+     * a partir da URL pública.
+     */
+    let storagePath = '';
+
+    try {
+      const publicUrl =
+        new URL(
+          story.media_url
+        );
+
+      const marker =
+        '/storage/v1/object/public/stories/';
+
+      const pathname =
+        publicUrl.pathname;
+
+      const markerIndex =
+        pathname.indexOf(
+          marker
+        );
+
+      if (
+        markerIndex !== -1
+      ) {
+        storagePath =
+          decodeURIComponent(
+            pathname.slice(
+              markerIndex +
+                marker.length
+            )
+          );
+      }
+    } catch {
+      storagePath = '';
     }
 
     /*
@@ -601,18 +908,52 @@ export async function DELETE(
     if (deleteError) {
       console.error(
         'Erro ao excluir Story:',
-        deleteError
+        {
+          message:
+            deleteError.message,
+          details:
+            deleteError.details,
+          hint:
+            deleteError.hint,
+          code:
+            deleteError.code,
+        }
       );
 
       return NextResponse.json(
         {
           error:
             'Não foi possível excluir o Story.',
+          details:
+            deleteError.message,
         },
         {
           status: 500,
         }
       );
+    }
+
+    /*
+     * Apaga também o arquivo do Storage.
+     */
+    if (storagePath) {
+      const {
+        error: storageDeleteError,
+      } =
+        await supabase.storage
+          .from('stories')
+          .remove([
+            storagePath,
+          ]);
+
+      if (
+        storageDeleteError
+      ) {
+        console.error(
+          'Erro ao excluir arquivo do Storage:',
+          storageDeleteError
+        );
+      }
     }
 
     return NextResponse.json(
@@ -633,6 +974,10 @@ export async function DELETE(
       {
         error:
           'Erro interno do servidor.',
+        details:
+          error instanceof Error
+            ? error.message
+            : String(error),
       },
       {
         status: 500,
