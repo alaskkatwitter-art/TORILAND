@@ -1,6 +1,6 @@
 'use client';
 
-import {
+import React, {
   ChangeEvent,
   FormEvent,
   KeyboardEvent,
@@ -9,7 +9,11 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import {
+  useParams,
+  useRouter,
+  useSearchParams,
+} from 'next/navigation';
 
 type Tag = {
   id: string;
@@ -168,6 +172,66 @@ function getStatusClass(
   return 'border-white/10 bg-white/[0.04] text-gray-400';
 }
 
+function sanitizeHtml(html: string) {
+  if (!html) {
+    return '';
+  }
+
+  const parser = new DOMParser();
+  const documentNode = parser.parseFromString(
+    html,
+    'text/html'
+  );
+
+  documentNode
+    .querySelectorAll(
+      'script, iframe, object, embed, style, link'
+    )
+    .forEach((element) => {
+      element.remove();
+    });
+
+  documentNode
+    .querySelectorAll('*')
+    .forEach((element) => {
+      Array.from(element.attributes).forEach(
+        (attribute) => {
+          const name = attribute.name.toLowerCase();
+          const value = attribute.value.trim();
+
+          if (name.startsWith('on')) {
+            element.removeAttribute(attribute.name);
+            return;
+          }
+
+          if (
+            ['href', 'src', 'action', 'formaction'].includes(
+              name
+            ) &&
+            /^javascript:/i.test(value)
+          ) {
+            element.removeAttribute(attribute.name);
+          }
+        }
+      );
+    });
+
+  documentNode
+    .querySelectorAll('a')
+    .forEach((anchor) => {
+      anchor.setAttribute(
+        'target',
+        '_blank'
+      );
+      anchor.setAttribute(
+        'rel',
+        'noopener noreferrer nofollow'
+      );
+    });
+
+  return documentNode.body.innerHTML;
+}
+
 export default function EditarHistoriaPage() {
   const params = useParams();
   const router = useRouter();
@@ -176,55 +240,93 @@ export default function EditarHistoriaPage() {
   const id = params?.id as string;
 
   const editorRef = useRef<HTMLDivElement | null>(null);
-  const mediaInputRef = useRef<HTMLInputElement | null>(null);
-  const linkInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaInputRef =
+    useRef<HTMLInputElement | null>(null);
+  const linkInputRef =
+    useRef<HTMLInputElement | null>(null);
 
-  const [story, setStory] = useState<Story | null>(null);
+  const [story, setStory] =
+    useState<Story | null>(null);
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [status, setStatus] = useState('');
-  const [rating, setRating] = useState('');
-  const [genre, setGenre] = useState('');
+  const [title, setTitle] =
+    useState('');
+  const [description, setDescription] =
+    useState('');
+  const [status, setStatus] =
+    useState('');
+  const [rating, setRating] =
+    useState('');
+  const [genre, setGenre] =
+    useState('');
 
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
+  const [tags, setTags] =
+    useState<string[]>([]);
+  const [tagInput, setTagInput] =
+    useState('');
 
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverFile, setCoverFile] =
+    useState<File | null>(null);
+  const [coverPreview, setCoverPreview] =
+    useState<string | null>(null);
 
-  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(
+  const [
+    selectedChapterId,
+    setSelectedChapterId,
+  ] = useState<string | null>(
     searchParams.get('chapter')
   );
 
-  const [chapter, setChapter] = useState<Chapter | null>(null);
-  const [chapterTitle, setChapterTitle] = useState('');
-  const [chapterBody, setChapterBody] = useState('');
-  const [authorNotes, setAuthorNotes] = useState('');
-  const [chapterStatus, setChapterStatus] =
-    useState<Chapter['publication_status']>('draft');
+  const [chapter, setChapter] =
+    useState<Chapter | null>(null);
 
-  const [scheduledFor, setScheduledFor] = useState('');
+  const [chapterTitle, setChapterTitle] =
+    useState('');
+  const [chapterBody, setChapterBody] =
+    useState('');
+  const [authorNotes, setAuthorNotes] =
+    useState('');
 
-  const [chapterMedia, setChapterMedia] = useState<EditorMedia[]>([]);
+  const [
+    chapterStatus,
+    setChapterStatus,
+  ] = useState<Chapter['publication_status']>(
+    'draft'
+  );
 
-  const [previewMode, setPreviewMode] = useState(false);
+  const [scheduledFor, setScheduledFor] =
+    useState('');
 
-  const [loading, setLoading] = useState(true);
-  const [loadingChapter, setLoadingChapter] = useState(false);
+  const [chapterMedia, setChapterMedia] =
+    useState<EditorMedia[]>([]);
 
-  const [savingStory, setSavingStory] = useState(false);
-  const [savingChapter, setSavingChapter] = useState(false);
+  const [previewMode, setPreviewMode] =
+    useState(false);
 
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [loading, setLoading] =
+    useState(true);
+  const [loadingChapter, setLoadingChapter] =
+    useState(false);
 
-  const [linkValue, setLinkValue] = useState('');
-  const [showLinkBox, setShowLinkBox] = useState(false);
+  const [savingStory, setSavingStory] =
+    useState(false);
+  const [savingChapter, setSavingChapter] =
+    useState(false);
 
-  const [mediaUploading, setMediaUploading] = useState(false);
+  const [error, setError] =
+    useState('');
+  const [success, setSuccess] =
+    useState('');
 
-  const [showSchedule, setShowSchedule] = useState(false);
+  const [linkValue, setLinkValue] =
+    useState('');
+  const [showLinkBox, setShowLinkBox] =
+    useState(false);
+
+  const [mediaUploading, setMediaUploading] =
+    useState(false);
+
+  const [showSchedule, setShowSchedule] =
+    useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -236,9 +338,12 @@ export default function EditarHistoriaPage() {
         setLoading(true);
         setError('');
 
-        const response = await fetch(`/api/stories/${id}`, {
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          `/api/stories/${id}`,
+          {
+            cache: 'no-store',
+          }
+        );
 
         const data = await response.json();
 
@@ -249,52 +354,83 @@ export default function EditarHistoriaPage() {
           );
         }
 
-        const loadedStory = data.story as Story;
+        const loadedStory =
+          data.story as Story;
 
         setStory(loadedStory);
 
-        setTitle(loadedStory.title || '');
-        setDescription(loadedStory.description || '');
-        setStatus(loadedStory.status || '');
-        setRating(loadedStory.rating || '');
-        setCoverPreview(loadedStory.cover_url || null);
-
-        const loadedTags = loadedStory.tags || [];
-
-        const loadedGenre = loadedTags.find(
-          (tag) => tag.category_slug === 'genre'
+        setTitle(
+          loadedStory.title || ''
         );
 
-        setGenre(loadedGenre?.name || '');
+        setDescription(
+          loadedStory.description || ''
+        );
+
+        setStatus(
+          loadedStory.status || ''
+        );
+
+        setRating(
+          loadedStory.rating || ''
+        );
+
+        setCoverPreview(
+          loadedStory.cover_url || null
+        );
+
+        const loadedTags =
+          loadedStory.tags || [];
+
+        const loadedGenre =
+          loadedTags.find(
+            (tag) =>
+              tag.category_slug ===
+              'genre'
+          );
+
+        setGenre(
+          loadedGenre?.name || ''
+        );
 
         setTags(
           loadedTags
             .filter(
-              (tag) => tag.category_slug !== 'genre'
+              (tag) =>
+                tag.category_slug !==
+                'genre'
             )
-            .map((tag) => tag.name)
+            .map(
+              (tag) => tag.name
+            )
         );
 
-        const chapters = loadedStory.chapters || [];
+        const chapters =
+          loadedStory.chapters || [];
 
         if (
           selectedChapterId &&
           chapters.some(
-            (item) => item.id === selectedChapterId
+            (item) =>
+              item.id ===
+              selectedChapterId
           )
         ) {
           return;
         }
 
         if (chapters.length > 0) {
-          setSelectedChapterId(chapters[0].id);
+          setSelectedChapterId(
+            chapters[0].id
+          );
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
 
         setError(
-          err?.message ||
-            'Não foi possível carregar a história.'
+          err instanceof Error
+            ? err.message
+            : 'Não foi possível carregar a história.'
         );
       } finally {
         setLoading(false);
@@ -307,6 +443,7 @@ export default function EditarHistoriaPage() {
   useEffect(() => {
     if (!selectedChapterId) {
       setChapter(null);
+      setChapterMedia([]);
       return;
     }
 
@@ -324,23 +461,42 @@ export default function EditarHistoriaPage() {
         );
 
         const data =
-          (await response.json()) as Partial<ChapterResponse> & {
-            error?: string;
-          };
+          (await response.json()) as
+            | (Partial<ChapterResponse> & {
+                error?: string;
+              })
+            | undefined;
 
-        if (!response.ok || !data.chapter) {
+        if (
+          !response.ok ||
+          !data?.chapter
+        ) {
           throw new Error(
             data?.error ||
               'Não foi possível carregar o capítulo.'
           );
         }
 
-        const loadedChapter = data.chapter;
+        const loadedChapter =
+          data.chapter;
 
-        setChapter(loadedChapter);
-        setChapterTitle(loadedChapter.title || '');
-        setChapterBody(loadedChapter.body || '');
-        setAuthorNotes(loadedChapter.author_notes || '');
+        setChapter(
+          loadedChapter
+        );
+
+        setChapterTitle(
+          loadedChapter.title || ''
+        );
+
+        setChapterBody(
+          loadedChapter.body || ''
+        );
+
+        setAuthorNotes(
+          loadedChapter.author_notes ||
+            ''
+        );
+
         setChapterStatus(
           loadedChapter.publication_status ||
             (loadedChapter.published
@@ -355,17 +511,27 @@ export default function EditarHistoriaPage() {
           const matchingStoryChapter =
             story?.chapters?.find(
               (item) =>
-                item.id === loadedChapter.id
+                item.id ===
+                loadedChapter.id
             );
 
-          if (matchingStoryChapter?.scheduled_for) {
-            const date = new Date(
-              matchingStoryChapter.scheduled_for
-            );
+          if (
+            matchingStoryChapter?.scheduled_for
+          ) {
+            const date =
+              new Date(
+                matchingStoryChapter.scheduled_for
+              );
 
-            if (!Number.isNaN(date.getTime())) {
+            if (
+              !Number.isNaN(
+                date.getTime()
+              )
+            ) {
               setScheduledFor(
-                date.toISOString().slice(0, 16)
+                date
+                  .toISOString()
+                  .slice(0, 16)
               );
             }
           }
@@ -377,19 +543,22 @@ export default function EditarHistoriaPage() {
           data.media || [];
 
         setChapterMedia(
-          loadedMedia.map((media) => ({
-            id: media.id,
-            url: media.media_url,
-            type: media.media_type,
-            existing: true,
-          }))
+          loadedMedia.map(
+            (media) => ({
+              id: media.id,
+              url: media.media_url,
+              type: media.media_type,
+              existing: true,
+            })
+          )
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
 
         setError(
-          err?.message ||
-            'Não foi possível carregar o capítulo.'
+          err instanceof Error
+            ? err.message
+            : 'Não foi possível carregar o capítulo.'
         );
       } finally {
         setLoadingChapter(false);
@@ -400,7 +569,10 @@ export default function EditarHistoriaPage() {
   }, [selectedChapterId]);
 
   useEffect(() => {
-    if (!editorRef.current || previewMode) {
+    if (
+      !editorRef.current ||
+      previewMode
+    ) {
       return;
     }
 
@@ -420,14 +592,21 @@ export default function EditarHistoriaPage() {
       return;
     }
 
-    setSelectedChapterId(chapterId);
-    setPreviewMode(false);
-
-    const params = new URLSearchParams(
-      searchParams.toString()
+    setSelectedChapterId(
+      chapterId
     );
 
-    params.set('chapter', chapterId);
+    setPreviewMode(false);
+
+    const params =
+      new URLSearchParams(
+        searchParams.toString()
+      );
+
+    params.set(
+      'chapter',
+      chapterId
+    );
 
     router.replace(
       `/editar-historia/${id}?${params.toString()}`
@@ -451,14 +630,21 @@ export default function EditarHistoriaPage() {
       'image/gif',
     ];
 
-    if (!allowedTypes.includes(file.type)) {
+    if (
+      !allowedTypes.includes(
+        file.type
+      )
+    ) {
       setError(
         'A capa precisa ser JPG, PNG, WEBP ou GIF.'
       );
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
+    if (
+      file.size >
+      10 * 1024 * 1024
+    ) {
       setError(
         'A capa pode ter no máximo 10 MB.'
       );
@@ -466,9 +652,11 @@ export default function EditarHistoriaPage() {
     }
 
     setCoverFile(file);
+
     setCoverPreview(
       URL.createObjectURL(file)
     );
+
     setError('');
   }
 
@@ -480,45 +668,56 @@ export default function EditarHistoriaPage() {
       return;
     }
 
-    if (newTag.length > 50) {
+    if (
+      newTag.length > 50
+    ) {
       setError(
         'Cada tag pode ter no máximo 50 caracteres.'
       );
       return;
     }
 
-    const exists = tags.some(
-      (tag) =>
-        tag.toLowerCase() ===
-        newTag.toLowerCase()
-    );
+    const exists =
+      tags.some(
+        (tag) =>
+          tag.toLowerCase() ===
+          newTag.toLowerCase()
+      );
 
     if (exists) {
       setTagInput('');
       return;
     }
 
-    if (tags.length >= 30) {
+    if (
+      tags.length >= 30
+    ) {
       setError(
         'Você pode adicionar no máximo 30 tags.'
       );
       return;
     }
 
-    setTags((current) => [
-      ...current,
-      newTag,
-    ]);
+    setTags(
+      (current) => [
+        ...current,
+        newTag,
+      ]
+    );
 
     setTagInput('');
     setError('');
   }
 
-  function removeTag(index: number) {
-    setTags((current) =>
-      current.filter(
-        (_, i) => i !== index
-      )
+  function removeTag(
+    index: number
+  ) {
+    setTags(
+      (current) =>
+        current.filter(
+          (_, i) =>
+            i !== index
+        )
     );
   }
 
@@ -534,11 +733,14 @@ export default function EditarHistoriaPage() {
     }
 
     if (
-      event.key === 'Backspace' &&
+      event.key ===
+        'Backspace' &&
       !tagInput &&
       tags.length > 0
     ) {
-      removeTag(tags.length - 1);
+      removeTag(
+        tags.length - 1
+      );
     }
   }
 
@@ -552,7 +754,9 @@ export default function EditarHistoriaPage() {
     setSuccess('');
 
     try {
-      const finalTags = [...tags];
+      const finalTags = [
+        ...tags,
+      ];
 
       const pendingTag =
         tagInput.trim();
@@ -565,7 +769,9 @@ export default function EditarHistoriaPage() {
             pendingTag.toLowerCase()
         )
       ) {
-        finalTags.push(pendingTag);
+        finalTags.push(
+          pendingTag
+        );
       }
 
       const formData =
@@ -632,16 +838,19 @@ export default function EditarHistoriaPage() {
       );
 
       if (data.story) {
-        setStory((current) =>
-          current
-            ? {
-                ...current,
-                ...data.story,
-              }
-            : current
+        setStory(
+          (current) =>
+            current
+              ? {
+                  ...current,
+                  ...data.story,
+                }
+              : current
         );
 
-        if (data.story.cover_url) {
+        if (
+          data.story.cover_url
+        ) {
           setCoverPreview(
             data.story.cover_url
           );
@@ -649,12 +858,13 @@ export default function EditarHistoriaPage() {
 
         setCoverFile(null);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
 
       setError(
-        err?.message ||
-          'Não foi possível salvar as alterações.'
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível salvar as alterações.'
       );
     } finally {
       setSavingStory(false);
@@ -730,92 +940,156 @@ export default function EditarHistoriaPage() {
     setError('');
   }
 
-  function countMediaPlaceholders() {
-    if (!editorRef.current) {
-      return 0;
-    }
+  function createPendingMediaMarker(
+    media: EditorMedia
+  ) {
+    const wrapper =
+      document.createElement(
+        'span'
+      );
 
-    return editorRef.current.querySelectorAll(
-      '[data-pending-media]'
-    ).length;
+    wrapper.setAttribute(
+      'data-pending-media',
+      media.id
+    );
+
+    wrapper.setAttribute(
+      'data-media-type',
+      media.type
+    );
+
+    wrapper.contentEditable =
+      'false';
+
+    wrapper.className =
+      'chapter-media-placeholder';
+
+    const image =
+      document.createElement(
+        'img'
+      );
+
+    image.src = media.url;
+    image.alt =
+      'Mídia adicionada ao capítulo';
+
+    const label =
+      document.createElement(
+        'span'
+      );
+
+    label.textContent =
+      media.type === 'gif'
+        ? 'GIF adicionado'
+        : 'Imagem adicionada';
+
+    wrapper.appendChild(
+      image
+    );
+
+    wrapper.appendChild(
+      label
+    );
+
+    return wrapper;
   }
 
-  function insertPendingMedia(
-    index: number,
-    url: string,
-    type: 'image' | 'gif'
+  function insertPendingMediaBatch(
+    mediaItems: EditorMedia[]
   ) {
-    if (!editorRef.current) {
+    if (
+      !editorRef.current ||
+      mediaItems.length === 0
+    ) {
       return;
     }
 
-    focusEditor();
-
-    const placeholder =
-      document.createElement('span');
-
-    placeholder.setAttribute(
-      'data-pending-media',
-      String(index)
-    );
-
-    placeholder.setAttribute(
-      'data-media-type',
-      type
-    );
-
-    placeholder.contentEditable =
-      'false';
-
-    placeholder.className =
-      'chapter-media-placeholder';
-
-    placeholder.innerHTML = `
-      <img
-        src="${url}"
-        alt="Mídia adicionada ao capítulo"
-      />
-      <span>mídia ${index + 1}</span>
-    `;
+    editorRef.current.focus();
 
     const selection =
       window.getSelection();
+
+    let range: Range | null =
+      null;
 
     if (
       selection &&
       selection.rangeCount > 0
     ) {
-      const range =
+      const possibleRange =
         selection.getRangeAt(0);
 
-      range.deleteContents();
-      range.insertNode(
-        placeholder
-      );
-
-      range.setStartAfter(
-        placeholder
-      );
-
-      range.collapse(true);
-
-      selection.removeAllRanges();
-      selection.addRange(range);
-    } else {
-      editorRef.current.appendChild(
-        placeholder
-      );
+      if (
+        editorRef.current.contains(
+          possibleRange.commonAncestorContainer
+        )
+      ) {
+        range =
+          possibleRange.cloneRange();
+      }
     }
 
-    const spacer =
-      document.createElement('p');
+    if (!range) {
+      range =
+        document.createRange();
 
-    spacer.innerHTML =
-      '<br>';
+      range.selectNodeContents(
+        editorRef.current
+      );
 
-    editorRef.current.appendChild(
-      spacer
+      range.collapse(false);
+    }
+
+    range.deleteContents();
+
+    const fragment =
+      document.createDocumentFragment();
+
+    mediaItems.forEach(
+      (media) => {
+        const marker =
+          createPendingMediaMarker(
+            media
+          );
+
+        fragment.appendChild(
+          marker
+        );
+
+        const paragraph =
+          document.createElement(
+            'p'
+          );
+
+        paragraph.innerHTML =
+          '<br>';
+
+        fragment.appendChild(
+          paragraph
+        );
+      }
     );
+
+    range.insertNode(
+      fragment
+    );
+
+    if (selection) {
+      selection.removeAllRanges();
+
+      const finalRange =
+        document.createRange();
+
+      finalRange.selectNodeContents(
+        editorRef.current
+      );
+
+      finalRange.collapse(false);
+
+      selection.addRange(
+        finalRange
+      );
+    }
 
     syncEditorBody();
   }
@@ -828,7 +1102,9 @@ export default function EditarHistoriaPage() {
         event.target.files || []
       );
 
-    if (files.length === 0) {
+    if (
+      files.length === 0
+    ) {
       return;
     }
 
@@ -851,7 +1127,9 @@ export default function EditarHistoriaPage() {
     const validFiles: File[] =
       [];
 
-    for (const file of files) {
+    for (
+      const file of files
+    ) {
       if (
         !ALLOWED_MEDIA_TYPES.includes(
           file.type
@@ -873,18 +1151,25 @@ export default function EditarHistoriaPage() {
         continue;
       }
 
-      validFiles.push(file);
+      validFiles.push(
+        file
+      );
     }
 
-    if (validFiles.length === 0) {
+    if (
+      validFiles.length === 0
+    ) {
       event.target.value = '';
       return;
     }
 
+    const timestamp =
+      Date.now();
+
     const newMedia =
       validFiles.map(
         (file, index) => ({
-          id: `pending-${Date.now()}-${index}-${file.name}`,
+          id: `pending-${timestamp}-${index}`,
           url: URL.createObjectURL(
             file
           ),
@@ -898,9 +1183,6 @@ export default function EditarHistoriaPage() {
         })
       );
 
-    const startIndex =
-      chapterMedia.length;
-
     setChapterMedia(
       (current) => [
         ...current,
@@ -909,14 +1191,8 @@ export default function EditarHistoriaPage() {
     );
 
     setTimeout(() => {
-      newMedia.forEach(
-        (media, index) => {
-          insertPendingMedia(
-            startIndex + index,
-            media.url,
-            media.type
-          );
-        }
+      insertPendingMediaBatch(
+        newMedia
       );
     }, 0);
 
@@ -927,164 +1203,143 @@ export default function EditarHistoriaPage() {
   function removeMedia(
     mediaId: string
   ) {
+    const media =
+      chapterMedia.find(
+        (item) =>
+          item.id === mediaId
+      );
+
+    if (
+      media &&
+      !media.existing &&
+      media.url.startsWith(
+        'blob:'
+      )
+    ) {
+      URL.revokeObjectURL(
+        media.url
+      );
+    }
+
     setChapterMedia(
       (current) =>
         current.filter(
-          (media) =>
-            media.id !== mediaId
+          (item) =>
+            item.id !== mediaId
         )
     );
 
-    if (editorRef.current) {
-      const related =
+    if (
+      editorRef.current
+    ) {
+      const pending =
         editorRef.current.querySelector(
-          `[data-media-id="${mediaId}"]`
+          `[data-pending-media="${CSS.escape(
+            mediaId
+          )}"]`
         );
 
-      related?.remove();
+      pending?.remove();
+
+      const existing =
+        editorRef.current.querySelector(
+          `[data-media-id="${CSS.escape(
+            mediaId
+          )}"]`
+        );
+
+      existing?.remove();
 
       syncEditorBody();
     }
   }
 
-  async function uploadPendingMedia(
-    body: string
-  ) {
-    const pending =
-      chapterMedia.filter(
-        (media) =>
-          !media.existing &&
-          media.file
-      );
-
-    if (pending.length === 0) {
-      return {
-        body,
-        media:
-          chapterMedia.filter(
-            (media) =>
-              media.existing
-          ),
-      };
-    }
-
-    setMediaUploading(true);
-
-    const formData =
-      new FormData();
-
-    formData.append(
-      'title',
-      chapterTitle.trim()
-    );
-
-    formData.append(
-      'body',
-      body
-    );
-
-    formData.append(
-      'author_notes',
-      authorNotes
-    );
-
-    formData.append(
-      'publication_status',
-      'draft'
-    );
-
-    const existing =
-      chapterMedia.filter(
-        (media) =>
-          media.existing
-      );
-
-    existing.forEach(
-      (media) => {
-        formData.append(
-          'existing_media_ids',
-          media.id
-        );
-      }
-    );
-
-    pending.forEach(
-      (media) => {
-        if (media.file) {
-          formData.append(
-            'media',
-            media.file
-          );
-        }
-      }
-    );
-
-    const response =
-      await fetch(
-        `/api/chapters/${chapter?.id}`,
-        {
-          method: 'PUT',
-          body: formData,
-        }
-      );
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data?.error ||
-          'Não foi possível enviar as mídias.'
-      );
-    }
-
-    setMediaUploading(false);
-
-    return {
-      body,
-      media:
-        (data.media || []) as ChapterMedia[],
-    };
-  }
-
   function replacePendingMediaWithRealUrls(
     html: string,
+    pendingMedia: EditorMedia[],
     uploaded: ChapterMedia[]
   ) {
-    if (!html) {
+    if (
+      !html ||
+      pendingMedia.length === 0 ||
+      uploaded.length === 0
+    ) {
       return html;
     }
 
-    let result = html;
+    const parser =
+      new DOMParser();
 
-    uploaded.forEach(
-      (media, index) => {
-        const pendingIndex =
-          index;
+    const documentNode =
+      parser.parseFromString(
+        html,
+        'text/html'
+      );
 
-        const markerRegex =
-          new RegExp(
-            `<span[^>]*data-pending-media=["']${pendingIndex}["'][^>]*>[\\s\\S]*?<\\/span>`,
-            'gi'
+    const uploadedByPendingId =
+      new Map<string, ChapterMedia>();
+
+    pendingMedia.forEach(
+      (pending, index) => {
+        const uploadedMedia =
+          uploaded[index];
+
+        if (uploadedMedia) {
+          uploadedByPendingId.set(
+            pending.id,
+            uploadedMedia
           );
-
-        const imageHtml = `
-          <img
-            src="${media.media_url}"
-            alt="Imagem do capítulo"
-            data-media-id="${media.id}"
-          />
-        `;
-
-        result =
-          result.replace(
-            markerRegex,
-            imageHtml
-          );
+        }
       }
     );
 
-    return result;
+    documentNode
+      .querySelectorAll(
+        '[data-pending-media]'
+      )
+      .forEach(
+        (element) => {
+          const pendingId =
+            element.getAttribute(
+              'data-pending-media'
+            );
+
+          if (!pendingId) {
+            return;
+          }
+
+          const uploadedMedia =
+            uploadedByPendingId.get(
+              pendingId
+            );
+
+          if (!uploadedMedia) {
+            return;
+          }
+
+          const image =
+            documentNode.createElement(
+              'img'
+            );
+
+          image.src =
+            uploadedMedia.media_url;
+
+          image.alt =
+            'Imagem do capítulo';
+
+          image.setAttribute(
+            'data-media-id',
+            uploadedMedia.id
+          );
+
+          element.replaceWith(
+            image
+          );
+        }
+      );
+
+    return documentNode.body.innerHTML;
   }
 
   async function saveChapter(
@@ -1099,21 +1354,27 @@ export default function EditarHistoriaPage() {
       chapterStatus;
 
     if (
-      finalStatus === 'scheduled' &&
+      finalStatus ===
+        'scheduled' &&
       !scheduledFor
     ) {
       setShowSchedule(true);
+
       setError(
         'Escolha a data e o horário da publicação.'
       );
+
       return;
     }
 
     if (
-      finalStatus === 'scheduled'
+      finalStatus ===
+      'scheduled'
     ) {
       const selectedDate =
-        new Date(scheduledFor);
+        new Date(
+          scheduledFor
+        );
 
       if (
         Number.isNaN(
@@ -1125,6 +1386,7 @@ export default function EditarHistoriaPage() {
         setError(
           'A data de publicação precisa estar no futuro.'
         );
+
         return;
       }
     }
@@ -1132,24 +1394,48 @@ export default function EditarHistoriaPage() {
     const body =
       syncEditorBody();
 
+    const plainText =
+      body
+        .replace(
+          /<[^>]+>/g,
+          ''
+        )
+        .replace(
+          /&nbsp;/gi,
+          ' '
+        )
+        .trim();
+
     if (
       !body ||
       body === '<br>' ||
-      body.replace(
-        /<[^>]+>/g,
-        ''
-      ).trim() === ''
+      plainText === ''
     ) {
       setError(
         'O capítulo não pode estar vazio.'
       );
+
       return;
     }
 
-    if (!chapterTitle.trim()) {
+    if (
+      !chapterTitle.trim()
+    ) {
       setError(
         'O capítulo precisa ter um título.'
       );
+
+      return;
+    }
+
+    if (
+      chapterTitle.trim()
+        .length > 150
+    ) {
+      setError(
+        'O título do capítulo pode ter no máximo 150 caracteres.'
+      );
+
       return;
     }
 
@@ -1160,6 +1446,7 @@ export default function EditarHistoriaPage() {
       setError(
         'As notas do autor podem ter no máximo 5.000 caracteres.'
       );
+
       return;
     }
 
@@ -1186,7 +1473,8 @@ export default function EditarHistoriaPage() {
 
       let finalMediaIds =
         existing.map(
-          (media) => media.id
+          (media) =>
+            media.id
         );
 
       if (
@@ -1249,7 +1537,9 @@ export default function EditarHistoriaPage() {
         const uploadResult =
           await uploadResponse.json();
 
-        if (!uploadResponse.ok) {
+        if (
+          !uploadResponse.ok
+        ) {
           throw new Error(
             uploadResult?.error ||
               'Não foi possível enviar as mídias.'
@@ -1260,10 +1550,6 @@ export default function EditarHistoriaPage() {
           (uploadResult.media ||
             []) as ChapterMedia[];
 
-        /*
-         * As novas mídias são retornadas
-         * na ordem em que foram enviadas.
-         */
         const newMedia =
           returnedMedia.filter(
             (media) =>
@@ -1277,12 +1563,14 @@ export default function EditarHistoriaPage() {
         workingBody =
           replacePendingMediaWithRealUrls(
             workingBody,
+            pending,
             newMedia
           );
 
         finalMediaIds =
           returnedMedia.map(
-            (media) => media.id
+            (media) =>
+              media.id
           );
 
         setChapterMedia(
@@ -1294,6 +1582,20 @@ export default function EditarHistoriaPage() {
               existing: true,
             })
           )
+        );
+
+        pending.forEach(
+          (media) => {
+            if (
+              media.url.startsWith(
+                'blob:'
+              )
+            ) {
+              URL.revokeObjectURL(
+                media.url
+              );
+            }
+          }
         );
 
         setMediaUploading(false);
@@ -1362,19 +1664,30 @@ export default function EditarHistoriaPage() {
         );
       }
 
+      const savedChapter =
+        data.chapter as Chapter;
+
       setChapter(
-        data.chapter as Chapter
+        savedChapter
       );
 
       setChapterStatus(
-        data.chapter
-          .publication_status
+        savedChapter.publication_status
       );
 
-      if (data.media) {
+      setChapterBody(
+        savedChapter.body ||
+          workingBody
+      );
+
+      if (
+        data.media
+      ) {
         setChapterMedia(
-          data.media.map(
-            (media: ChapterMedia) => ({
+          (
+            data.media as ChapterMedia[]
+          ).map(
+            (media) => ({
               id: media.id,
               url: media.media_url,
               type: media.media_type,
@@ -1388,7 +1701,7 @@ export default function EditarHistoriaPage() {
         editorRef.current
       ) {
         editorRef.current.innerHTML =
-          data.chapter.body ||
+          savedChapter.body ||
           workingBody;
       }
 
@@ -1419,53 +1732,48 @@ export default function EditarHistoriaPage() {
         );
       }
 
-      setChapterBody(
-        data.chapter.body ||
-          workingBody
-      );
-
-      setStory((current) =>
-        current
-          ? {
-              ...current,
-              chapters:
-                current.chapters.map(
-                  (item) =>
-                    item.id ===
-                    data.chapter.id
-                      ? {
-                          ...item,
-                          title:
-                            data.chapter
-                              .title,
-                          published:
-                            data.chapter
-                              .published,
-                          scheduled_for:
-                            data.scheduled_for ||
-                            null,
-                          is_scheduled:
-                            Boolean(
-                              data.scheduled
-                            ),
-                        }
-                      : item
-                ),
-            }
-          : current
+      setStory(
+        (current) =>
+          current
+            ? {
+                ...current,
+                chapters:
+                  current.chapters.map(
+                    (item) =>
+                      item.id ===
+                      savedChapter.id
+                        ? {
+                            ...item,
+                            title:
+                              savedChapter.title,
+                            published:
+                              savedChapter.published,
+                            scheduled_for:
+                              data.scheduled_for ||
+                              null,
+                            is_scheduled:
+                              Boolean(
+                                data.scheduled
+                              ),
+                          }
+                        : item
+                  ),
+              }
+            : current
       );
 
       setChapterStatus(
-        finalStatus
+        savedChapter.publication_status
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
 
       setMediaUploading(false);
 
       setError(
-        err?.message ||
-          'Não foi possível salvar o capítulo.'
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível salvar o capítulo.'
       );
     } finally {
       setSavingChapter(false);
@@ -1526,20 +1834,6 @@ export default function EditarHistoriaPage() {
     );
   }
 
-  function insertTextAtCursor(
-    text: string
-  ) {
-    focusEditor();
-
-    document.execCommand(
-      'insertText',
-      false,
-      text
-    );
-
-    syncEditorBody();
-  }
-
   function addHorizontalRule() {
     focusEditor();
 
@@ -1561,6 +1855,8 @@ export default function EditarHistoriaPage() {
     setChapterStatus(
       'scheduled'
     );
+
+    setShowSchedule(true);
   }
 
   function openMediaPicker() {
@@ -1581,7 +1877,8 @@ export default function EditarHistoriaPage() {
       return '';
     }
 
-    const date = new Date(value);
+    const date =
+      new Date(value);
 
     if (
       Number.isNaN(
@@ -1600,13 +1897,16 @@ export default function EditarHistoriaPage() {
     setSelectedChapterId(null);
     setChapter(null);
     setPreviewMode(false);
+    setChapterMedia([]);
 
     const params =
       new URLSearchParams(
         searchParams.toString()
       );
 
-    params.delete('chapter');
+    params.delete(
+      'chapter'
+    );
 
     const query =
       params.toString();
@@ -1664,6 +1964,7 @@ export default function EditarHistoriaPage() {
           outline: none;
           white-space: pre-wrap;
           word-break: break-word;
+          font-family: inherit;
         }
 
         .chapter-editor:empty:before {
@@ -1735,6 +2036,10 @@ export default function EditarHistoriaPage() {
           font-size: 0.75rem;
         }
 
+        .chapter-preview {
+          overflow-wrap: anywhere;
+        }
+
         .chapter-preview img {
           display: block;
           max-width: 100%;
@@ -1745,6 +2050,18 @@ export default function EditarHistoriaPage() {
 
         .chapter-preview p {
           margin: 0 0 1.15rem;
+        }
+
+        .chapter-preview h2 {
+          margin: 2rem 0 1rem;
+          font-size: 1.5rem;
+          font-weight: 700;
+        }
+
+        .chapter-preview h3 {
+          margin: 1.5rem 0 0.75rem;
+          font-size: 1.25rem;
+          font-weight: 700;
         }
 
         .chapter-preview a {
@@ -1914,7 +2231,9 @@ export default function EditarHistoriaPage() {
                     </label>
 
                     <textarea
-                      value={description}
+                      value={
+                        description
+                      }
                       onChange={(event) =>
                         setDescription(
                           event.target.value
@@ -1926,7 +2245,10 @@ export default function EditarHistoriaPage() {
                     />
 
                     <div className="mt-1 text-right text-xs text-gray-600">
-                      {description.length}/5000
+                      {
+                        description.length
+                      }
+                      /5000
                     </div>
                   </div>
 
@@ -1979,21 +2301,27 @@ export default function EditarHistoriaPage() {
                       <option value="">
                         Selecione
                       </option>
+
                       <option value="Livre">
                         Livre
                       </option>
+
                       <option value="10">
                         10 anos
                       </option>
+
                       <option value="12">
                         12 anos
                       </option>
+
                       <option value="14">
                         14 anos
                       </option>
+
                       <option value="16">
                         16 anos
                       </option>
+
                       <option value="18">
                         18 anos
                       </option>
@@ -2053,7 +2381,9 @@ export default function EditarHistoriaPage() {
                     )}
 
                     <input
-                      value={tagInput}
+                      value={
+                        tagInput
+                      }
                       onChange={(event) =>
                         setTagInput(
                           event.target.value
@@ -2064,12 +2394,14 @@ export default function EditarHistoriaPage() {
                       }
                       className="min-w-[150px] flex-1 bg-transparent px-1 py-2 text-sm text-white outline-none placeholder:text-gray-600"
                       placeholder={
-                        tags.length >= 30
+                        tags.length >=
+                        30
                           ? 'Limite atingido'
                           : 'Adicionar tag...'
                       }
                       disabled={
-                        tags.length >= 30
+                        tags.length >=
+                        30
                       }
                     />
                   </div>
@@ -2102,8 +2434,12 @@ export default function EditarHistoriaPage() {
                     </h2>
 
                     <p className="mt-1 text-xs text-gray-600">
-                      {story.chapters.length}{' '}
-                      {story.chapters.length === 1
+                      {
+                        story.chapters
+                          .length
+                      }{' '}
+                      {story.chapters
+                        .length === 1
                         ? 'capítulo'
                         : 'capítulos'}
                     </p>
@@ -2111,7 +2447,8 @@ export default function EditarHistoriaPage() {
                 </div>
 
                 <div className="mt-4 space-y-2">
-                  {story.chapters.length === 0 ? (
+                  {story.chapters
+                    .length === 0 ? (
                     <div className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-gray-600">
                       Sua obra ainda não possui capítulos.
                     </div>
@@ -2119,7 +2456,9 @@ export default function EditarHistoriaPage() {
                     story.chapters.map(
                       (item) => (
                         <button
-                          key={item.id}
+                          key={
+                            item.id
+                          }
                           type="button"
                           onClick={() =>
                             selectChapter(
@@ -2225,7 +2564,10 @@ export default function EditarHistoriaPage() {
                   </h2>
 
                   <span className="text-xs text-gray-600">
-                    {story.chapters.length}
+                    {
+                      story.chapters
+                        .length
+                    }
                   </span>
                 </div>
 
@@ -2233,7 +2575,9 @@ export default function EditarHistoriaPage() {
                   {story.chapters.map(
                     (item) => (
                       <button
-                        key={item.id}
+                        key={
+                          item.id
+                        }
                         type="button"
                         onClick={() =>
                           selectChapter(
@@ -2277,6 +2621,14 @@ export default function EditarHistoriaPage() {
                                 : 'RASCUNHO'}
                           </span>
                         </div>
+
+                        {item.scheduled_for && (
+                          <p className="mt-2 text-[10px] text-violet-300/60">
+                            {formatShortDate(
+                              item.scheduled_for
+                            )}
+                          </p>
+                        )}
                       </button>
                     )
                   )}
@@ -2397,7 +2749,9 @@ export default function EditarHistoriaPage() {
                         <div
                           dangerouslySetInnerHTML={{
                             __html:
-                              chapterBody ||
+                              sanitizeHtml(
+                                chapterBody
+                              ) ||
                               '<p>O capítulo está vazio.</p>',
                           }}
                         />
@@ -2409,7 +2763,9 @@ export default function EditarHistoriaPage() {
                             </p>
 
                             <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-gray-400">
-                              {authorNotes}
+                              {
+                                authorNotes
+                              }
                             </p>
                           </div>
                         )}
@@ -2476,6 +2832,11 @@ export default function EditarHistoriaPage() {
 
                             <button
                               type="button"
+                              onMouseDown={(
+                                event
+                              ) =>
+                                event.preventDefault()
+                              }
                               onClick={() =>
                                 executeCommand(
                                   'formatBlock',
@@ -2489,6 +2850,11 @@ export default function EditarHistoriaPage() {
 
                             <button
                               type="button"
+                              onMouseDown={(
+                                event
+                              ) =>
+                                event.preventDefault()
+                              }
                               onClick={() =>
                                 executeCommand(
                                   'formatBlock',
@@ -2502,6 +2868,11 @@ export default function EditarHistoriaPage() {
 
                             <button
                               type="button"
+                              onMouseDown={(
+                                event
+                              ) =>
+                                event.preventDefault()
+                              }
                               onClick={
                                 addHorizontalRule
                               }
@@ -2514,6 +2885,11 @@ export default function EditarHistoriaPage() {
 
                             <button
                               type="button"
+                              onMouseDown={(
+                                event
+                              ) =>
+                                event.preventDefault()
+                              }
                               onClick={() =>
                                 setShowLinkBox(
                                   (current) =>
@@ -2527,6 +2903,11 @@ export default function EditarHistoriaPage() {
 
                             <button
                               type="button"
+                              onMouseDown={(
+                                event
+                              ) =>
+                                event.preventDefault()
+                              }
                               onClick={
                                 handleMediaButtonClick
                               }
@@ -2549,8 +2930,14 @@ export default function EditarHistoriaPage() {
                             />
 
                             <span className="ml-auto text-[11px] text-gray-600">
-                              {chapterMedia.length}/
-                              {MAX_MEDIA} mídias
+                              {
+                                chapterMedia.length
+                              }
+                              /
+                              {
+                                MAX_MEDIA
+                              }{' '}
+                              mídias
                             </span>
                           </div>
 
@@ -2588,6 +2975,11 @@ export default function EditarHistoriaPage() {
 
                                 <button
                                   type="button"
+                                  onMouseDown={(
+                                    event
+                                  ) =>
+                                    event.preventDefault()
+                                  }
                                   onClick={
                                     addLink
                                   }
@@ -2622,7 +3014,8 @@ export default function EditarHistoriaPage() {
                     )}
                   </div>
 
-                  {chapterMedia.length > 0 && (
+                  {chapterMedia.length >
+                    0 && (
                     <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -2638,7 +3031,11 @@ export default function EditarHistoriaPage() {
                         <span className="text-xs text-gray-500">
                           {
                             chapterMedia.length
-                          }/{MAX_MEDIA}
+                          }
+                          /
+                          {
+                            MAX_MEDIA
+                          }
                         </span>
                       </div>
 
@@ -2668,7 +3065,10 @@ export default function EditarHistoriaPage() {
                                     media.id
                                   )
                                 }
-                                className="absolute right-2 top-2 rounded-lg border border-white/10 bg-black/70 px-2 py-1 text-xs text-gray-300 hover:bg-red-500/80 hover:text-white transition"
+                                disabled={
+                                  savingChapter
+                                }
+                                className="absolute right-2 top-2 rounded-lg border border-white/10 bg-black/70 px-2 py-1 text-xs text-gray-300 hover:bg-red-500/80 hover:text-white disabled:opacity-50 transition"
                               >
                                 Remover
                               </button>
@@ -2678,6 +3078,9 @@ export default function EditarHistoriaPage() {
                                 'gif'
                                   ? 'GIF'
                                   : 'IMAGEM'}
+
+                                {!media.existing &&
+                                  ' · NÃO SALVA'}
                               </div>
                             </div>
                           )
@@ -2699,7 +3102,10 @@ export default function EditarHistoriaPage() {
                       </div>
 
                       <span className="text-xs text-gray-600">
-                        {authorNotes.length}/5000
+                        {
+                          authorNotes.length
+                        }
+                        /5000
                       </span>
                     </div>
 
@@ -2772,9 +3178,7 @@ export default function EditarHistoriaPage() {
                           type="datetime-local"
                           value={
                             scheduledFor ||
-                            formatDateForInput(
-                              chapter.created_at
-                            )
+                            ''
                           }
                           onChange={
                             handleScheduleChange
