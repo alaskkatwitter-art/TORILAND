@@ -1,6 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import {
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 type User = {
@@ -158,11 +162,15 @@ function getInitial(
 }
 
 function cleanUrl(url: string) {
-  return url.replace(/[.,!?;:)\]}]+$/g, '');
+  return url.replace(
+    /[.,!?;:)\]}]+$/g,
+    ''
+  );
 }
 
 function isSpotifyUrl(url: string) {
   SPOTIFY_URL_REGEX.lastIndex = 0;
+
   return SPOTIFY_URL_REGEX.test(url);
 }
 
@@ -357,7 +365,9 @@ function SpotifyPreview({
           }
         );
 
-        if (!response.ok) return;
+        if (!response.ok) {
+          return;
+        }
 
         const result = await response.json();
 
@@ -432,7 +442,9 @@ function PostBody({
 }: {
   body: string | null;
 }) {
-  if (!body) return null;
+  if (!body) {
+    return null;
+  }
 
   const matches = Array.from(
     body.matchAll(URL_REGEX)
@@ -446,7 +458,7 @@ function PostBody({
     );
   }
 
-  const elements: React.ReactNode[] = [];
+  const elements: ReactNode[] = [];
 
   let lastIndex = 0;
 
@@ -685,7 +697,9 @@ function PublicPost({
   }, [commentsOpen, post.id]);
 
   async function toggleLike() {
-    if (liking) return;
+    if (liking) {
+      return;
+    }
 
     setLiking(true);
 
@@ -693,6 +707,7 @@ function PublicPost({
     const previousCount = likeCount;
 
     const nextLiked = !liked;
+
     const nextCount = nextLiked
       ? likeCount + 1
       : Math.max(0, likeCount - 1);
@@ -740,7 +755,9 @@ function PublicPost({
         );
       }
 
-      if (typeof data.reacted === 'boolean') {
+      if (
+        typeof data.reacted === 'boolean'
+      ) {
         onUpdate(post.id, {
           user_reactions: data.reacted
             ? Array.from(
@@ -1204,13 +1221,20 @@ export default function PublicProfilePage() {
       return;
     }
 
+    /*
+     * Guardamos o valor validado em uma constante.
+     * Isso impede o TypeScript de tratá-lo novamente
+     * como string | undefined dentro da função async.
+     */
+    const safeUsername = username;
+
     async function loadProfile() {
       setLoading(true);
       setError('');
 
       try {
         const encodedUsername =
-          encodeURIComponent(username);
+          encodeURIComponent(safeUsername);
 
         const response = await fetch(
           `/api/public-profile/${encodedUsername}`,
