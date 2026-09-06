@@ -102,7 +102,7 @@ async function getAuthenticatedUser(
 
 /*
 =========================================================
-GET — BUSCAR STORIES
+GET — BUSCAR STORIES DE 24 HORAS
 =========================================================
 */
 
@@ -132,7 +132,7 @@ export async function GET(
     const {
       error: expiredStoriesError,
     } = await supabase
-      .from('stories')
+      .from('social_stories')
       .delete()
       .lt(
         'expires_at',
@@ -147,7 +147,7 @@ export async function GET(
     }
 
     /*
-     * Usuários que o usuário atual segue.
+     * Busca quem o usuário segue.
      */
     const {
       data: follows,
@@ -172,6 +172,8 @@ export async function GET(
         {
           error:
             'Não foi possível carregar os Stories.',
+          details:
+            followsError.message,
         },
         {
           status: 500,
@@ -196,11 +198,14 @@ export async function GET(
         ])
       );
 
+    /*
+     * Busca os Stories de 24h.
+     */
     const {
       data: stories,
       error: storiesError,
     } = await supabase
-      .from('stories')
+      .from('social_stories')
       .select(
         `
           id,
@@ -209,7 +214,7 @@ export async function GET(
           media_type,
           created_at,
           expires_at,
-          user:profiles!stories_user_id_fkey (
+          user:profiles!social_stories_user_id_fkey (
             id,
             username,
             display_name,
@@ -253,6 +258,8 @@ export async function GET(
             'Não foi possível carregar os Stories.',
           details:
             storiesError.message,
+          code:
+            storiesError.code,
         },
         {
           status: 500,
@@ -292,6 +299,10 @@ export async function GET(
       {
         error:
           'Erro interno do servidor.',
+        details:
+          error instanceof Error
+            ? error.message
+            : String(error),
       },
       {
         status: 500,
@@ -302,7 +313,7 @@ export async function GET(
 
 /*
 =========================================================
-POST — PUBLICAR STORY
+POST — PUBLICAR STORY DE 24 HORAS
 =========================================================
 */
 
@@ -333,19 +344,12 @@ export async function POST(
     }
 
     console.log(
-      '[STORIES] Usuário autenticado:',
+      '[SOCIAL STORIES] Usuário:',
       currentUser.id
     );
 
     /*
-     * 2. Verificar se o usuário possui
-     *    um perfil.
-     *
-     * A tabela stories possui:
-     *
-     * user_id uuid references profiles(id)
-     *
-     * Portanto, o perfil precisa existir.
+     * 2. Confirmar que o perfil existe.
      */
     const {
       data: profile,
@@ -361,17 +365,8 @@ export async function POST(
 
     if (profileError) {
       console.error(
-        '[STORIES] Erro ao verificar perfil:',
-        {
-          message:
-            profileError.message,
-          details:
-            profileError.details,
-          hint:
-            profileError.hint,
-          code:
-            profileError.code,
-        }
+        '[SOCIAL STORIES] Erro ao verificar perfil:',
+        profileError
       );
 
       return NextResponse.json(
@@ -388,11 +383,6 @@ export async function POST(
     }
 
     if (!profile) {
-      console.error(
-        '[STORIES] Perfil não encontrado para o usuário:',
-        currentUser.id
-      );
-
       return NextResponse.json(
         {
           error:
@@ -405,7 +395,7 @@ export async function POST(
     }
 
     /*
-     * 3. Ler o arquivo
+     * 3. Ler arquivo enviado.
      */
     const formData =
       await request.formData();
@@ -426,7 +416,7 @@ export async function POST(
     }
 
     /*
-     * 4. Verificar tamanho
+     * 4. Verificar tamanho.
      */
     if (
       file.size >
@@ -444,7 +434,7 @@ export async function POST(
     }
 
     /*
-     * 5. Verificar formato
+     * 5. Verificar formato.
      */
     if (
       !ALLOWED_TYPES.includes(
@@ -478,6 +468,10 @@ export async function POST(
     const fileName =
       `${crypto.randomUUID()}.${extension}`;
 
+    /*
+     * IMPORTANTE:
+     * Bucket exclusivo dos Stories de 24h.
+     */
     const storagePath =
       `${currentUser.id}/${fileName}`;
 
@@ -485,17 +479,18 @@ export async function POST(
       storagePath;
 
     console.log(
-      '[STORIES] Enviando arquivo:',
+      '[SOCIAL STORIES] Upload:',
       storagePath
     );
 
     /*
-     * 6. Upload para Storage
+     * 6. Upload para o bucket
+     *    social-stories
      */
     const {
       error: uploadError,
     } = await supabase.storage
-      .from('stories')
+      .from('social-stories')
       .upload(
         storagePath,
         file,
@@ -510,11 +505,11 @@ export async function POST(
 
     if (uploadError) {
       console.error(
-        '[STORIES] Erro no upload:',
+        '[SOCIAL STORIES] Erro no upload:',
         {
           message:
             uploadError.message,
-          details:
+          name:
             uploadError.name,
         }
       );
@@ -532,18 +527,14 @@ export async function POST(
       );
     }
 
-    console.log(
-      '[STORIES] Upload concluído.'
-    );
-
     /*
-     * 7. Obter URL pública
+     * 7. URL pública.
      */
     const {
       data: publicUrlData,
     } =
       supabase.storage
-        .from('stories')
+        .from('social-stories')
         .getPublicUrl(
           storagePath
         );
@@ -552,12 +543,8 @@ export async function POST(
       publicUrlData.publicUrl;
 
     if (!mediaUrl) {
-      console.error(
-        '[STORIES] URL pública não foi gerada.'
-      );
-
       await supabase.storage
-        .from('stories')
+        .from('social-stories')
         .remove([
           storagePath,
         ]);
@@ -577,7 +564,7 @@ export async function POST(
     }
 
     /*
-     * 8. Expiração de 24 horas
+     * 8. Expiração de 24 horas.
      */
     const expiresAt =
       new Date(
@@ -588,18 +575,15 @@ export async function POST(
             1000
       ).toISOString();
 
-    console.log(
-      '[STORIES] Salvando registro no banco...'
-    );
-
     /*
-     * 9. Salvar Story no banco
+     * 9. Salvar no banco EXCLUSIVO
+     *    dos Stories de 24h.
      */
     const {
       data: story,
       error: storyError,
     } = await supabase
-      .from('stories')
+      .from('social_stories')
       .insert({
         user_id:
           currentUser.id,
@@ -623,13 +607,8 @@ export async function POST(
       .single();
 
     if (storyError) {
-      /*
-       * ESTE É O PONTO IMPORTANTE:
-       * agora o erro real do Supabase
-       * ficará visível nos logs.
-       */
       console.error(
-        '[STORIES] ERRO AO SALVAR NO BANCO:',
+        '[SOCIAL STORIES] ERRO AO SALVAR NO BANCO:',
         {
           message:
             storyError.message,
@@ -643,24 +622,27 @@ export async function POST(
       );
 
       /*
-       * Remove o arquivo que foi enviado,
-       * já que o registro não foi criado.
+       * Se o banco falhar, remove
+       * o arquivo que acabou de subir.
        */
       if (
         uploadedStoragePath
       ) {
         const {
-          error: cleanupError,
+          error:
+            cleanupError,
         } =
           await supabase.storage
-            .from('stories')
+            .from(
+              'social-stories'
+            )
             .remove([
               uploadedStoragePath,
             ]);
 
         if (cleanupError) {
           console.error(
-            '[STORIES] Erro ao limpar arquivo:',
+            '[SOCIAL STORIES] Erro ao limpar arquivo:',
             cleanupError
           );
         }
@@ -684,12 +666,12 @@ export async function POST(
     }
 
     console.log(
-      '[STORIES] Story publicado:',
+      '[SOCIAL STORIES] Story publicado:',
       story?.id
     );
 
     /*
-     * 10. Tudo certo
+     * 10. Sucesso.
      */
     return NextResponse.json(
       {
@@ -701,26 +683,28 @@ export async function POST(
     );
   } catch (error) {
     console.error(
-      '[STORIES] ERRO INESPERADO:',
+      '[SOCIAL STORIES] ERRO INESPERADO:',
       error
     );
 
     /*
-     * Se alguma coisa explodir depois
-     * do upload, tenta limpar o arquivo.
+     * Limpeza caso algo dê errado
+     * depois do upload.
      */
     if (
       uploadedStoragePath
     ) {
       try {
         await supabase.storage
-          .from('stories')
+          .from(
+            'social-stories'
+          )
           .remove([
             uploadedStoragePath,
           ]);
       } catch (cleanupError) {
         console.error(
-          '[STORIES] Erro na limpeza após exceção:',
+          '[SOCIAL STORIES] Erro na limpeza:',
           cleanupError
         );
       }
@@ -744,7 +728,7 @@ export async function POST(
 
 /*
 =========================================================
-DELETE — EXCLUIR STORY
+DELETE — EXCLUIR STORY DE 24 HORAS
 =========================================================
 */
 
@@ -790,13 +774,13 @@ export async function DELETE(
     }
 
     /*
-     * Localiza o Story do usuário.
+     * Buscar Story do usuário.
      */
     const {
       data: story,
       error: findError,
     } = await supabase
-      .from('stories')
+      .from('social_stories')
       .select(
         'id, user_id, media_url'
       )
@@ -812,17 +796,8 @@ export async function DELETE(
 
     if (findError) {
       console.error(
-        'Erro ao localizar Story:',
-        {
-          message:
-            findError.message,
-          details:
-            findError.details,
-          hint:
-            findError.hint,
-          code:
-            findError.code,
-        }
+        '[SOCIAL STORIES] Erro ao localizar:',
+        findError
       );
 
       return NextResponse.json(
@@ -851,8 +826,7 @@ export async function DELETE(
     }
 
     /*
-     * Extrai o caminho do Storage
-     * a partir da URL pública.
+     * Descobrir o caminho do Storage.
      */
     let storagePath = '';
 
@@ -863,13 +837,10 @@ export async function DELETE(
         );
 
       const marker =
-        '/storage/v1/object/public/stories/';
-
-      const pathname =
-        publicUrl.pathname;
+        '/storage/v1/object/public/social-stories/';
 
       const markerIndex =
-        pathname.indexOf(
+        publicUrl.pathname.indexOf(
           marker
         );
 
@@ -878,7 +849,7 @@ export async function DELETE(
       ) {
         storagePath =
           decodeURIComponent(
-            pathname.slice(
+            publicUrl.pathname.slice(
               markerIndex +
                 marker.length
             )
@@ -889,12 +860,12 @@ export async function DELETE(
     }
 
     /*
-     * Apaga o registro.
+     * Apagar registro.
      */
     const {
       error: deleteError,
     } = await supabase
-      .from('stories')
+      .from('social_stories')
       .delete()
       .eq(
         'id',
@@ -907,17 +878,8 @@ export async function DELETE(
 
     if (deleteError) {
       console.error(
-        'Erro ao excluir Story:',
-        {
-          message:
-            deleteError.message,
-          details:
-            deleteError.details,
-          hint:
-            deleteError.hint,
-          code:
-            deleteError.code,
-        }
+        '[SOCIAL STORIES] Erro ao excluir:',
+        deleteError
       );
 
       return NextResponse.json(
@@ -934,14 +896,17 @@ export async function DELETE(
     }
 
     /*
-     * Apaga também o arquivo do Storage.
+     * Apagar arquivo do Storage.
      */
     if (storagePath) {
       const {
-        error: storageDeleteError,
+        error:
+          storageDeleteError,
       } =
         await supabase.storage
-          .from('stories')
+          .from(
+            'social-stories'
+          )
           .remove([
             storagePath,
           ]);
@@ -950,7 +915,7 @@ export async function DELETE(
         storageDeleteError
       ) {
         console.error(
-          'Erro ao excluir arquivo do Storage:',
+          '[SOCIAL STORIES] Erro ao excluir arquivo:',
           storageDeleteError
         );
       }
@@ -966,7 +931,7 @@ export async function DELETE(
     );
   } catch (error) {
     console.error(
-      'Erro inesperado em DELETE /api/stories:',
+      '[SOCIAL STORIES] ERRO INESPERADO NO DELETE:',
       error
     );
 
