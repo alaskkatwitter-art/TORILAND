@@ -1,6 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 type Chapter = {
@@ -11,6 +15,21 @@ type Chapter = {
   body?: string;
   published?: boolean;
   created_at?: string;
+  author_notes?: string | null;
+  original_published_at?: string | null;
+  republished_at?: string | null;
+  updated_at?: string | null;
+  publication_status?: string;
+};
+
+type ChapterMedia = {
+  id: string;
+  url?: string;
+  image_url?: string;
+  media_url?: string;
+  type?: string;
+  mime_type?: string;
+  position?: number;
 };
 
 type Sticker = {
@@ -53,114 +72,244 @@ export default function CapituloPage() {
 
   const id = params.id as string;
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef =
+    useRef<HTMLInputElement | null>(null);
 
-  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [chapter, setChapter] =
+    useState<Chapter | null>(null);
+
+  const [media, setMedia] =
+    useState<ChapterMedia[]>([]);
+
   const [previousChapter, setPreviousChapter] =
     useState<Chapter | null>(null);
+
   const [nextChapter, setNextChapter] =
     useState<Chapter | null>(null);
 
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [stickers, setStickers] = useState<Sticker[]>([]);
+  const [chapters, setChapters] =
+    useState<Chapter[]>([]);
 
-  const [showContents, setShowContents] = useState(false);
+  const [comments, setComments] =
+    useState<Comment[]>([]);
 
-  const [selectedText, setSelectedText] = useState('');
-  const [selectionOffset, setSelectionOffset] = useState<number | null>(
-    null
-  );
+  const [stickers, setStickers] =
+    useState<Sticker[]>([]);
 
-  const [showCommentBox, setShowCommentBox] = useState(false);
-  const [commentText, setCommentText] = useState('');
-  const [sendingComment, setSendingComment] = useState(false);
+  const [showContents, setShowContents] =
+    useState(false);
 
-  const [showStickers, setShowStickers] = useState(false);
+  const [selectedText, setSelectedText] =
+    useState('');
+
+  const [selectionOffset, setSelectionOffset] =
+    useState<number | null>(null);
+
+  const [showCommentBox, setShowCommentBox] =
+    useState(false);
+
+  const [commentText, setCommentText] =
+    useState('');
+
+  const [sendingComment, setSendingComment] =
+    useState(false);
+
+  const [showStickers, setShowStickers] =
+    useState(false);
+
   const [selectedSticker, setSelectedSticker] =
     useState<Sticker | null>(null);
-  const [uploadingSticker, setUploadingSticker] = useState(false);
 
-  const [activeCommentGroup, setActiveCommentGroup] = useState<Comment[]>(
-    []
-  );
+  const [uploadingSticker, setUploadingSticker] =
+    useState(false);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [activeCommentGroup, setActiveCommentGroup] =
+    useState<Comment[]>([]);
 
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState('');
+
+  /*
+   * CARREGA O CAPÍTULO PRIMEIRO.
+   *
+   * Comentários, figurinhas e sumário não podem
+   * bloquear a renderização do capítulo.
+   */
   useEffect(() => {
+    if (!id) {
+      return;
+    }
+
+    let cancelled = false;
+
     async function loadChapter() {
       try {
         setLoading(true);
         setError('');
 
-        const response = await fetch(`/api/chapters/${id}`, {
-          cache: 'no-store',
-        });
+        const response = await fetch(
+          `/api/chapters/${id}`,
+          {
+            cache: 'no-store',
+          }
+        );
 
-        const data = await response.json();
+        const text = await response.text();
+
+        let data: any = null;
+
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error(
+            'A API do capítulo retornou uma resposta inválida.'
+          );
+        }
 
         if (!response.ok) {
           throw new Error(
-            data.error || 'Não foi possível carregar o capítulo.'
+            data?.error ||
+              'Não foi possível carregar o capítulo.'
           );
+        }
+
+        if (!data?.chapter) {
+          throw new Error(
+            'Capítulo não encontrado.'
+          );
+        }
+
+        if (cancelled) {
+          return;
         }
 
         setChapter(data.chapter);
-        setPreviousChapter(data.previousChapter || null);
-        setNextChapter(data.nextChapter || null);
+        setMedia(data.media || []);
+        setPreviousChapter(
+          data.previousChapter || null
+        );
+        setNextChapter(
+          data.nextChapter || null
+        );
 
-        if (data.chapter?.story_id) {
-          const storyResponse = await fetch(
-            `/api/stories/${data.chapter.story_id}`,
-            {
-              cache: 'no-store',
-            }
-          );
+        /*
+         * MUITO IMPORTANTE:
+         *
+         * O capítulo já pode aparecer agora.
+         */
+        setLoading(false);
 
-          const storyData = await storyResponse.json();
-
-          if (storyResponse.ok) {
-            setChapters(storyData.chapters || []);
-          }
+        /*
+         * O restante carrega separadamente.
+         */
+        loadStory(data.chapter.story_id);
+        loadComments();
+        loadStickers();
+      } catch (err) {
+        if (cancelled) {
+          return;
         }
 
-        const commentsResponse = await fetch(
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Não foi possível carregar o capítulo.'
+        );
+
+        setLoading(false);
+      }
+    }
+
+    async function loadStory(
+      storyId?: string
+    ) {
+      if (!storyId) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `/api/stories/${storyId}`,
+          {
+            cache: 'no-store',
+          }
+        );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+
+        if (!cancelled) {
+          setChapters(data.chapters || []);
+        }
+      } catch {
+        /*
+         * O sumário não pode impedir
+         * a leitura do capítulo.
+         */
+      }
+    }
+
+    async function loadComments() {
+      try {
+        const response = await fetch(
           `/api/comments?chapter_id=${id}`,
           {
             cache: 'no-store',
           }
         );
 
-        const commentsData = await commentsResponse.json();
-
-        if (commentsResponse.ok) {
-          setComments(commentsData.comments || []);
+        if (!response.ok) {
+          return;
         }
 
-        const stickersResponse = await fetch('/api/stickers', {
-          cache: 'no-store',
-        });
+        const data = await response.json();
 
-        const stickersData = await stickersResponse.json();
-
-        if (stickersResponse.ok) {
-          setStickers(stickersData.stickers || []);
+        if (!cancelled) {
+          setComments(data.comments || []);
         }
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Não foi possível carregar o capítulo.'
-        );
-      } finally {
-        setLoading(false);
+      } catch {
+        /*
+         * Comentários são opcionais.
+         */
       }
     }
 
-    if (id) {
-      loadChapter();
+    async function loadStickers() {
+      try {
+        const response = await fetch(
+          '/api/stickers',
+          {
+            cache: 'no-store',
+          }
+        );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+
+        if (!cancelled) {
+          setStickers(data.stickers || []);
+        }
+      } catch {
+        /*
+         * Figurinhas são opcionais.
+         */
+      }
     }
+
+    loadChapter();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   function handleTextSelection() {
@@ -180,8 +329,16 @@ export default function CapituloPage() {
       return;
     }
 
-    const fullText = chapter.body;
-    const start = fullText.indexOf(text);
+    /*
+     * Para comentários antigos que usam texto puro,
+     * tentamos encontrar o trecho no conteúdo.
+     */
+    const plainBody = chapter.body.replace(
+      /<[^>]*>/g,
+      ''
+    );
+
+    const start = plainBody.indexOf(text);
 
     if (start === -1) {
       return;
@@ -218,40 +375,51 @@ export default function CapituloPage() {
       setUploadingSticker(true);
 
       const formData = new FormData();
+
       formData.append('file', file);
 
-      const response = await fetch('/api/stickers', {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await fetch(
+        '/api/stickers',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const data = await response.json();
 
       if (response.status === 401) {
-        alert('Você precisa estar logado para criar uma figurinha.');
+        alert(
+          'Você precisa estar logado para criar uma figurinha.'
+        );
         return;
       }
 
       if (!response.ok) {
         alert(
-          data.error || 'Não foi possível criar a figurinha.'
+          data.error ||
+            'Não foi possível criar a figurinha.'
         );
         return;
       }
 
-      const newSticker = data.sticker as Sticker;
+      const newSticker =
+        data.sticker as Sticker;
 
       setStickers((current) => [
         newSticker,
         ...current.filter(
-          (sticker) => sticker.id !== newSticker.id
+          (sticker) =>
+            sticker.id !== newSticker.id
         ),
       ]);
 
       setSelectedSticker(newSticker);
       setShowStickers(false);
     } catch {
-      alert('Não foi possível enviar a figurinha.');
+      alert(
+        'Não foi possível enviar a figurinha.'
+      );
     } finally {
       setUploadingSticker(false);
     }
@@ -263,38 +431,52 @@ export default function CapituloPage() {
   }
 
   async function submitComment() {
-    if (!commentText.trim() && !selectedSticker) {
-      alert('Escreva um comentário ou escolha uma figurinha.');
+    if (
+      !commentText.trim() &&
+      !selectedSticker
+    ) {
+      alert(
+        'Escreva um comentário ou escolha uma figurinha.'
+      );
       return;
     }
 
     try {
       setSendingComment(true);
 
-      const response = await fetch('/api/comments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chapter_id: id,
-          body: commentText.trim() || ' ',
-          selected_text: selectedText || null,
-          start_offset: selectionOffset,
-          sticker_id: selectedSticker?.id || null,
-        }),
-      });
+      const response = await fetch(
+        '/api/comments',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chapter_id: id,
+            body:
+              commentText.trim() || ' ',
+            selected_text:
+              selectedText || null,
+            start_offset: selectionOffset,
+            sticker_id:
+              selectedSticker?.id || null,
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (response.status === 401) {
-        alert('Você precisa estar logado para comentar.');
+        alert(
+          'Você precisa estar logado para comentar.'
+        );
         return;
       }
 
       if (!response.ok) {
         alert(
-          data.error || 'Não foi possível publicar o comentário.'
+          data.error ||
+            'Não foi possível publicar o comentário.'
         );
         return;
       }
@@ -311,18 +493,25 @@ export default function CapituloPage() {
               sticker.id === selectedSticker.id
                 ? {
                     ...sticker,
-                    last_used_at: new Date().toISOString(),
+                    last_used_at:
+                      new Date().toISOString(),
                   }
                 : sticker
             )
             .sort((a, b) => {
-              const aTime = a.last_used_at
-                ? new Date(a.last_used_at).getTime()
-                : 0;
+              const aTime =
+                a.last_used_at
+                  ? new Date(
+                      a.last_used_at
+                    ).getTime()
+                  : 0;
 
-              const bTime = b.last_used_at
-                ? new Date(b.last_used_at).getTime()
-                : 0;
+              const bTime =
+                b.last_used_at
+                  ? new Date(
+                      b.last_used_at
+                    ).getTime()
+                  : 0;
 
               return bTime - aTime;
             })
@@ -331,14 +520,19 @@ export default function CapituloPage() {
 
       cancelComment();
     } catch {
-      alert('Não foi possível publicar o comentário.');
+      alert(
+        'Não foi possível publicar o comentário.'
+      );
     } finally {
       setSendingComment(false);
     }
   }
 
   function getCommentGroups(): CommentGroup[] {
-    const groups = new Map<string, Comment[]>();
+    const groups = new Map<
+      string,
+      Comment[]
+    >();
 
     comments.forEach((comment) => {
       if (
@@ -350,9 +544,13 @@ export default function CapituloPage() {
 
       const key = `${comment.start_offset}-${comment.selected_text.length}`;
 
-      const current = groups.get(key) || [];
+      const current =
+        groups.get(key) || [];
 
-      groups.set(key, [...current, comment]);
+      groups.set(key, [
+        ...current,
+        comment,
+      ]);
     });
 
     return Array.from(groups.values())
@@ -375,118 +573,102 @@ export default function CapituloPage() {
         };
       })
       .filter(
-        (group): group is CommentGroup =>
+        (
+          group
+        ): group is CommentGroup =>
           group !== null
       )
-      .sort((a, b) => a.start - b.start);
+      .sort(
+        (a, b) => a.start - b.start
+      );
   }
 
-  function renderChapterText() {
+  /*
+   * Retorna a URL da mídia independente
+   * de como a API nomeou o campo.
+   */
+  function getMediaUrl(
+    item: ChapterMedia
+  ) {
+    return (
+      item.url ||
+      item.image_url ||
+      item.media_url ||
+      ''
+    );
+  }
+
+  /*
+   * Renderiza o conteúdo produzido pelo editor.
+   *
+   * Se o body for HTML, usamos HTML.
+   *
+   * Se for texto antigo, continuamos
+   * mostrando normalmente.
+   */
+  function renderChapterBody() {
     if (!chapter?.body) {
-      return null;
-    }
-
-    const text = chapter.body;
-    const commentGroups = getCommentGroups();
-
-    if (commentGroups.length === 0) {
-      return text;
-    }
-
-    const pieces: React.ReactNode[] = [];
-
-    let currentPosition = 0;
-
-    commentGroups.forEach((group, index) => {
-      if (group.start < currentPosition) {
-        return;
-      }
-
-      if (group.start > currentPosition) {
-        pieces.push(
-          <span key={`text-${index}-${currentPosition}`}>
-            {text.slice(currentPosition, group.start)}
-          </span>
-        );
-      }
-
-      const selected = text.slice(
-        group.start,
-        group.end
-      );
-
-      pieces.push(
-        <span
-          key={`commented-${index}`}
-          className="relative inline bg-white/[0.025] border-b border-white/10 box-decoration-clone"
-        >
-          {selected}
-
-          <button
-            type="button"
-            aria-label="Ver comentários deste trecho"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-
-              setActiveCommentGroup(group.comments);
-            }}
-            className="
-              absolute
-              left-full
-              top-1/2
-              -translate-y-1/2
-              ml-2
-              w-5
-              h-5
-              flex
-              items-center
-              justify-center
-              z-20
-              opacity-70
-              hover:opacity-100
-              active:opacity-100
-              transition
-            "
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="w-[17px] h-[17px]"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M7 18.5C4.79 17.52 3.25 15.3 3.25 12.75C3.25 9.02 6.27 6 10 6H14C17.73 6 20.75 9.02 20.75 12.75C20.75 16.48 17.73 19.5 14 19.5H10.5L7 21V18.5Z"
-                stroke="#a3a3a3"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </span>
-      );
-
-      currentPosition = group.end;
-    });
-
-    if (currentPosition < text.length) {
-      pieces.push(
-        <span key={`text-end-${currentPosition}`}>
-          {text.slice(currentPosition)}
-        </span>
+      return (
+        <p className="text-gray-600">
+          Este capítulo ainda não possui conteúdo.
+        </p>
       );
     }
 
-    return pieces;
+    const body = chapter.body;
+
+    const looksLikeHtml =
+      /<\/?[a-z][\s\S]*>/i.test(body);
+
+    if (looksLikeHtml) {
+      return (
+        <div
+          className="
+            chapter-content
+            text-[18px]
+            leading-8
+            text-gray-200
+            font-serif
+          "
+          onMouseUp={handleTextSelection}
+          onTouchEnd={handleTextSelection}
+          dangerouslySetInnerHTML={{
+            __html: body,
+          }}
+        />
+      );
+    }
+
+    return (
+      <article
+        onMouseUp={handleTextSelection}
+        onTouchEnd={handleTextSelection}
+        className="
+          chapter-content
+          text-[18px]
+          leading-8
+          text-gray-200
+          font-serif
+          whitespace-pre-wrap
+        "
+      >
+        {body}
+      </article>
+    );
   }
 
   if (loading) {
     return (
       <main className="min-h-screen bg-[#0d0d0d] text-white flex items-center justify-center">
-        <p className="text-[#ff4f9a]">
-          Carregando capítulo...
-        </p>
+        <div className="text-center">
+          <p className="text-[#ff4f9a]">
+            Carregando capítulo...
+          </p>
+
+          <p className="text-xs text-gray-600 mt-2">
+            Aguarde um instante.
+          </p>
+        </div>
       </main>
     );
   }
@@ -494,14 +676,23 @@ export default function CapituloPage() {
   if (error || !chapter) {
     return (
       <main className="min-h-screen bg-[#0d0d0d] text-white flex items-center justify-center px-6">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <p className="text-red-400 mb-5">
-            {error || 'Capítulo não encontrado.'}
+            {error ||
+              'Capítulo não encontrado.'}
           </p>
 
           <button
+            type="button"
             onClick={() => router.back()}
-            className="px-5 py-3 rounded-xl bg-[#ff4f9a] text-black font-semibold"
+            className="
+              px-5
+              py-3
+              rounded-xl
+              bg-[#ff4f9a]
+              text-black
+              font-semibold
+            "
           >
             Voltar
           </button>
@@ -510,16 +701,18 @@ export default function CapituloPage() {
     );
   }
 
-  const commentGroups = getCommentGroups();
-
   const recentStickers = [...stickers]
     .sort((a, b) => {
       const aTime = a.last_used_at
-        ? new Date(a.last_used_at).getTime()
+        ? new Date(
+            a.last_used_at
+          ).getTime()
         : 0;
 
       const bTime = b.last_used_at
-        ? new Date(b.last_used_at).getTime()
+        ? new Date(
+            b.last_used_at
+          ).getTime()
         : 0;
 
       return bTime - aTime;
@@ -528,31 +721,163 @@ export default function CapituloPage() {
 
   return (
     <main className="min-h-screen bg-[#0d0d0d] text-white">
+
+      <style jsx global>{`
+        .chapter-content {
+          max-width: 100%;
+          overflow-wrap: anywhere;
+        }
+
+        .chapter-content p {
+          margin-bottom: 1.5rem;
+        }
+
+        .chapter-content h1,
+        .chapter-content h2,
+        .chapter-content h3 {
+          color: white;
+          font-family: inherit;
+          font-weight: 700;
+          line-height: 1.3;
+          margin-top: 2rem;
+          margin-bottom: 1rem;
+        }
+
+        .chapter-content h1 {
+          font-size: 2rem;
+        }
+
+        .chapter-content h2 {
+          font-size: 1.6rem;
+        }
+
+        .chapter-content h3 {
+          font-size: 1.3rem;
+        }
+
+        .chapter-content strong {
+          font-weight: 700;
+        }
+
+        .chapter-content em {
+          font-style: italic;
+        }
+
+        .chapter-content u {
+          text-decoration: underline;
+        }
+
+        .chapter-content blockquote {
+          margin: 1.5rem 0;
+          padding-left: 1rem;
+          border-left: 3px solid #ff4f9a;
+          color: #b5b5b5;
+          font-style: italic;
+        }
+
+        .chapter-content a {
+          color: #ff4f9a;
+          text-decoration: underline;
+        }
+
+        .chapter-content hr {
+          border: 0;
+          border-top: 1px solid rgba(255,255,255,.12);
+          margin: 2rem 0;
+        }
+
+        .chapter-content img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 1rem;
+          margin: 1.5rem auto;
+        }
+
+        .chapter-content figure {
+          margin: 1.5rem 0;
+        }
+
+        .chapter-content figcaption {
+          text-align: center;
+          color: #666;
+          font-size: .8rem;
+        }
+
+        .chapter-content ul {
+          list-style: disc;
+          padding-left: 1.5rem;
+          margin: 1rem 0;
+        }
+
+        .chapter-content ol {
+          list-style: decimal;
+          padding-left: 1.5rem;
+          margin: 1rem 0;
+        }
+
+        .chapter-content div[style*="text-align: center"] {
+          text-align: center;
+        }
+
+        .chapter-content div[style*="text-align: right"] {
+          text-align: right;
+        }
+
+        .chapter-content div[style*="text-align: left"] {
+          text-align: left;
+        }
+      `}</style>
+
       <div className="max-w-3xl mx-auto px-5 py-8">
 
-        {/* Topo */}
+        {/* TOPO */}
+
         <div className="flex items-center justify-between gap-4 mb-8">
 
           <button
+            type="button"
             onClick={() =>
-              router.push(`/historia/${chapter.story_id}`)
+              router.push(
+                `/historia/${chapter.story_id}`
+              )
             }
-            className="text-sm text-gray-400 hover:text-white transition"
+            className="
+              text-sm
+              text-gray-400
+              hover:text-white
+              transition
+            "
           >
             ← Voltar para a história
           </button>
 
           <button
-            onClick={() => setShowContents(true)}
-            className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm font-semibold hover:border-[#ff4f9a]/50 transition"
+            type="button"
+            onClick={() =>
+              setShowContents(true)
+            }
+            className="
+              px-4
+              py-2
+              rounded-xl
+              bg-white/5
+              border
+              border-white/10
+              text-sm
+              font-semibold
+              hover:border-[#ff4f9a]/50
+              transition
+            "
           >
-            ☰ Sumário
+            Sumário
           </button>
 
         </div>
 
-        {/* Cabeçalho */}
+        {/* CABEÇALHO */}
+
         <header className="mb-10">
+
           <p className="text-sm text-[#ff4f9a] mb-2">
             Capítulo {chapter.chapter_number}
           </p>
@@ -560,38 +885,117 @@ export default function CapituloPage() {
           <h1 className="text-3xl font-bold">
             {chapter.title}
           </h1>
+
         </header>
 
-        {/* Texto */}
-        <article
-          onMouseUp={handleTextSelection}
-          onTouchEnd={handleTextSelection}
-          className="relative text-[18px] leading-8 text-gray-200 font-serif whitespace-pre-wrap select-text pr-8"
-        >
-          {renderChapterText()}
-        </article>
+        {/* CONTEÚDO */}
 
-        {/* Caixa de comentário */}
+        {renderChapterBody()}
+
+        {/* MÍDIAS DO CAPÍTULO */}
+
+        {media.length > 0 && (
+          <section className="mt-10 space-y-5">
+
+            {media
+              .sort(
+                (a, b) =>
+                  (a.position || 0) -
+                  (b.position || 0)
+              )
+              .map((item) => {
+                const url =
+                  getMediaUrl(item);
+
+                if (!url) {
+                  return null;
+                }
+
+                return (
+                  <div
+                    key={item.id}
+                    className="flex justify-center"
+                  >
+                    <img
+                      src={url}
+                      alt=""
+                      className="
+                        max-w-full
+                        max-h-[800px]
+                        rounded-2xl
+                        object-contain
+                      "
+                    />
+                  </div>
+                );
+              })}
+
+          </section>
+        )}
+
+        {/* CAIXA DE COMENTÁRIO */}
+
         {showCommentBox && (
-          <div className="fixed inset-0 z-50 bg-black/70 flex items-end md:items-center justify-center p-4">
+          <div className="
+            fixed
+            inset-0
+            z-50
+            bg-black/70
+            flex
+            items-end
+            md:items-center
+            justify-center
+            p-4
+          ">
 
-            <div className="w-full max-w-xl bg-[#151515] border border-white/10 rounded-2xl p-5 shadow-2xl">
+            <div className="
+              w-full
+              max-w-xl
+              bg-[#151515]
+              border
+              border-white/10
+              rounded-2xl
+              p-5
+              shadow-2xl
+            ">
 
-              <div className="flex items-start justify-between gap-4 mb-5">
+              <div className="
+                flex
+                items-start
+                justify-between
+                gap-4
+                mb-5
+              ">
 
                 <div>
-                  <p className="text-xs text-[#ff4f9a] uppercase tracking-wider mb-2">
+                  <p className="
+                    text-xs
+                    text-[#ff4f9a]
+                    uppercase
+                    tracking-wider
+                    mb-2
+                  ">
                     Comentando o trecho
                   </p>
 
-                  <p className="text-sm text-gray-300 italic leading-6">
+                  <p className="
+                    text-sm
+                    text-gray-300
+                    italic
+                    leading-6
+                  ">
                     “{selectedText}”
                   </p>
                 </div>
 
                 <button
+                  type="button"
                   onClick={cancelComment}
-                  className="text-gray-500 hover:text-white text-2xl"
+                  className="
+                    text-gray-500
+                    hover:text-white
+                    text-2xl
+                  "
                 >
                   ×
                 </button>
@@ -601,38 +1005,88 @@ export default function CapituloPage() {
               <textarea
                 value={commentText}
                 onChange={(event) =>
-                  setCommentText(event.target.value)
+                  setCommentText(
+                    event.target.value
+                  )
                 }
                 placeholder="Escreva seu comentário..."
                 rows={4}
                 autoFocus
-                className="w-full resize-none rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder:text-gray-600 outline-none focus:border-[#ff4f9a]/60"
+                className="
+                  w-full
+                  resize-none
+                  rounded-xl
+                  bg-white/5
+                  border
+                  border-white/10
+                  px-4
+                  py-3
+                  text-white
+                  placeholder:text-gray-600
+                  outline-none
+                  focus:border-[#ff4f9a]/60
+                "
               />
 
-              {/* Ferramentas */}
+              {/* FIGURINHAS */}
+
               <div className="mt-3">
 
                 <button
                   type="button"
                   onClick={() =>
-                    setShowStickers((current) => !current)
+                    setShowStickers(
+                      (current) => !current
+                    )
                   }
-                  className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-300 hover:border-[#ff4f9a]/50 transition"
+                  className="
+                    px-4
+                    py-2
+                    rounded-xl
+                    bg-white/5
+                    border
+                    border-white/10
+                    text-sm
+                    text-gray-300
+                    hover:border-[#ff4f9a]/50
+                    transition
+                  "
                 >
-                  ☁ Figurinhas
+                  Figurinhas
                 </button>
 
                 {showStickers && (
-                  <div className="mt-3 rounded-2xl bg-[#101010] border border-white/10 p-4">
+                  <div className="
+                    mt-3
+                    rounded-2xl
+                    bg-[#101010]
+                    border
+                    border-white/10
+                    p-4
+                  ">
 
-                    <div className="flex items-center justify-between gap-3 mb-4">
+                    <div className="
+                      flex
+                      items-center
+                      justify-between
+                      gap-3
+                      mb-4
+                    ">
 
                       <div>
-                        <p className="text-sm font-semibold text-white">
+                        <p className="
+                          text-sm
+                          font-semibold
+                          text-white
+                        ">
                           Usadas recentemente
                         </p>
 
-                        <p className="text-xs text-gray-600 mt-1">
+                        <p className="
+                          text-xs
+                          text-gray-600
+                          mt-1
+                        ">
                           Escolha uma figurinha ou crie uma nova.
                         </p>
                       </div>
@@ -642,8 +1096,19 @@ export default function CapituloPage() {
                         onClick={() =>
                           fileInputRef.current?.click()
                         }
-                        disabled={uploadingSticker}
-                        className="px-3 py-2 rounded-xl bg-[#ff4f9a] text-black text-xs font-semibold disabled:opacity-50"
+                        disabled={
+                          uploadingSticker
+                        }
+                        className="
+                          px-3
+                          py-2
+                          rounded-xl
+                          bg-[#ff4f9a]
+                          text-black
+                          text-xs
+                          font-semibold
+                          disabled:opacity-50
+                        "
                       >
                         {uploadingSticker
                           ? 'Enviando...'
@@ -653,40 +1118,70 @@ export default function CapituloPage() {
                     </div>
 
                     {recentStickers.length === 0 ? (
-                      <div className="rounded-xl bg-white/5 border border-white/10 p-5 text-center">
+                      <div className="
+                        rounded-xl
+                        bg-white/5
+                        border
+                        border-white/10
+                        p-5
+                        text-center
+                      ">
 
-                        <p className="text-sm text-gray-500">
+                        <p className="
+                          text-sm
+                          text-gray-500
+                        ">
                           Você ainda não tem figurinhas.
                         </p>
 
-                        <p className="text-xs text-gray-600 mt-1">
+                        <p className="
+                          text-xs
+                          text-gray-600
+                          mt-1
+                        ">
                           Crie a primeira usando uma imagem da sua galeria.
                         </p>
 
                       </div>
                     ) : (
-                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
+                      <div className="
+                        grid
+                        grid-cols-4
+                        sm:grid-cols-6
+                        gap-3
+                      ">
 
-                        {recentStickers.map((sticker) => (
-                          <button
-                            key={sticker.id}
-                            type="button"
-                            onClick={() =>
-                              selectSticker(sticker)
-                            }
-                            className={`aspect-square rounded-xl overflow-hidden border transition ${
-                              selectedSticker?.id === sticker.id
-                                ? 'border-[#ff4f9a] ring-2 ring-[#ff4f9a]/30'
-                                : 'border-white/10 hover:border-[#ff4f9a]/50'
-                            }`}
-                          >
-                            <img
-                              src={sticker.image_url}
-                              alt="Figurinha"
-                              className="w-full h-full object-cover"
-                            />
-                          </button>
-                        ))}
+                        {recentStickers.map(
+                          (sticker) => (
+                            <button
+                              key={sticker.id}
+                              type="button"
+                              onClick={() =>
+                                selectSticker(
+                                  sticker
+                                )
+                              }
+                              className={`aspect-square rounded-xl overflow-hidden border transition ${
+                                selectedSticker?.id ===
+                                sticker.id
+                                  ? 'border-[#ff4f9a] ring-2 ring-[#ff4f9a]/30'
+                                  : 'border-white/10 hover:border-[#ff4f9a]/50'
+                              }`}
+                            >
+                              <img
+                                src={
+                                  sticker.image_url
+                                }
+                                alt="Figurinha"
+                                className="
+                                  w-full
+                                  h-full
+                                  object-cover
+                                "
+                              />
+                            </button>
+                          )
+                        )}
 
                       </div>
                     )}
@@ -704,13 +1199,27 @@ export default function CapituloPage() {
                 className="hidden"
               />
 
-              {/* Figurinha selecionada */}
               {selectedSticker && (
-                <div className="mt-4 rounded-xl bg-white/5 border border-white/10 p-3">
+                <div className="
+                  mt-4
+                  rounded-xl
+                  bg-white/5
+                  border
+                  border-white/10
+                  p-3
+                ">
 
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="
+                    flex
+                    items-center
+                    justify-between
+                    mb-2
+                  ">
 
-                    <p className="text-xs text-gray-500">
+                    <p className="
+                      text-xs
+                      text-gray-500
+                    ">
                       Figurinha selecionada
                     </p>
 
@@ -719,7 +1228,10 @@ export default function CapituloPage() {
                       onClick={() =>
                         setSelectedSticker(null)
                       }
-                      className="text-gray-500 hover:text-white"
+                      className="
+                        text-gray-500
+                        hover:text-white
+                      "
                     >
                       Remover
                     </button>
@@ -727,32 +1239,67 @@ export default function CapituloPage() {
                   </div>
 
                   <div className="flex justify-center">
+
                     <img
-                      src={selectedSticker.image_url}
+                      src={
+                        selectedSticker.image_url
+                      }
                       alt="Figurinha selecionada"
-                      className="max-h-40 max-w-full rounded-xl object-contain"
+                      className="
+                        max-h-40
+                        max-w-full
+                        rounded-xl
+                        object-contain
+                      "
                     />
+
                   </div>
 
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 mt-4">
+              <div className="
+                flex
+                justify-end
+                gap-3
+                mt-4
+              ">
 
                 <button
+                  type="button"
                   onClick={cancelComment}
-                  className="px-4 py-2 rounded-xl text-sm text-gray-400 hover:text-white transition"
+                  className="
+                    px-4
+                    py-2
+                    rounded-xl
+                    text-sm
+                    text-gray-400
+                    hover:text-white
+                    transition
+                  "
                 >
                   Cancelar
                 </button>
 
                 <button
+                  type="button"
                   onClick={submitComment}
                   disabled={
                     sendingComment ||
-                    (!commentText.trim() && !selectedSticker)
+                    (!commentText.trim() &&
+                      !selectedSticker)
                   }
-                  className="px-5 py-2 rounded-xl bg-[#ff4f9a] text-black text-sm font-semibold disabled:opacity-50 transition"
+                  className="
+                    px-5
+                    py-2
+                    rounded-xl
+                    bg-[#ff4f9a]
+                    text-black
+                    text-sm
+                    font-semibold
+                    disabled:opacity-50
+                    transition
+                  "
                 >
                   {sendingComment
                     ? 'Publicando...'
@@ -765,34 +1312,84 @@ export default function CapituloPage() {
           </div>
         )}
 
-        {/* Comentários do trecho */}
+        {/* COMENTÁRIOS DO TRECHO */}
+
         {activeCommentGroup.length > 0 && (
           <div
-            className="fixed inset-0 z-50 bg-black/70 flex items-end md:items-center justify-center p-4"
-            onClick={() => setActiveCommentGroup([])}
+            className="
+              fixed
+              inset-0
+              z-50
+              bg-black/70
+              flex
+              items-end
+              md:items-center
+              justify-center
+              p-4
+            "
+            onClick={() =>
+              setActiveCommentGroup([])
+            }
           >
+
             <div
-              className="w-full max-w-xl max-h-[80vh] overflow-y-auto bg-[#151515] border border-white/10 rounded-2xl p-5 shadow-2xl"
-              onClick={(event) => event.stopPropagation()}
+              className="
+                w-full
+                max-w-xl
+                max-h-[80vh]
+                overflow-y-auto
+                bg-[#151515]
+                border
+                border-white/10
+                rounded-2xl
+                p-5
+                shadow-2xl
+              "
+              onClick={(event) =>
+                event.stopPropagation()
+              }
             >
 
-              <div className="flex items-center justify-between gap-4 mb-5">
+              <div className="
+                flex
+                items-center
+                justify-between
+                gap-4
+                mb-5
+              ">
 
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                  <p className="
+                    text-xs
+                    text-gray-500
+                    uppercase
+                    tracking-wider
+                    mb-1
+                  ">
                     Comentários do trecho
                   </p>
 
-                  <p className="text-sm text-white">
-                    {activeCommentGroup[0]?.selected_text
+                  <p className="
+                    text-sm
+                    text-white
+                  ">
+                    {activeCommentGroup[0]
+                      ?.selected_text
                       ? `“${activeCommentGroup[0].selected_text}”`
                       : 'Trecho comentado'}
                   </p>
                 </div>
 
                 <button
-                  onClick={() => setActiveCommentGroup([])}
-                  className="text-gray-500 hover:text-white text-2xl"
+                  type="button"
+                  onClick={() =>
+                    setActiveCommentGroup([])
+                  }
+                  className="
+                    text-gray-500
+                    hover:text-white
+                    text-2xl
+                  "
                 >
                   ×
                 </button>
@@ -801,64 +1398,132 @@ export default function CapituloPage() {
 
               <div className="space-y-4">
 
-                {activeCommentGroup.map((comment) => (
-                  <div
-                    key={comment.id}
-                    className="rounded-2xl bg-white/5 border border-white/10 p-4"
-                  >
+                {activeCommentGroup.map(
+                  (comment) => (
+                    <div
+                      key={comment.id}
+                      className="
+                        rounded-2xl
+                        bg-white/5
+                        border
+                        border-white/10
+                        p-4
+                      "
+                    >
 
-                    <div className="flex items-center gap-3 mb-3">
+                      <div className="
+                        flex
+                        items-center
+                        gap-3
+                        mb-3
+                      ">
 
-                      {comment.profiles?.avatar_url ? (
-                        <img
-                          src={comment.profiles.avatar_url}
-                          alt=""
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-[#ff4f9a]/20 flex items-center justify-center text-[#ff4f9a] text-xs font-bold">
-                          {(comment.profiles?.display_name ||
-                            comment.profiles?.username ||
-                            '?')
-                            .charAt(0)
-                            .toUpperCase()}
+                        {comment.profiles
+                          ?.avatar_url ? (
+                          <img
+                            src={
+                              comment.profiles
+                                .avatar_url
+                            }
+                            alt=""
+                            className="
+                              w-8
+                              h-8
+                              rounded-full
+                              object-cover
+                            "
+                          />
+                        ) : (
+                          <div className="
+                            w-8
+                            h-8
+                            rounded-full
+                            bg-[#ff4f9a]/20
+                            flex
+                            items-center
+                            justify-center
+                            text-[#ff4f9a]
+                            text-xs
+                            font-bold
+                          ">
+                            {(
+                              comment.profiles
+                                ?.display_name ||
+                              comment.profiles
+                                ?.username ||
+                              '?'
+                            )
+                              .charAt(0)
+                              .toUpperCase()}
+                          </div>
+                        )}
+
+                        <div>
+
+                          <p className="
+                            text-sm
+                            font-semibold
+                            text-white
+                          ">
+                            {comment.profiles
+                              ?.display_name ||
+                              comment.profiles
+                                ?.username ||
+                              'Usuário'}
+                          </p>
+
+                          {comment.profiles
+                            ?.username && (
+                            <p className="
+                              text-xs
+                              text-gray-600
+                            ">
+                              @
+                              {
+                                comment.profiles
+                                  .username
+                              }
+                            </p>
+                          )}
+
+                        </div>
+
+                      </div>
+
+                      {comment.body.trim() && (
+                        <p className="
+                          text-gray-300
+                          leading-7
+                        ">
+                          {comment.body}
+                        </p>
+                      )}
+
+                      {comment.user_stickers
+                        ?.image_url && (
+                        <div className="mt-3">
+
+                          <img
+                            src={
+                              comment
+                                .user_stickers
+                                .image_url
+                            }
+                            alt="Figurinha"
+                            className="
+                              max-w-full
+                              max-h-64
+                              rounded-xl
+                              object-contain
+                            "
+                          />
+
                         </div>
                       )}
 
-                      <div>
-                        <p className="text-sm font-semibold text-white">
-                          {comment.profiles?.display_name ||
-                            comment.profiles?.username ||
-                            'Usuário'}
-                        </p>
-
-                        {comment.profiles?.username && (
-                          <p className="text-xs text-gray-600">
-                            @{comment.profiles.username}
-                          </p>
-                        )}
-                      </div>
-
                     </div>
-
-                    {comment.body.trim() && (
-                      <p className="text-gray-300 leading-7">
-                        {comment.body}
-                      </p>
-                    )}
-
-                    {comment.user_stickers?.image_url && (
-                      <div className="mt-3">
-                        <img
-                          src={comment.user_stickers.image_url}
-                          alt="Figurinha"
-                          className="max-w-full max-h-64 rounded-xl object-contain"
-                        />
-                      </div>
-                    )}
-
-                  </div>
-                ))}
+                  )
+                )}
 
               </div>
 
@@ -866,21 +1531,44 @@ export default function CapituloPage() {
           </div>
         )}
 
-        {/* Comentários */}
-        <section className="mt-16 pt-10 border-t border-white/10">
+        {/* COMENTÁRIOS */}
 
-          <h2 className="text-2xl font-bold mb-6">
+        <section className="
+          mt-16
+          pt-10
+          border-t
+          border-white/10
+        ">
+
+          <h2 className="
+            text-2xl
+            font-bold
+            mb-6
+          ">
             Comentários
           </h2>
 
           {comments.length === 0 ? (
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
+            <div className="
+              rounded-2xl
+              bg-white/5
+              border
+              border-white/10
+              p-6
+            ">
 
-              <p className="text-gray-500 text-sm">
+              <p className="
+                text-gray-500
+                text-sm
+              ">
                 Ainda não há comentários neste capítulo.
               </p>
 
-              <p className="text-gray-600 text-xs mt-2">
+              <p className="
+                text-gray-600
+                text-xs
+                mt-2
+              ">
                 Selecione um trecho do texto para ser o primeiro.
               </p>
 
@@ -891,70 +1579,147 @@ export default function CapituloPage() {
               {comments.map((comment) => (
                 <div
                   key={comment.id}
-                  className="rounded-2xl bg-white/5 border border-white/10 p-5"
+                  className="
+                    rounded-2xl
+                    bg-white/5
+                    border
+                    border-white/10
+                    p-5
+                  "
                 >
 
                   {comment.selected_text && (
-                    <div className="border-l-2 border-[#ff4f9a] pl-4 mb-4">
+                    <div className="
+                      border-l-2
+                      border-[#ff4f9a]
+                      pl-4
+                      mb-4
+                    ">
 
-                      <p className="text-xs text-gray-500 mb-1">
+                      <p className="
+                        text-xs
+                        text-gray-500
+                        mb-1
+                      ">
                         Trecho comentado
                       </p>
 
-                      <p className="text-sm text-gray-300 italic">
+                      <p className="
+                        text-sm
+                        text-gray-300
+                        italic
+                      ">
                         “{comment.selected_text}”
                       </p>
 
                     </div>
                   )}
 
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="
+                    flex
+                    items-center
+                    gap-3
+                    mb-3
+                  ">
 
-                    {comment.profiles?.avatar_url ? (
+                    {comment.profiles
+                      ?.avatar_url ? (
                       <img
-                        src={comment.profiles.avatar_url}
+                        src={
+                          comment.profiles
+                            .avatar_url
+                        }
                         alt=""
-                        className="w-8 h-8 rounded-full object-cover"
+                        className="
+                          w-8
+                          h-8
+                          rounded-full
+                          object-cover
+                        "
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-[#ff4f9a]/20 flex items-center justify-center text-[#ff4f9a] text-xs font-bold">
-                        {(comment.profiles?.display_name ||
-                          comment.profiles?.username ||
-                          '?')
+                      <div className="
+                        w-8
+                        h-8
+                        rounded-full
+                        bg-[#ff4f9a]/20
+                        flex
+                        items-center
+                        justify-center
+                        text-[#ff4f9a]
+                        text-xs
+                        font-bold
+                      ">
+                        {(
+                          comment.profiles
+                            ?.display_name ||
+                          comment.profiles
+                            ?.username ||
+                          '?'
+                        )
                           .charAt(0)
                           .toUpperCase()}
                       </div>
                     )}
 
                     <div>
-                      <p className="text-sm font-semibold text-white">
-                        {comment.profiles?.display_name ||
-                          comment.profiles?.username ||
+
+                      <p className="
+                        text-sm
+                        font-semibold
+                        text-white
+                      ">
+                        {comment.profiles
+                          ?.display_name ||
+                          comment.profiles
+                            ?.username ||
                           'Usuário'}
                       </p>
 
-                      {comment.profiles?.username && (
-                        <p className="text-xs text-gray-600">
-                          @{comment.profiles.username}
+                      {comment.profiles
+                        ?.username && (
+                        <p className="
+                          text-xs
+                          text-gray-600
+                        ">
+                          @
+                          {
+                            comment.profiles
+                              .username
+                          }
                         </p>
                       )}
+
                     </div>
 
                   </div>
 
                   {comment.body.trim() && (
-                    <p className="text-gray-300 leading-7">
+                    <p className="
+                      text-gray-300
+                      leading-7
+                    ">
                       {comment.body}
                     </p>
                   )}
 
-                  {comment.user_stickers?.image_url && (
+                  {comment.user_stickers
+                    ?.image_url && (
                     <div className="mt-3">
 
                       <img
-                        src={comment.user_stickers.image_url}
+                        src={
+                          comment
+                            .user_stickers
+                            .image_url
+                        }
                         alt="Figurinha"
-                        className="max-w-full max-h-64 rounded-xl object-contain"
+                        className="
+                          max-w-full
+                          max-h-64
+                          rounded-xl
+                          object-contain
+                        "
                       />
 
                     </div>
@@ -968,23 +1733,59 @@ export default function CapituloPage() {
 
         </section>
 
-        {/* Navegação */}
-        <nav className="mt-14 pt-8 border-t border-white/10 flex items-center justify-between gap-4">
+        {/* NAVEGAÇÃO */}
+
+        <nav className="
+          mt-14
+          pt-8
+          border-t
+          border-white/10
+          flex
+          items-center
+          justify-between
+          gap-4
+        ">
 
           {previousChapter ? (
             <button
+              type="button"
               onClick={() =>
-                router.push(`/capitulo/${previousChapter.id}`)
+                router.push(
+                  `/capitulo/${previousChapter.id}`
+                )
               }
-              className="flex-1 text-left px-4 py-4 rounded-xl bg-white/5 border border-white/10 hover:border-[#ff4f9a]/50 transition"
+              className="
+                flex-1
+                text-left
+                px-4
+                py-4
+                rounded-xl
+                bg-white/5
+                border
+                border-white/10
+                hover:border-[#ff4f9a]/50
+                transition
+              "
             >
-              <span className="block text-xs text-gray-500 mb-1">
+
+              <span className="
+                block
+                text-xs
+                text-gray-500
+                mb-1
+              ">
                 Capítulo anterior
               </span>
 
-              <span className="text-sm font-semibold text-white">
-                ← Capítulo {previousChapter.chapter_number}
+              <span className="
+                text-sm
+                font-semibold
+                text-white
+              ">
+                ← Capítulo{' '}
+                {previousChapter.chapter_number}
               </span>
+
             </button>
           ) : (
             <div className="flex-1" />
@@ -992,18 +1793,45 @@ export default function CapituloPage() {
 
           {nextChapter ? (
             <button
+              type="button"
               onClick={() =>
-                router.push(`/capitulo/${nextChapter.id}`)
+                router.push(
+                  `/capitulo/${nextChapter.id}`
+                )
               }
-              className="flex-1 text-right px-4 py-4 rounded-xl bg-white/5 border border-white/10 hover:border-[#ff4f9a]/50 transition"
+              className="
+                flex-1
+                text-right
+                px-4
+                py-4
+                rounded-xl
+                bg-white/5
+                border
+                border-white/10
+                hover:border-[#ff4f9a]/50
+                transition
+              "
             >
-              <span className="block text-xs text-gray-500 mb-1">
+
+              <span className="
+                block
+                text-xs
+                text-gray-500
+                mb-1
+              ">
                 Próximo capítulo
               </span>
 
-              <span className="text-sm font-semibold text-white">
-                Capítulo {nextChapter.chapter_number} →
+              <span className="
+                text-sm
+                font-semibold
+                text-white
+              ">
+                Capítulo{' '}
+                {nextChapter.chapter_number}
+                {' '}→
               </span>
+
             </button>
           ) : (
             <div className="flex-1" />
@@ -1013,32 +1841,83 @@ export default function CapituloPage() {
 
       </div>
 
-      {/* Sumário */}
+      {/* SUMÁRIO */}
+
       {showContents && (
         <div
-          className="fixed inset-0 z-50 bg-black/70"
-          onClick={() => setShowContents(false)}
+          className="
+            fixed
+            inset-0
+            z-50
+            bg-black/70
+          "
+          onClick={() =>
+            setShowContents(false)
+          }
         >
+
           <div
-            className="absolute right-0 top-0 h-full w-full max-w-md bg-[#111111] border-l border-white/10 overflow-y-auto"
-            onClick={(event) => event.stopPropagation()}
+            className="
+              absolute
+              right-0
+              top-0
+              h-full
+              w-full
+              max-w-md
+              bg-[#111111]
+              border-l
+              border-white/10
+              overflow-y-auto
+            "
+            onClick={(event) =>
+              event.stopPropagation()
+            }
           >
 
-            <div className="sticky top-0 bg-[#111111] border-b border-white/10 px-6 py-5 flex items-center justify-between">
+            <div className="
+              sticky
+              top-0
+              bg-[#111111]
+              border-b
+              border-white/10
+              px-6
+              py-5
+              flex
+              items-center
+              justify-between
+            ">
 
               <div>
-                <p className="text-xs text-[#ff4f9a] uppercase tracking-wider">
+
+                <p className="
+                  text-xs
+                  text-[#ff4f9a]
+                  uppercase
+                  tracking-wider
+                ">
                   História
                 </p>
 
-                <h2 className="text-xl font-bold mt-1">
+                <h2 className="
+                  text-xl
+                  font-bold
+                  mt-1
+                ">
                   Sumário
                 </h2>
+
               </div>
 
               <button
-                onClick={() => setShowContents(false)}
-                className="text-gray-400 hover:text-white text-2xl"
+                type="button"
+                onClick={() =>
+                  setShowContents(false)
+                }
+                className="
+                  text-gray-400
+                  hover:text-white
+                  text-2xl
+                "
               >
                 ×
               </button>
@@ -1048,7 +1927,12 @@ export default function CapituloPage() {
             <div className="p-4">
 
               {chapters.length === 0 ? (
-                <p className="text-gray-500 text-sm px-2 py-4">
+                <p className="
+                  text-gray-500
+                  text-sm
+                  px-2
+                  py-4
+                ">
                   Nenhum capítulo encontrado.
                 </p>
               ) : (
@@ -1061,6 +1945,7 @@ export default function CapituloPage() {
                     return (
                       <button
                         key={item.id}
+                        type="button"
                         onClick={() => {
                           setShowContents(false);
 
@@ -1077,7 +1962,11 @@ export default function CapituloPage() {
                         }`}
                       >
 
-                        <div className="flex items-center gap-3">
+                        <div className="
+                          flex
+                          items-center
+                          gap-3
+                        ">
 
                           <span
                             className={`text-xs font-semibold ${
@@ -1089,7 +1978,9 @@ export default function CapituloPage() {
                             {item.chapter_number}
                           </span>
 
-                          <div className="min-w-0">
+                          <div className="
+                            min-w-0
+                          ">
 
                             <p
                               className={`font-semibold truncate ${
@@ -1102,7 +1993,11 @@ export default function CapituloPage() {
                             </p>
 
                             {isCurrent && (
-                              <p className="text-xs text-gray-500 mt-1">
+                              <p className="
+                                text-xs
+                                text-gray-500
+                                mt-1
+                              ">
                                 Você está aqui
                               </p>
                             )}
@@ -1121,6 +2016,7 @@ export default function CapituloPage() {
             </div>
 
           </div>
+
         </div>
       )}
 
