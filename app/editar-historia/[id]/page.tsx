@@ -71,7 +71,7 @@ type Chapter = {
 };
 
 type ChapterResponse = {
-  chapter: Chapter;
+  chapter?: Chapter;
   media?: ChapterMedia[];
   scheduled?: boolean;
   published?: boolean;
@@ -131,7 +131,9 @@ function formatShortDate(value: string | null | undefined) {
   });
 }
 
-function formatDateForInput(value: string | null | undefined) {
+function formatDateForInput(
+  value: string | null | undefined
+) {
   if (!value) {
     return '';
   }
@@ -195,7 +197,10 @@ function getStatusLabel(
     return 'AGENDADO';
   }
 
-  if (status === 'published' || published) {
+  if (
+    status === 'published' ||
+    published
+  ) {
     return 'PUBLICADO';
   }
 
@@ -214,7 +219,10 @@ function getStatusClass(
     return 'border-violet-400/30 bg-violet-500/10 text-violet-200';
   }
 
-  if (status === 'published' || published) {
+  if (
+    status === 'published' ||
+    published
+  ) {
     return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200';
   }
 
@@ -615,6 +623,12 @@ export default function EditarHistoriaPage() {
           throw new Error(
             data.error ||
               'Não foi possível carregar o capítulo.'
+          );
+        }
+
+        if (!data.chapter) {
+          throw new Error(
+            'A API não retornou o capítulo.'
           );
         }
 
@@ -1042,6 +1056,25 @@ export default function EditarHistoriaPage() {
   ) {
     event.preventDefault();
 
+    if (!title.trim()) {
+      setError(
+        'A obra precisa ter um título.'
+      );
+
+      return;
+    }
+
+    if (
+      title.trim().length >
+      150
+    ) {
+      setError(
+        'O título da obra pode ter no máximo 150 caracteres.'
+      );
+
+      return;
+    }
+
     try {
       setSavingStory(true);
       setError('');
@@ -1080,24 +1113,36 @@ export default function EditarHistoriaPage() {
         );
       }
 
+      const nextTitle =
+        title.trim();
+
+      const nextDescription =
+        description.trim();
+
+      const nextGenre =
+        genre.trim();
+
+      const nextTags =
+        tags.map(
+          (name) => ({
+            name,
+          })
+        );
+
       setStory(
         (current) =>
           current
             ? {
                 ...current,
                 title:
-                  title.trim(),
+                  nextTitle,
                 description:
-                  description.trim(),
+                  nextDescription,
                 status,
                 rating,
                 genre:
-                  genre.trim(),
-                tags: tags.map(
-                  (name) => ({
-                    name,
-                  })
-                ),
+                  nextGenre,
+                tags: nextTags,
               }
             : current
       );
@@ -1106,18 +1151,14 @@ export default function EditarHistoriaPage() {
         storyRef.current = {
           ...storyRef.current,
           title:
-            title.trim(),
+            nextTitle,
           description:
-            description.trim(),
+            nextDescription,
           status,
           rating,
           genre:
-            genre.trim(),
-          tags: tags.map(
-            (name) => ({
-              name,
-            })
-          ),
+            nextGenre,
+          tags: nextTags,
         };
       }
 
@@ -1602,10 +1643,14 @@ export default function EditarHistoriaPage() {
         const matchingElements =
           Array.from(
             documentNode.querySelectorAll(
-              `[data-pending-media="${CSS.escape(
-                pendingItem.id
-              )}"]`
+              '[data-pending-media]'
             )
+          ).filter(
+            (element) =>
+              element.getAttribute(
+                'data-pending-media'
+              ) ===
+              pendingItem.id
           );
 
         matchingElements.forEach(
@@ -1720,7 +1765,7 @@ export default function EditarHistoriaPage() {
     const body =
       syncEditorBody();
 
-    const sanitizedBody =
+    let sanitizedBody =
       sanitizeHtml(body);
 
     const plainText =
@@ -1779,23 +1824,23 @@ export default function EditarHistoriaPage() {
       return;
     }
 
+    const pending =
+      chapterMedia.filter(
+        (media) =>
+          !media.existing &&
+          media.file
+      );
+
+    const existing =
+      chapterMedia.filter(
+        (media) =>
+          media.existing
+      );
+
     try {
       setSavingChapter(true);
       setError('');
       setSuccess('');
-
-      const pending =
-        chapterMedia.filter(
-          (media) =>
-            !media.existing &&
-            media.file
-        );
-
-      const existing =
-        chapterMedia.filter(
-          (media) =>
-            media.existing
-        );
 
       let workingBody =
         sanitizedBody;
@@ -1806,6 +1851,14 @@ export default function EditarHistoriaPage() {
             media.id
         );
 
+      /*
+       * A API atual precisa primeiro receber os arquivos
+       * para gerar as URLs reais. Por isso, quando existem
+       * novas mídias, fazemos uma primeira gravação técnica
+       * como rascunho e, depois, a gravação definitiva.
+       *
+       * O capítulo nunca é publicado nessa primeira etapa.
+       */
       if (
         pending.length > 0
       ) {
@@ -1875,7 +1928,7 @@ export default function EditarHistoriaPage() {
           );
         }
 
-        const returnedMedia: ChapterMedia[] =
+        const returnedMedia =
           uploadResult.media ||
           [];
 
@@ -1888,6 +1941,15 @@ export default function EditarHistoriaPage() {
                   media.id
               )
           );
+
+        if (
+          newMedia.length !==
+          pending.length
+        ) {
+          throw new Error(
+            'Nem todas as mídias foram enviadas corretamente. Tente novamente.'
+          );
+        }
 
         workingBody =
           replacePendingMediaWithRealUrls(
@@ -1930,6 +1992,9 @@ export default function EditarHistoriaPage() {
         setMediaUploading(false);
       }
 
+      /*
+       * Gravação definitiva.
+       */
       const formData =
         new FormData();
 
@@ -1993,20 +2058,39 @@ export default function EditarHistoriaPage() {
         );
       }
 
+      if (!data.chapter) {
+        throw new Error(
+          'A API não retornou o capítulo salvo.'
+        );
+      }
+
       const savedChapter =
         data.chapter;
 
+      /*
+       * A API pode não devolver scheduled_for enquanto
+       * ele estiver armazenado na tabela de agendamento.
+       * Por isso preservamos o valor que o usuário acabou
+       * de escolher quando estamos agendando.
+       */
       const resolvedScheduledFor =
-        data.scheduled_for ??
-        savedChapter.scheduled_for ??
-        null;
+        finalStatus === 'scheduled'
+          ? data.scheduled_for ??
+            savedChapter.scheduled_for ??
+            new Date(
+              scheduledFor
+            ).toISOString()
+          : null;
 
-      setChapter(
+      const normalizedSavedChapter: Chapter =
         {
           ...savedChapter,
           scheduled_for:
             resolvedScheduledFor,
-        }
+        };
+
+      setChapter(
+        normalizedSavedChapter
       );
 
       setChapterStatus(
@@ -2147,6 +2231,7 @@ export default function EditarHistoriaPage() {
       );
     } finally {
       setSavingChapter(false);
+      setMediaUploading(false);
     }
   }
 
@@ -2255,6 +2340,19 @@ export default function EditarHistoriaPage() {
   }
 
   function clearChapterSelection() {
+    chapterMedia.forEach(
+      (media) => {
+        if (
+          !media.existing &&
+          media.url.startsWith('blob:')
+        ) {
+          URL.revokeObjectURL(
+            media.url
+          );
+        }
+      }
+    );
+
     setSelectedChapterId(null);
     setChapter(null);
     setPreviewMode(false);
@@ -2268,6 +2366,7 @@ export default function EditarHistoriaPage() {
     setLinkValue('');
     setError('');
     setSuccess('');
+
     savedSelectionRef.current =
       null;
 
@@ -3107,7 +3206,9 @@ export default function EditarHistoriaPage() {
                         }
                         className="rounded-xl bg-pink-500 px-4 py-2.5 text-sm font-medium hover:bg-pink-400 disabled:opacity-50 transition"
                       >
-                        Publicar
+                        {savingChapter
+                          ? 'Salvando...'
+                          : 'Publicar'}
                       </button>
                     </div>
                   </div>
@@ -3324,10 +3425,7 @@ export default function EditarHistoriaPage() {
                               {
                                 chapterMedia.length
                               }
-                              /
-                              {
-                                MAX_MEDIA
-                              }{' '}
+                              /{MAX_MEDIA}{' '}
                               mídias
                             </span>
                           </div>
@@ -3446,10 +3544,7 @@ export default function EditarHistoriaPage() {
                           {
                             chapterMedia.length
                           }
-                          /
-                          {
-                            MAX_MEDIA
-                          }
+                          /{MAX_MEDIA}
                         </span>
                       </div>
 
@@ -3555,12 +3650,24 @@ export default function EditarHistoriaPage() {
                         value={
                           chapterStatus
                         }
-                        onChange={(event) =>
-                          setChapterStatus(
+                        onChange={(event) => {
+                          const nextStatus =
                             event.target
-                              .value as Chapter['publication_status']
-                          )
-                        }
+                              .value as Chapter['publication_status'];
+
+                          setChapterStatus(
+                            nextStatus
+                          );
+
+                          if (
+                            nextStatus !==
+                            'scheduled'
+                          ) {
+                            setScheduledFor(
+                              ''
+                            );
+                          }
+                        }}
                         className="rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
                       >
                         <option value="draft">
