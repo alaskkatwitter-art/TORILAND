@@ -130,6 +130,38 @@ function formatShortDate(value: string | null | undefined) {
   });
 }
 
+function formatDateForInput(value: string | null | undefined) {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const year = date.getFullYear();
+
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, '0');
+
+  const day = String(
+    date.getDate()
+  ).padStart(2, '0');
+
+  const hours = String(
+    date.getHours()
+  ).padStart(2, '0');
+
+  const minutes = String(
+    date.getMinutes()
+  ).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 function getStatusLabel(
   status: Chapter['publication_status'],
   published?: boolean
@@ -173,10 +205,11 @@ function sanitizeHtml(html: string) {
     return '';
   }
 
-  const documentNode = new DOMParser().parseFromString(
-    html,
-    'text/html'
-  );
+  const documentNode =
+    new DOMParser().parseFromString(
+      html,
+      'text/html'
+    );
 
   documentNode
     .querySelectorAll(
@@ -189,32 +222,46 @@ function sanitizeHtml(html: string) {
   documentNode
     .querySelectorAll('*')
     .forEach((element) => {
-      Array.from(element.attributes).forEach(
-        (attribute) => {
-          const name = attribute.name.toLowerCase();
-          const value = attribute.value;
+      Array.from(
+        element.attributes
+      ).forEach((attribute) => {
+        const name =
+          attribute.name.toLowerCase();
 
-          if (name.startsWith('on')) {
-            element.removeAttribute(attribute.name);
-            return;
-          }
+        const value =
+          attribute.value;
 
-          if (
-            ['href', 'src', 'action', 'formaction'].includes(
-              name
-            ) &&
-            /^\s*javascript:/i.test(value)
-          ) {
-            element.removeAttribute(attribute.name);
-          }
+        if (name.startsWith('on')) {
+          element.removeAttribute(
+            attribute.name
+          );
+          return;
         }
-      );
+
+        if (
+          [
+            'href',
+            'src',
+            'action',
+            'formaction',
+          ].includes(name) &&
+          /^\s*javascript:/i.test(value)
+        ) {
+          element.removeAttribute(
+            attribute.name
+          );
+        }
+      });
     });
 
   documentNode
     .querySelectorAll('a')
     .forEach((link) => {
-      link.setAttribute('target', '_blank');
+      link.setAttribute(
+        'target',
+        '_blank'
+      );
+
       link.setAttribute(
         'rel',
         'noopener noreferrer nofollow'
@@ -227,7 +274,8 @@ function sanitizeHtml(html: string) {
 export default function EditarHistoriaPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams =
+    useSearchParams();
 
   const id = String(params.id);
 
@@ -237,11 +285,17 @@ export default function EditarHistoriaPage() {
   const mediaInputRef =
     useRef<HTMLInputElement | null>(null);
 
+  const coverInputRef =
+    useRef<HTMLInputElement | null>(null);
+
   const linkInputRef =
     useRef<HTMLInputElement | null>(null);
 
   const savedSelectionRef =
     useRef<Range | null>(null);
+
+  const storyRef =
+    useRef<Story | null>(null);
 
   const [story, setStory] =
     useState<Story | null>(null);
@@ -329,22 +383,30 @@ export default function EditarHistoriaPage() {
     useState('');
 
   function saveSelection() {
-    const selection = window.getSelection();
-
-    if (!selection || selection.rangeCount === 0) {
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
+    const selection =
+      window.getSelection();
 
     if (
-      !editorRef.current ||
-      !editorRef.current.contains(range.commonAncestorContainer)
+      !selection ||
+      selection.rangeCount === 0
     ) {
       return;
     }
 
-    savedSelectionRef.current = range.cloneRange();
+    const range =
+      selection.getRangeAt(0);
+
+    if (
+      !editorRef.current ||
+      !editorRef.current.contains(
+        range.commonAncestorContainer
+      )
+    ) {
+      return;
+    }
+
+    savedSelectionRef.current =
+      range.cloneRange();
   }
 
   function restoreSelection() {
@@ -352,26 +414,31 @@ export default function EditarHistoriaPage() {
       return;
     }
 
-    const range = savedSelectionRef.current;
+    const range =
+      savedSelectionRef.current;
 
     if (!range) {
       editorRef.current.focus();
       return;
     }
 
-    const selection = window.getSelection();
+    try {
+      const selection =
+        window.getSelection();
 
-    if (!selection) {
-      return;
+      if (!selection) {
+        return;
+      }
+
+      selection.removeAllRanges();
+      selection.addRange(
+        range
+      );
+
+      editorRef.current.focus();
+    } catch {
+      editorRef.current.focus();
     }
-
-    selection.removeAllRanges();
-    selection.addRange(range);
-    editorRef.current.focus();
-  }
-
-  function focusEditor() {
-    editorRef.current?.focus();
   }
 
   function syncEditorBody() {
@@ -393,14 +460,16 @@ export default function EditarHistoriaPage() {
         setLoading(true);
         setError('');
 
-        const response = await fetch(
-          `/api/stories/${id}`,
-          {
-            cache: 'no-store',
-          }
-        );
+        const response =
+          await fetch(
+            `/api/stories/${id}`,
+            {
+              cache: 'no-store',
+            }
+          );
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
         if (!response.ok) {
           throw new Error(
@@ -412,7 +481,12 @@ export default function EditarHistoriaPage() {
         const loadedStory =
           data.story || data;
 
-        setStory(loadedStory);
+        storyRef.current =
+          loadedStory;
+
+        setStory(
+          loadedStory
+        );
 
         setTitle(
           loadedStory.title || ''
@@ -435,10 +509,15 @@ export default function EditarHistoriaPage() {
         );
 
         setTags(
-          Array.isArray(loadedStory.tags)
+          Array.isArray(
+            loadedStory.tags
+          )
             ? loadedStory.tags.map(
-                (tag: Tag | string) =>
-                  typeof tag === 'string'
+                (
+                  tag: Tag | string
+                ) =>
+                  typeof tag ===
+                  'string'
                     ? tag
                     : tag.name
               )
@@ -446,17 +525,23 @@ export default function EditarHistoriaPage() {
         );
 
         setCoverPreview(
-          loadedStory.cover_url || null
+          loadedStory.cover_url ||
+            null
         );
 
         const requestedChapter =
-          searchParams.get('chapter');
+          searchParams.get(
+            'chapter'
+          );
 
         if (
           requestedChapter &&
           loadedStory.chapters?.some(
-            (item: StoryChapter) =>
-              item.id === requestedChapter
+            (
+              item: StoryChapter
+            ) =>
+              item.id ===
+              requestedChapter
           )
         ) {
           setSelectedChapterId(
@@ -476,7 +561,7 @@ export default function EditarHistoriaPage() {
       }
     }
 
-    loadStory();
+    void loadStory();
   }, [id, searchParams]);
 
   useEffect(() => {
@@ -490,12 +575,13 @@ export default function EditarHistoriaPage() {
         setError('');
         setSuccess('');
 
-        const response = await fetch(
-          `/api/chapters/${selectedChapterId}`,
-          {
-            cache: 'no-store',
-          }
-        );
+        const response =
+          await fetch(
+            `/api/chapters/${selectedChapterId}`,
+            {
+              cache: 'no-store',
+            }
+          );
 
         const data =
           (await response.json()) as
@@ -506,7 +592,8 @@ export default function EditarHistoriaPage() {
 
         if (!response.ok) {
           throw new Error(
-            'error' in data && data.error
+            'error' in data &&
+            data.error
               ? data.error
               : 'Não foi possível carregar o capítulo.'
           );
@@ -514,6 +601,22 @@ export default function EditarHistoriaPage() {
 
         const loadedChapter =
           data.chapter;
+
+        const currentStory =
+          storyRef.current;
+
+        const storyChapter =
+          currentStory?.chapters?.find(
+            (item) =>
+              item.id ===
+              loadedChapter.id
+          );
+
+        const resolvedScheduledFor =
+          data.scheduled_for ??
+          loadedChapter.scheduled_for ??
+          storyChapter?.scheduled_for ??
+          null;
 
         setChapter(
           loadedChapter
@@ -528,7 +631,8 @@ export default function EditarHistoriaPage() {
         );
 
         setAuthorNotes(
-          loadedChapter.author_notes || ''
+          loadedChapter.author_notes ||
+            ''
         );
 
         setChapterStatus(
@@ -539,9 +643,9 @@ export default function EditarHistoriaPage() {
         );
 
         setScheduledFor(
-          loadedChapter.scheduled_for
+          resolvedScheduledFor
             ? formatDateForInput(
-                loadedChapter.scheduled_for
+                resolvedScheduledFor
               )
             : ''
         );
@@ -562,22 +666,36 @@ export default function EditarHistoriaPage() {
           )
         );
 
-        const params =
+        savedSelectionRef.current =
+          null;
+
+        const nextParams =
           new URLSearchParams(
             searchParams.toString()
           );
 
-        params.set(
+        nextParams.set(
           'chapter',
           loadedChapter.id
         );
 
-        const query =
-          params.toString();
+        const nextQuery =
+          nextParams.toString();
 
-        router.replace(
-          `/editar-historia/${id}?${query}`
-        );
+        const nextUrl =
+          nextQuery
+            ? `/editar-historia/${id}?${nextQuery}`
+            : `/editar-historia/${id}`;
+
+        if (
+          window.location.pathname +
+            window.location.search !==
+          nextUrl
+        ) {
+          router.replace(
+            nextUrl
+          );
+        }
       } catch (err: unknown) {
         console.error(err);
 
@@ -591,7 +709,7 @@ export default function EditarHistoriaPage() {
       }
     }
 
-    loadChapter();
+    void loadChapter();
   }, [
     selectedChapterId,
     id,
@@ -632,6 +750,23 @@ export default function EditarHistoriaPage() {
     }
   }, [showLinkBox]);
 
+  useEffect(() => {
+    return () => {
+      chapterMedia.forEach(
+        (media) => {
+          if (
+            !media.existing &&
+            media.url.startsWith('blob:')
+          ) {
+            URL.revokeObjectURL(
+              media.url
+            );
+          }
+        }
+      );
+    };
+  }, [chapterMedia]);
+
   function selectChapter(
     chapterId: string
   ) {
@@ -640,22 +775,25 @@ export default function EditarHistoriaPage() {
     setSelectedChapterId(
       chapterId
     );
+
     setPreviewMode(false);
+    setShowLinkBox(false);
+    setLinkValue('');
     setError('');
     setSuccess('');
 
-    const params =
+    const nextParams =
       new URLSearchParams(
         searchParams.toString()
       );
 
-    params.set(
+    nextParams.set(
       'chapter',
       chapterId
     );
 
     router.replace(
-      `/editar-historia/${id}?${params.toString()}`
+      `/editar-historia/${id}?${nextParams.toString()}`
     );
   }
 
@@ -664,6 +802,8 @@ export default function EditarHistoriaPage() {
   ) {
     const file =
       event.target.files?.[0];
+
+    event.target.value = '';
 
     if (!file) {
       return;
@@ -700,6 +840,7 @@ export default function EditarHistoriaPage() {
     );
 
     setError('');
+    setSuccess('');
 
     void (async () => {
       try {
@@ -736,12 +877,32 @@ export default function EditarHistoriaPage() {
           setCoverPreview(
             data.cover_url
           );
+
+          URL.revokeObjectURL(
+            objectUrl
+          );
         }
+
+        setStory(
+          (current) =>
+            current
+              ? {
+                  ...current,
+                  cover_url:
+                    data.cover_url ||
+                    current.cover_url,
+                }
+              : current
+        );
 
         setSuccess(
           'Capa alterada com sucesso.'
         );
       } catch (err: unknown) {
+        URL.revokeObjectURL(
+          objectUrl
+        );
+
         console.error(err);
 
         setError(
@@ -795,6 +956,7 @@ export default function EditarHistoriaPage() {
     );
 
     setTagInput('');
+    setError('');
   }
 
   function removeTag(
@@ -863,7 +1025,8 @@ export default function EditarHistoriaPage() {
                 'application/json',
             },
             body: JSON.stringify({
-              title: title.trim(),
+              title:
+                title.trim(),
               description:
                 description.trim(),
               status,
@@ -907,6 +1070,25 @@ export default function EditarHistoriaPage() {
             : current
       );
 
+      if (storyRef.current) {
+        storyRef.current = {
+          ...storyRef.current,
+          title:
+            title.trim(),
+          description:
+            description.trim(),
+          status,
+          rating,
+          genre:
+            genre.trim(),
+          tags: tags.map(
+            (name) => ({
+              name,
+            })
+          ),
+        };
+      }
+
       setSuccess(
         'Informações da obra salvas com sucesso.'
       );
@@ -929,6 +1111,8 @@ export default function EditarHistoriaPage() {
   ) {
     restoreSelection();
 
+    editorRef.current?.focus();
+
     document.execCommand(
       command,
       false,
@@ -944,6 +1128,10 @@ export default function EditarHistoriaPage() {
       linkValue.trim();
 
     if (!value) {
+      setError(
+        'Digite um endereço para inserir o link.'
+      );
+
       return;
     }
 
@@ -971,6 +1159,7 @@ export default function EditarHistoriaPage() {
 
     setLinkValue('');
     setShowLinkBox(false);
+    setError('');
   }
 
   function createPendingMediaMarker(
@@ -1108,6 +1297,7 @@ export default function EditarHistoriaPage() {
               'br'
             )
           );
+
           fragment.appendChild(
             document.createElement(
               'br'
@@ -1173,14 +1363,23 @@ export default function EditarHistoriaPage() {
       return;
     }
 
-    const filesToProcess =
-      files.slice(
-        0,
-        availableSlots
+    if (
+      files.length >
+      availableSlots
+    ) {
+      setError(
+        `Você pode adicionar apenas mais ${availableSlots} mídia${
+          availableSlots === 1
+            ? ''
+            : 's'
+        } neste capítulo.`
       );
 
+      return;
+    }
+
     const invalidType =
-      filesToProcess.find(
+      files.find(
         (file) =>
           !ALLOWED_MEDIA_TYPES.includes(
             file.type
@@ -1196,7 +1395,7 @@ export default function EditarHistoriaPage() {
     }
 
     const oversized =
-      filesToProcess.find(
+      files.find(
         (file) =>
           file.size >
           MAX_MEDIA_SIZE
@@ -1204,7 +1403,7 @@ export default function EditarHistoriaPage() {
 
     if (oversized) {
       setError(
-        `Cada imagem ou GIF pode ter no máximo 5 MB.`
+        'Cada imagem ou GIF pode ter no máximo 5 MB.'
       );
 
       return;
@@ -1216,7 +1415,7 @@ export default function EditarHistoriaPage() {
       Date.now();
 
     const pendingMedia =
-      filesToProcess.map(
+      files.map(
         (file, index) => ({
           id:
             `pending-${timestamp}-${index}-${Math.random()
@@ -1282,33 +1481,36 @@ export default function EditarHistoriaPage() {
     if (
       editorRef.current
     ) {
-      const pendingMarkers =
-        editorRef.current.querySelectorAll(
-          `[data-pending-media="${CSS.escape(
-            mediaId
-          )}"]`
+      const elements =
+        Array.from(
+          editorRef.current.querySelectorAll(
+            '[data-pending-media], [data-media-id]'
+          )
         );
 
-      pendingMarkers.forEach(
+      elements.forEach(
         (element) => {
-          element.remove();
-        }
-      );
+          const pendingId =
+            element.getAttribute(
+              'data-pending-media'
+            );
 
-      const existingMarkers =
-        editorRef.current.querySelectorAll(
-          `[data-media-id="${CSS.escape(
-            mediaId
-          )}"]`
-        );
+          const existingId =
+            element.getAttribute(
+              'data-media-id'
+            );
 
-      existingMarkers.forEach(
-        (element) => {
-          element.remove();
+          if (
+            pendingId === mediaId ||
+            existingId === mediaId
+          ) {
+            element.remove();
+          }
         }
       );
 
       syncEditorBody();
+      saveSelection();
     }
   }
 
@@ -1323,12 +1525,6 @@ export default function EditarHistoriaPage() {
         'text/html'
       );
 
-    const uploadedByPendingId =
-      new Map<
-        string,
-        ChapterMedia
-      >();
-
     const pendingElements =
       Array.from(
         documentNode.querySelectorAll(
@@ -1336,28 +1532,40 @@ export default function EditarHistoriaPage() {
         )
       );
 
-    pendingElements.forEach(
-      (element, index) => {
-        const pendingId =
-          element.getAttribute(
-            'data-pending-media'
-          );
+    const pendingIdsInDocument =
+      pendingElements
+        .map(
+          (element) =>
+            element.getAttribute(
+              'data-pending-media'
+            )
+        )
+        .filter(
+          (
+            value
+          ): value is string =>
+            Boolean(value)
+        );
 
-        if (!pendingId) {
-          return;
-        }
+    const pendingInOrder =
+      pendingIdsInDocument
+        .map(
+          (pendingId) =>
+            pendingMedia.find(
+              (item) =>
+                item.id ===
+                pendingId
+            )
+        )
+        .filter(
+          (
+            item
+          ): item is EditorMedia =>
+            Boolean(item)
+        );
 
-        const pendingItem =
-          pendingMedia.find(
-            (item) =>
-              item.id ===
-              pendingId
-          );
-
-        if (!pendingItem) {
-          return;
-        }
-
+    pendingInOrder.forEach(
+      (pendingItem, index) => {
         const uploadedMedia =
           uploaded[index];
 
@@ -1365,9 +1573,50 @@ export default function EditarHistoriaPage() {
           return;
         }
 
-        uploadedByPendingId.set(
-          pendingId,
-          uploadedMedia
+        const matchingElements =
+          Array.from(
+            documentNode.querySelectorAll(
+              `[data-pending-media="${CSS.escape(
+                pendingItem.id
+              )}"]`
+            )
+          );
+
+        matchingElements.forEach(
+          (element) => {
+            const image =
+              documentNode.createElement(
+                'img'
+              );
+
+            image.src =
+              uploadedMedia.media_url;
+
+            image.alt =
+              uploadedMedia.media_type ===
+              'gif'
+                ? 'GIF do capítulo'
+                : 'Imagem do capítulo';
+
+            image.setAttribute(
+              'data-media-id',
+              uploadedMedia.id
+            );
+
+            image.setAttribute(
+              'data-media-type',
+              uploadedMedia.media_type
+            );
+
+            image.setAttribute(
+              'loading',
+              'lazy'
+            );
+
+            element.replaceWith(
+              image
+            );
+          }
         );
       }
     );
@@ -1378,50 +1627,16 @@ export default function EditarHistoriaPage() {
       )
       .forEach(
         (element) => {
-          const pendingId =
-            element.getAttribute(
-              'data-pending-media'
-            );
-
-          if (!pendingId) {
-            return;
-          }
-
-          const uploadedMedia =
-            uploadedByPendingId.get(
-              pendingId
-            );
-
-          if (!uploadedMedia) {
-            return;
-          }
-
-          const image =
-            documentNode.createElement(
-              'img'
-            );
-
-          image.src =
-            uploadedMedia.media_url;
-
-          image.alt =
-            uploadedMedia.media_type ===
-            'gif'
-              ? 'GIF do capítulo'
-              : 'Imagem do capítulo';
-
-          image.setAttribute(
-            'data-media-id',
-            uploadedMedia.id
+          element.removeAttribute(
+            'data-pending-media'
           );
 
-          image.setAttribute(
-            'data-media-type',
-            uploadedMedia.media_type
+          element.removeAttribute(
+            'data-media-type'
           );
 
-          element.replaceWith(
-            image
+          element.classList.remove(
+            'chapter-media-placeholder'
           );
         }
       );
@@ -1479,8 +1694,11 @@ export default function EditarHistoriaPage() {
     const body =
       syncEditorBody();
 
+    const sanitizedBody =
+      sanitizeHtml(body);
+
     const plainText =
-      body
+      sanitizedBody
         .replace(
           /<[^>]+>/g,
           ''
@@ -1492,8 +1710,8 @@ export default function EditarHistoriaPage() {
         .trim();
 
     if (
-      !body ||
-      body === '<br>' ||
+      !sanitizedBody ||
+      sanitizedBody === '<br>' ||
       plainText === ''
     ) {
       setError(
@@ -1554,7 +1772,7 @@ export default function EditarHistoriaPage() {
         );
 
       let workingBody =
-        body;
+        sanitizedBody;
 
       let finalMediaIds =
         existing.map(
@@ -1752,8 +1970,17 @@ export default function EditarHistoriaPage() {
       const savedChapter =
         data.chapter as Chapter;
 
+      const resolvedScheduledFor =
+        data.scheduled_for ??
+        savedChapter.scheduled_for ??
+        null;
+
       setChapter(
-        savedChapter
+        {
+          ...savedChapter,
+          scheduled_for:
+            resolvedScheduledFor,
+        }
       );
 
       setChapterStatus(
@@ -1765,18 +1992,13 @@ export default function EditarHistoriaPage() {
           workingBody
       );
 
-      if (
-        data.scheduled_for !==
-        undefined
-      ) {
-        setScheduledFor(
-          data.scheduled_for
-            ? formatDateForInput(
-                data.scheduled_for
-              )
-            : ''
-        );
-      }
+      setScheduledFor(
+        resolvedScheduledFor
+          ? formatDateForInput(
+              resolvedScheduledFor
+            )
+          : ''
+      );
 
       if (
         data.media
@@ -1802,6 +2024,9 @@ export default function EditarHistoriaPage() {
           savedChapter.body ||
           workingBody;
       }
+
+      savedSelectionRef.current =
+        null;
 
       if (
         finalStatus ===
@@ -1849,19 +2074,43 @@ export default function EditarHistoriaPage() {
                             publication_status:
                               savedChapter.publication_status,
                             scheduled_for:
-                              data.scheduled_for ??
-                              savedChapter.scheduled_for ??
-                              null,
+                              resolvedScheduledFor,
                             is_scheduled:
-                              Boolean(
-                                data.scheduled
-                              ),
+                              finalStatus ===
+                              'scheduled',
                           }
                         : item
                   ),
               }
             : current
       );
+
+      if (storyRef.current) {
+        storyRef.current = {
+          ...storyRef.current,
+          chapters:
+            storyRef.current.chapters.map(
+              (item) =>
+                item.id ===
+                savedChapter.id
+                  ? {
+                      ...item,
+                      title:
+                        savedChapter.title,
+                      published:
+                        savedChapter.published,
+                      publication_status:
+                        savedChapter.publication_status,
+                      scheduled_for:
+                        resolvedScheduledFor,
+                      is_scheduled:
+                        finalStatus ===
+                        'scheduled',
+                    }
+                  : item
+            ),
+        };
+      }
     } catch (err: unknown) {
       console.error(err);
 
@@ -1981,50 +2230,6 @@ export default function EditarHistoriaPage() {
     openMediaPicker();
   }
 
-  function formatDateForInput(
-    value: string | null
-  ) {
-    if (!value) {
-      return '';
-    }
-
-    const date =
-      new Date(value);
-
-    if (
-      Number.isNaN(
-        date.getTime()
-      )
-    ) {
-      return '';
-    }
-
-    const year =
-      date.getFullYear();
-
-    const month =
-      String(
-        date.getMonth() + 1
-      ).padStart(2, '0');
-
-    const day =
-      String(
-        date.getDate()
-      ).padStart(2, '0');
-
-    const hours =
-      String(
-        date.getHours()
-      ).padStart(2, '0');
-
-    const minutes =
-      String(
-        date.getMinutes()
-      ).padStart(2, '0');
-
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  }
-
   function clearChapterSelection() {
     setSelectedChapterId(null);
     setChapter(null);
@@ -2035,18 +2240,24 @@ export default function EditarHistoriaPage() {
     setAuthorNotes('');
     setScheduledFor('');
     setChapterStatus('draft');
+    setShowLinkBox(false);
+    setLinkValue('');
+    setError('');
+    setSuccess('');
+    savedSelectionRef.current =
+      null;
 
-    const params =
+    const nextParams =
       new URLSearchParams(
         searchParams.toString()
       );
 
-    params.delete(
+    nextParams.delete(
       'chapter'
     );
 
     const query =
-      params.toString();
+      nextParams.toString();
 
     router.replace(
       query
@@ -2101,6 +2312,7 @@ export default function EditarHistoriaPage() {
           outline: none;
           white-space: pre-wrap;
           word-break: break-word;
+          overflow-wrap: anywhere;
           font-family: inherit;
         }
 
@@ -2301,6 +2513,7 @@ export default function EditarHistoriaPage() {
                   ALTERAR A CAPA
 
                   <input
+                    ref={coverInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={
@@ -2678,6 +2891,7 @@ export default function EditarHistoriaPage() {
                   ALTERAR A CAPA
 
                   <input
+                    ref={coverInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={
@@ -3120,6 +3334,19 @@ export default function EditarHistoriaPage() {
                                     ) {
                                       event.preventDefault();
                                       addLink();
+                                    }
+
+                                    if (
+                                      event.key ===
+                                      'Escape'
+                                    ) {
+                                      event.preventDefault();
+                                      setShowLinkBox(
+                                        false
+                                      );
+                                      setLinkValue(
+                                        ''
+                                      );
                                     }
                                   }}
                                   placeholder="https://exemplo.com"
