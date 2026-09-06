@@ -29,6 +29,19 @@ type Story = {
   rating: string | null;
   created_at: string;
   updated_at: string;
+  fandom?: string | null;
+  main_fandom?: string | null;
+  fandom_name?: string | null;
+};
+
+type SocialStory = {
+  id: string;
+  user_id: string;
+  media_url: string;
+  media_type: 'image' | 'gif' | 'video';
+  created_at: string;
+  expires_at: string;
+  thought?: string | null;
 };
 
 type PostMedia = {
@@ -80,7 +93,9 @@ type SpotifyPreviewData = {
   provider_name?: string | null;
 };
 
-type ProfileTab = 'stories' | 'nook';
+type ProfileTab =
+  | 'stories'
+  | 'nook';
 
 const REACTIONS = [
   '❤️',
@@ -92,7 +107,8 @@ const REACTIONS = [
 ];
 
 const MAX_MEDIA = 4;
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE =
+  10 * 1024 * 1024;
 
 const ACCEPTED_MEDIA_TYPES = [
   'image/jpeg',
@@ -104,13 +120,34 @@ const ACCEPTED_MEDIA_TYPES = [
 const SPOTIFY_URL_REGEX =
   /https?:\/\/(?:open\.)?spotify\.com\/(?:intl-[a-zA-Z-]+\/)?(?:track|album|playlist|artist|episode|show)\/[A-Za-z0-9]+(?:\?[^\s]+)?/g;
 
+const PRIVATE_THEME_STORAGE_PREFIX =
+  'nooklie-profile-theme:';
+
+const DEFAULT_PROFILE_THEME =
+  '#ff78b9';
+
+const PROFILE_THEME_OPTIONS = [
+  '#ff78b9',
+  '#ff9aca',
+  '#b77cff',
+  '#7c8cff',
+  '#62c8ff',
+  '#61d6a4',
+  '#9be15d',
+  '#ffd166',
+  '#ff8a65',
+  '#ffffff',
+];
+
 function SpotifyPreview({
   url,
 }: {
   url: string;
 }) {
   const [preview, setPreview] =
-    useState<SpotifyPreviewData | null>(null);
+    useState<SpotifyPreviewData | null>(
+      null
+    );
 
   const [loading, setLoading] =
     useState(true);
@@ -229,7 +266,7 @@ function renderPostBody(body: string) {
 
   if (!matches.length) {
     return (
-      <p className="whitespace-pre-wrap pr-8 text-sm leading-7 text-white/75">
+      <p className="whitespace-pre-wrap text-sm leading-7 text-white/75">
         {body}
       </p>
     );
@@ -275,7 +312,8 @@ function renderPostBody(body: string) {
       />
     );
 
-    lastIndex = start + url.length;
+    lastIndex =
+      start + url.length;
   });
 
   if (lastIndex < body.length) {
@@ -290,7 +328,7 @@ function renderPostBody(body: string) {
   }
 
   return (
-    <div className="pr-8 text-sm leading-7 text-white/75">
+    <div className="text-sm leading-7 text-white/75">
       {content}
     </div>
   );
@@ -300,16 +338,24 @@ export default function PerfilPage() {
   const router = useRouter();
 
   const avatarInputRef =
-    useRef<HTMLInputElement | null>(null);
+    useRef<HTMLInputElement | null>(
+      null
+    );
 
   const coverInputRef =
-    useRef<HTMLInputElement | null>(null);
+    useRef<HTMLInputElement | null>(
+      null
+    );
 
   const mediaInputRef =
-    useRef<HTMLInputElement | null>(null);
+    useRef<HTMLInputElement | null>(
+      null
+    );
 
   const tabsContainerRef =
-    useRef<HTMLDivElement | null>(null);
+    useRef<HTMLDivElement | null>(
+      null
+    );
 
   const swipeStartX =
     useRef<number | null>(null);
@@ -319,6 +365,9 @@ export default function PerfilPage() {
 
   const [stories, setStories] =
     useState<Story[]>([]);
+
+  const [socialStories, setSocialStories] =
+    useState<SocialStory[]>([]);
 
   const [nookPosts, setNookPosts] =
     useState<NookPost[]>([]);
@@ -345,6 +394,12 @@ export default function PerfilPage() {
     useState('');
 
   const [saving, setSaving] =
+    useState(false);
+
+  const [profileTheme, setProfileTheme] =
+    useState(DEFAULT_PROFILE_THEME);
+
+  const [showThemePicker, setShowThemePicker] =
     useState(false);
 
   /* =========================
@@ -482,6 +537,72 @@ export default function PerfilPage() {
   }, [router]);
 
   /* =========================
+     COR PRIVADA DO PERFIL
+  ========================= */
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    const storageKey =
+      `${PRIVATE_THEME_STORAGE_PREFIX}${user.id}`;
+
+    try {
+      const savedTheme =
+        window.localStorage.getItem(
+          storageKey
+        );
+
+      if (
+        savedTheme &&
+        PROFILE_THEME_OPTIONS.includes(
+          savedTheme
+        )
+      ) {
+        setProfileTheme(savedTheme);
+      } else {
+        setProfileTheme(
+          DEFAULT_PROFILE_THEME
+        );
+      }
+    } catch {
+      setProfileTheme(
+        DEFAULT_PROFILE_THEME
+      );
+    }
+  }, [user?.id]);
+
+  function handleThemeChange(
+    color: string
+  ) {
+    if (!user?.id) {
+      return;
+    }
+
+    setProfileTheme(color);
+
+    try {
+      window.localStorage.setItem(
+        `${PRIVATE_THEME_STORAGE_PREFIX}${user.id}`,
+        color
+      );
+    } catch {
+      // O perfil continua funcionando mesmo se localStorage estiver indisponível.
+    }
+
+    setSuccess(
+      'Sua cor de perfil foi alterada. Essa personalização é privada.'
+    );
+
+    setShowThemePicker(false);
+
+    setTimeout(() => {
+      setSuccess('');
+    }, 2500);
+  }
+
+  /* =========================
      CARREGAR HISTÓRIAS
   ========================= */
 
@@ -529,6 +650,49 @@ export default function PerfilPage() {
     }
 
     loadStories();
+  }, []);
+
+  /* =========================
+     CARREGAR STORIES SOCIAIS
+  ========================= */
+
+  useEffect(() => {
+    async function loadSocialStories() {
+      try {
+        const response = await fetch(
+          '/api/stories',
+          {
+            cache: 'no-store',
+          }
+        );
+
+        if (!response.ok) {
+          setSocialStories([]);
+          return;
+        }
+
+        const data =
+          await response.json();
+
+        const loadedStories =
+          Array.isArray(data.stories)
+            ? data.stories
+            : [];
+
+        setSocialStories(
+          loadedStories
+        );
+      } catch (error) {
+        console.error(
+          'Erro ao carregar Stories:',
+          error
+        );
+
+        setSocialStories([]);
+      }
+    }
+
+    loadSocialStories();
   }, []);
 
   /* =========================
@@ -2503,12 +2667,33 @@ export default function PerfilPage() {
     user.display_name ||
     user.username;
 
+  const hasActiveSocialStories =
+    socialStories.some(
+      (story) =>
+        story.user_id === user.id &&
+        new Date(
+          story.expires_at
+        ).getTime() > Date.now()
+    );
+
+  const mainFandom = (
+    story: Story
+  ) =>
+    story.main_fandom ||
+    story.fandom ||
+    story.fandom_name ||
+    'Fandom não informado';
+
   return (
     <main
       className="min-h-screen bg-[#100b12] text-white"
       onClick={() => {
         if (menuOpenPostId) {
           setMenuOpenPostId(null);
+        }
+
+        if (showThemePicker) {
+          setShowThemePicker(false);
         }
       }}
     >
@@ -2524,9 +2709,16 @@ export default function PerfilPage() {
             }}
             className="flex items-center gap-3"
           >
-            <CloudLogo />
+            <CloudLogo
+              color={profileTheme}
+            />
 
-            <span className="text-xl font-bold tracking-[0.15em] text-[#ff78b9]">
+            <span
+              className="text-xl font-bold tracking-[0.15em]"
+              style={{
+                color: profileTheme,
+              }}
+            >
               NOOKLIE
             </span>
           </button>
@@ -2537,7 +2729,7 @@ export default function PerfilPage() {
               event.stopPropagation();
               router.push('/');
             }}
-            className="rounded-full border border-white/10 px-5 py-2 text-sm font-semibold text-white/60 transition hover:border-[#ff78b9]/40 hover:text-white"
+            className="rounded-full border border-white/10 px-5 py-2 text-sm font-semibold text-white/60 transition hover:border-white/20 hover:text-white"
           >
             Voltar
           </button>
@@ -2547,14 +2739,22 @@ export default function PerfilPage() {
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-5 sm:py-8">
         {/* PERFIL */}
 
-        <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#191219]">
+        <section
+          className="overflow-hidden rounded-3xl border border-white/10 bg-[#191219]"
+          style={{
+            boxShadow: `0 0 80px ${profileTheme}10`,
+          }}
+        >
           {/* CAPA */}
 
           <button
             type="button"
             onClick={openCoverPicker}
             disabled={uploadingCover}
-            className="group relative block h-36 w-full overflow-hidden bg-gradient-to-r from-[#3b1b30] via-[#572544] to-[#241322] sm:h-44 md:h-48"
+            className="group relative block h-36 w-full overflow-hidden sm:h-44 md:h-48"
+            style={{
+              background: `linear-gradient(135deg, ${profileTheme}70, #191219, ${profileTheme}25)`,
+            }}
           >
             {user.cover_url && (
               <img
@@ -2587,30 +2787,80 @@ export default function PerfilPage() {
 
           <div className="relative px-5 pb-7 sm:px-7 md:px-10 md:pb-8">
             <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 md:flex-row md:items-end">
-              <button
-                type="button"
-                onClick={openAvatarPicker}
-                disabled={uploadingAvatar}
-                className="group relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-[#191219] bg-[#ff78b9] text-3xl font-black text-[#180d15] sm:h-28 sm:w-28 sm:text-4xl"
-              >
-                {user.avatar_url ? (
-                  <img
-                    src={user.avatar_url}
-                    alt={`Foto de perfil de ${displayName}`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  user.username
-                    .charAt(0)
-                    .toUpperCase()
-                )}
+              <div className="relative shrink-0">
+                {/* ANEL DE STORIES */}
 
-                <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100">
-                  {uploadingAvatar
-                    ? 'Enviando...'
-                    : 'Alterar foto'}
-                </span>
-              </button>
+                <div
+                  className={`rounded-full p-[3px] transition ${
+                    hasActiveSocialStories
+                      ? 'animate-[pulse_2.5s_ease-in-out_infinite]'
+                      : ''
+                  }`}
+                  style={
+                    hasActiveSocialStories
+                      ? {
+                          background:
+                            'linear-gradient(135deg, #ff78b9, #ff4f9a, #ffb3d8, #ff78b9)',
+                        }
+                      : undefined
+                  }
+                >
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+
+                      if (
+                        hasActiveSocialStories
+                      ) {
+                        router.push(
+                          '/stories'
+                        );
+                      } else {
+                        openAvatarPicker();
+                      }
+                    }}
+                    disabled={
+                      uploadingAvatar
+                    }
+                    className="group relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-[#191219] bg-[#ff78b9] text-3xl font-black text-[#180d15] sm:h-28 sm:w-28 sm:text-4xl"
+                  >
+                    {user.avatar_url ? (
+                      <img
+                        src={
+                          user.avatar_url
+                        }
+                        alt={`Foto de perfil de ${displayName}`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      user.username
+                        .charAt(0)
+                        .toUpperCase()
+                    )}
+
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100">
+                      {hasActiveSocialStories
+                        ? 'Ver Stories'
+                        : uploadingAvatar
+                          ? 'Enviando...'
+                          : 'Alterar foto'}
+                    </span>
+                  </button>
+                </div>
+
+                {hasActiveSocialStories && (
+                  <div
+                    className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#180d15]"
+                    style={{
+                      background:
+                        'linear-gradient(135deg, #ff78b9, #ffb3d8)',
+                    }}
+                  >
+                    Story
+                  </div>
+                )}
+              </div>
 
               <input
                 ref={avatarInputRef}
@@ -2625,18 +2875,107 @@ export default function PerfilPage() {
                   {displayName}
                 </h1>
 
-                <p className="mt-1 text-sm text-[#ff78b9]">
+                <p
+                  className="mt-1 text-sm"
+                  style={{
+                    color: profileTheme,
+                  }}
+                >
                   @{user.username}
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={openEditor}
-                className="rounded-full bg-[#ff78b9] px-6 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110 md:ml-auto md:shrink-0"
-              >
-                Editar perfil
-              </button>
+              <div className="relative flex flex-col gap-2 md:ml-auto md:shrink-0">
+                <div className="flex gap-2">
+                  {/* COR DO PERFIL */}
+
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+
+                      setShowThemePicker(
+                        (current) =>
+                          !current
+                      );
+                    }}
+                    className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-bold text-white/60 transition hover:border-white/20 hover:text-white"
+                  >
+                    <span
+                      className="h-4 w-4 rounded-full border border-white/20"
+                      style={{
+                        backgroundColor:
+                          profileTheme,
+                      }}
+                    />
+
+                    Cor
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={openEditor}
+                    className="rounded-full px-6 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110"
+                    style={{
+                      backgroundColor:
+                        profileTheme,
+                    }}
+                  >
+                    Editar perfil
+                  </button>
+                </div>
+
+                {showThemePicker && (
+                  <div
+                    onClick={(event) =>
+                      event.stopPropagation()
+                    }
+                    className="absolute right-0 top-14 z-30 w-64 rounded-2xl border border-white/10 bg-[#191219] p-4 shadow-2xl"
+                  >
+                    <p className="text-xs font-black uppercase tracking-[0.15em] text-white/40">
+                      Cor do seu perfil
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-white/25">
+                      Essa escolha é privada e só aparece para você.
+                    </p>
+
+                    <div className="mt-4 grid grid-cols-5 gap-2">
+                      {PROFILE_THEME_OPTIONS.map(
+                        (color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() =>
+                              handleThemeChange(
+                                color
+                              )
+                            }
+                            aria-label={`Escolher cor ${color}`}
+                            className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition hover:scale-110 ${
+                              profileTheme ===
+                              color
+                                ? 'border-white'
+                                : 'border-white/10'
+                            }`}
+                            style={{
+                              backgroundColor:
+                                color,
+                            }}
+                          >
+                            {profileTheme ===
+                              color && (
+                              <span className="text-xs font-black text-black/70">
+                                ✓
+                              </span>
+                            )}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="mt-6 max-w-2xl">
@@ -2695,13 +3034,13 @@ export default function PerfilPage() {
         {/* ABAS */}
 
         <section className="mt-6">
-          <div className="relative flex border-b border-white/10">
+          <div className="relative flex overflow-x-auto border-b border-white/10 scrollbar-none">
             <button
               type="button"
               onClick={() =>
                 changeTab('stories')
               }
-              className={`relative flex-1 py-4 text-sm font-bold transition sm:flex-none sm:px-10 ${
+              className={`relative min-w-[50%] py-4 text-sm font-bold transition sm:min-w-0 sm:flex-none sm:px-10 ${
                 activeTab === 'stories'
                   ? 'text-[#ff78b9]'
                   : 'text-white/35 hover:text-white/70'
@@ -2711,7 +3050,13 @@ export default function PerfilPage() {
 
               {activeTab ===
                 'stories' && (
-                <span className="absolute bottom-[-1px] left-0 h-0.5 w-full rounded-full bg-[#ff78b9]" />
+                <span
+                  className="absolute bottom-[-1px] left-0 h-0.5 w-full rounded-full"
+                  style={{
+                    backgroundColor:
+                      profileTheme,
+                  }}
+                />
               )}
             </button>
 
@@ -2720,7 +3065,7 @@ export default function PerfilPage() {
               onClick={() =>
                 changeTab('nook')
               }
-              className={`relative flex-1 py-4 text-sm font-bold transition sm:flex-none sm:px-10 ${
+              className={`relative min-w-[50%] py-4 text-sm font-bold transition sm:min-w-0 sm:flex-none sm:px-10 ${
                 activeTab === 'nook'
                   ? 'text-[#ff78b9]'
                   : 'text-white/35 hover:text-white/70'
@@ -2730,9 +3075,20 @@ export default function PerfilPage() {
 
               {activeTab ===
                 'nook' && (
-                <span className="absolute bottom-[-1px] left-0 h-0.5 w-full rounded-full bg-[#ff78b9]" />
+                <span
+                  className="absolute bottom-[-1px] left-0 h-0.5 w-full rounded-full"
+                  style={{
+                    backgroundColor:
+                      profileTheme,
+                  }}
+                />
               )}
             </button>
+
+            {/* FUTURAS ABAS
+                LISTAS DE LEITURAS
+                CLUBES DAS FICS
+            */}
           </div>
 
           {/* CONTEÚDO */}
@@ -2752,7 +3108,7 @@ export default function PerfilPage() {
                   : 'opacity-0'
               }`}
             >
-              <div className="mb-5">
+              <div className="mx-auto mb-5 max-w-3xl">
                 <h2 className="text-xl font-black sm:text-2xl">
                   Histórias de{' '}
                   {displayName}
@@ -2764,13 +3120,13 @@ export default function PerfilPage() {
               </div>
 
               {loadingStories ? (
-                <div className="rounded-3xl border border-white/10 bg-[#191219] px-6 py-14 text-center">
+                <div className="mx-auto max-w-3xl rounded-3xl border border-white/10 bg-[#191219] px-6 py-14 text-center">
                   <p className="text-sm text-white/35">
                     Carregando histórias...
                   </p>
                 </div>
               ) : stories.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-white/10 bg-[#191219] px-6 py-14 text-center">
+                <div className="mx-auto max-w-3xl rounded-3xl border border-dashed border-white/10 bg-[#191219] px-6 py-14 text-center">
                   <p className="text-sm text-white/35">
                     Este autor ainda não criou nenhuma história.
                   </p>
@@ -2780,77 +3136,147 @@ export default function PerfilPage() {
                     onClick={() =>
                       router.push('/')
                     }
-                    className="mt-5 rounded-full border border-[#ff78b9]/30 px-5 py-2.5 text-sm font-semibold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
+                    className="mt-5 rounded-full border px-5 py-2.5 text-sm font-semibold transition hover:bg-white/5"
+                    style={{
+                      borderColor: `${profileTheme}50`,
+                      color: profileTheme,
+                    }}
                   >
                     Voltar ao início
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
+                <div className="mx-auto w-full max-w-3xl space-y-3">
                   {stories.map(
-                    (story) => (
-                      <button
-                        key={story.id}
-                        type="button"
-                        onClick={() =>
-                          router.push(
-                            `/historia/${story.id}`
-                          )
-                        }
-                        className="group overflow-hidden rounded-2xl border border-white/10 bg-[#191219] text-left transition hover:-translate-y-1 hover:border-[#ff78b9]/30 sm:rounded-3xl"
-                      >
-                        <div className="relative aspect-[2/3] overflow-hidden bg-[#241722]">
-                          {story.cover_url ? (
-                            <img
-                              src={
-                                story.cover_url
-                              }
-                              alt={`Capa de ${story.title}`}
-                              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#3b1b30] to-[#241322] p-4 text-center">
-                              <span className="text-sm font-black text-[#ff78b9]/70 sm:text-lg">
+                    (story) => {
+                      const status =
+                        story.status
+                          ?.trim() || '';
+
+                      const isOngoing =
+                        status
+                          .toLowerCase()
+                          .includes(
+                            'andamento'
+                          );
+
+                      return (
+                        <button
+                          key={story.id}
+                          type="button"
+                          onClick={() =>
+                            router.push(
+                              `/historia/${story.id}`
+                            )
+                          }
+                          className="group flex w-full overflow-hidden rounded-2xl border border-white/10 bg-[#191219] text-left transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#1d151d]"
+                        >
+                          {/* CAPA */}
+
+                          <div className="relative h-36 w-24 shrink-0 overflow-hidden bg-[#241722] sm:h-40 sm:w-28 md:h-44 md:w-32">
+                            {story.cover_url ? (
+                              <img
+                                src={
+                                  story.cover_url
+                                }
+                                alt={`Capa de ${story.title}`}
+                                className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                              />
+                            ) : (
+                              <div
+                                className="flex h-full w-full items-center justify-center p-3 text-center"
+                                style={{
+                                  background: `linear-gradient(145deg, ${profileTheme}45, #241322)`,
+                                }}
+                              >
+                                <span
+                                  className="text-xs font-black sm:text-sm"
+                                  style={{
+                                    color:
+                                      profileTheme,
+                                  }}
+                                >
+                                  {
+                                    story.title
+                                  }
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* INFORMAÇÕES */}
+
+                          <div className="min-w-0 flex-1 p-4 sm:p-5">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <h3 className="line-clamp-2 text-base font-black text-white transition group-hover:text-white sm:text-lg">
                                 {
                                   story.title
                                 }
-                              </span>
+                              </h3>
+
+                              {isOngoing && (
+                                <span
+                                  className="w-fit shrink-0 rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#180d15] shadow-lg sm:text-[10px]"
+                                  style={{
+                                    background:
+                                      'linear-gradient(135deg, #ff4f9a, #ff78b9, #ffb3d8)',
+                                    boxShadow:
+                                      '0 0 18px rgba(255,120,185,0.28)',
+                                  }}
+                                >
+                                  EM ANDAMENTO
+                                </span>
+                              )}
+
+                              {!isOngoing &&
+                                status && (
+                                  <span className="w-fit shrink-0 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wide text-white/45">
+                                    {
+                                      status
+                                    }
+                                  </span>
+                                )}
                             </div>
-                          )}
 
-                          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
+                            <p className="mt-2 line-clamp-3 text-xs leading-5 text-white/45 sm:text-sm sm:leading-6">
+                              {story.description ||
+                                'Esta história ainda não possui uma sinopse.'}
+                            </p>
 
-                          {story.status && (
-                            <span className="absolute left-2 top-2 max-w-[75%] truncate rounded-full bg-black/60 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm sm:left-3 sm:top-3 sm:px-3 sm:py-1.5 sm:text-xs">
-                              {
-                                story.status
-                              }
-                            </span>
-                          )}
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span
+                                className="rounded-full border px-2.5 py-1 text-[10px] font-bold"
+                                style={{
+                                  borderColor: `${profileTheme}30`,
+                                  backgroundColor: `${profileTheme}08`,
+                                  color: `${profileTheme}`,
+                                }}
+                              >
+                                {mainFandom(
+                                  story
+                                )}
+                              </span>
 
-                          {story.rating && (
-                            <span className="absolute right-2 top-2 rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm sm:right-3 sm:top-3 sm:px-3 sm:py-1.5 sm:text-xs">
-                              {
-                                story.rating
-                              }
-                            </span>
-                          )}
-                        </div>
+                              {story.rating && (
+                                <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold text-white/40">
+                                  {
+                                    story.rating
+                                  }
+                                </span>
+                              )}
+                            </div>
 
-                        <div className="p-3 sm:p-4">
-                          <h3 className="line-clamp-2 text-sm font-black text-white transition group-hover:text-[#ff78b9] sm:text-base">
-                            {
-                              story.title
-                            }
-                          </h3>
-
-                          <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-white/35 sm:mt-2 sm:text-sm sm:leading-6">
-                            {story.description ||
-                              'Esta história ainda não possui uma sinopse.'}
-                          </p>
-                        </div>
-                      </button>
-                    )
+                            <div className="mt-3 text-[10px] text-white/25">
+                              Atualizada em{' '}
+                              {formatDate(
+                                story.updated_at ||
+                                  story.created_at
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    }
                   )}
                 </div>
               )}
@@ -2865,682 +3291,723 @@ export default function PerfilPage() {
                   : 'opacity-0'
               }`}
             >
-              <section className="relative overflow-hidden rounded-3xl border border-[#ff78b9]/15 bg-[#191219]">
-                <div className="relative p-4 sm:p-6 md:p-8">
-                  <div className="mb-5">
-                    <h2 className="text-xl font-black sm:text-2xl">
-                      Mural
-                    </h2>
+              <section className="mx-auto w-full max-w-2xl">
+                <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#191219]">
+                  <div className="relative p-4 sm:p-5">
+                    <div className="mb-5">
+                      <h2 className="text-xl font-black sm:text-2xl">
+                        Mural
+                      </h2>
 
-                    <p className="mt-1 text-sm text-white/40">
-                      Um cantinho para compartilhar seus pensamentos como escritor.
-                    </p>
-                  </div>
+                      <p className="mt-1 text-sm text-white/40">
+                        Um cantinho para compartilhar seus pensamentos como escritor.
+                      </p>
+                    </div>
 
-                  {/* NOVO POST */}
+                    {/* NOVO POST */}
 
-                  <div className="rounded-3xl border border-white/10 bg-[#100b12] p-4 sm:p-5">
-                    <textarea
-                      value={newPost}
-                      onChange={(event) =>
-                        setNewPost(
-                          event.target
-                            .value
-                        )
-                      }
-                      maxLength={5000}
-                      rows={4}
-                      placeholder="O que está passando pela sua cabeça?"
-                      className="w-full resize-none bg-transparent text-sm leading-7 text-white outline-none placeholder:text-white/20"
-                    />
+                    <div className="rounded-3xl border border-white/10 bg-[#100b12] p-4 sm:p-5">
+                      <textarea
+                        value={newPost}
+                        onChange={(event) =>
+                          setNewPost(
+                            event.target
+                              .value
+                          )
+                        }
+                        maxLength={5000}
+                        rows={4}
+                        placeholder="O que está passando pela sua cabeça?"
+                        className="w-full resize-none bg-transparent text-sm leading-7 text-white outline-none placeholder:text-white/20"
+                      />
 
-                    {/* PREVIEWS */}
+                      {/* PREVIEWS */}
 
-                    {mediaPreviews.length >
-                      0 && (
-                      <div
-                        className={`mt-4 grid gap-2 ${
-                          mediaPreviews.length ===
-                          1
-                            ? 'grid-cols-1'
-                            : 'grid-cols-2'
-                        }`}
-                      >
-                        {mediaPreviews.map(
-                          (
-                            preview,
-                            index
-                          ) => (
-                            <div
-                              key={
-                                preview
-                              }
-                              className="group relative aspect-square overflow-hidden rounded-2xl bg-[#191219]"
-                            >
-                              <img
-                                src={
+                      {mediaPreviews.length >
+                        0 && (
+                        <div
+                          className={`mt-4 grid gap-2 ${
+                            mediaPreviews.length ===
+                            1
+                              ? 'grid-cols-1'
+                              : 'grid-cols-2'
+                          }`}
+                        >
+                          {mediaPreviews.map(
+                            (
+                              preview,
+                              index
+                            ) => (
+                              <div
+                                key={
                                   preview
                                 }
-                                alt={`Prévia ${
-                                  index + 1
-                                }`}
-                                className="h-full w-full object-cover"
-                              />
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  removeMedia(
-                                    index
-                                  )
-                                }
-                                className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-lg text-white transition hover:bg-black"
+                                className="group relative aspect-square overflow-hidden rounded-2xl bg-[#191219]"
                               >
-                                ×
-                              </button>
+                                <img
+                                  src={
+                                    preview
+                                  }
+                                  alt={`Prévia ${
+                                    index + 1
+                                  }`}
+                                  className="h-full w-full object-cover"
+                                />
 
-                              <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white">
-                                {index + 1} / 4
-                              </span>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    )}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeMedia(
+                                      index
+                                    )
+                                  }
+                                  className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-lg text-white transition hover:bg-black"
+                                >
+                                  ×
+                                </button>
 
-                    <div className="mt-4 flex flex-col gap-3 border-t border-white/5 pt-4 sm:flex-row sm:items-center">
-                      <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            mediaInputRef.current?.click()
-                          }
-                          disabled={
-                            mediaFiles.length >=
-                            MAX_MEDIA
-                          }
-                          className="shrink-0 rounded-full border border-white/10 px-4 py-2.5 text-xs font-semibold text-white/50 transition hover:border-[#ff78b9]/40 hover:text-[#ff78b9] disabled:cursor-not-allowed disabled:opacity-30"
-                        >
-                          🖼️{' '}
-                          {mediaFiles.length
-                            ? `${mediaFiles.length}/4`
-                            : 'Imagem/GIF'}
-                        </button>
-
-                        <input
-                          ref={
-                            mediaInputRef
-                          }
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,image/gif"
-                          multiple
-                          onChange={
-                            handleMediaSelection
-                          }
-                          className="hidden"
-                        />
-
-                        <select
-                          value={
-                            selectedStoryId
-                          }
-                          onChange={(event) =>
-                            setSelectedStoryId(
-                              event.target
-                                .value
-                            )
-                          }
-                          className="min-w-0 flex-1 rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-[#ff78b9]/50"
-                        >
-                          <option value="">
-                            Vincular uma história
-                          </option>
-
-                          {stories.map(
-                            (story) => (
-                              <option
-                                key={
-                                  story.id
-                                }
-                                value={
-                                  story.id
-                                }
-                              >
-                                {
-                                  story.title
-                                }
-                              </option>
+                                <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white">
+                                  {index + 1} / 4
+                                </span>
+                              </div>
                             )
                           )}
-                        </select>
+                        </div>
+                      )}
 
-                        <span className="hidden shrink-0 text-xs text-white/25 sm:block">
-                          {newPost.length}/5000
-                        </span>
+                      <div className="mt-4 flex flex-col gap-3 border-t border-white/5 pt-4 sm:flex-row sm:items-center">
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              mediaInputRef.current?.click()
+                            }
+                            disabled={
+                              mediaFiles.length >=
+                              MAX_MEDIA
+                            }
+                            className="shrink-0 rounded-full border border-white/10 px-4 py-2.5 text-xs font-semibold text-white/50 transition hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                          >
+                            🖼️{' '}
+                            {mediaFiles.length
+                              ? `${mediaFiles.length}/4`
+                              : 'Imagem/GIF'}
+                          </button>
+
+                          <input
+                            ref={
+                              mediaInputRef
+                            }
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            multiple
+                            onChange={
+                              handleMediaSelection
+                            }
+                            className="hidden"
+                          />
+
+                          <select
+                            value={
+                              selectedStoryId
+                            }
+                            onChange={(event) =>
+                              setSelectedStoryId(
+                                event.target
+                                  .value
+                              )
+                            }
+                            className="min-w-0 flex-1 rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-white/20"
+                          >
+                            <option value="">
+                              Vincular uma história
+                            </option>
+
+                            {stories.map(
+                              (story) => (
+                                <option
+                                  key={
+                                    story.id
+                                  }
+                                  value={
+                                    story.id
+                                  }
+                                >
+                                  {
+                                    story.title
+                                  }
+                                </option>
+                              )
+                            )}
+                          </select>
+
+                          <span className="hidden shrink-0 text-xs text-white/25 sm:block">
+                            {newPost.length}/5000
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={
+                            handleCreateNookPost
+                          }
+                          disabled={
+                            creatingPost ||
+                            (!newPost.trim() &&
+                              mediaFiles.length ===
+                                0)
+                          }
+                          className="rounded-full px-6 py-2.5 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                          style={{
+                            backgroundColor:
+                              profileTheme,
+                          }}
+                        >
+                          {creatingPost
+                            ? 'Publicando...'
+                            : 'Publicar'}
+                        </button>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={
-                          handleCreateNookPost
-                        }
-                        disabled={
-                          creatingPost ||
-                          (!newPost.trim() &&
-                            mediaFiles.length ===
-                              0)
-                        }
-                        className="rounded-full bg-[#ff78b9] px-6 py-2.5 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {creatingPost
-                          ? 'Publicando...'
-                          : 'Publicar'}
-                      </button>
                     </div>
-                  </div>
 
-                  {/* POSTS */}
+                    {/* POSTS */}
 
-                  <div className="mt-6">
-                    {loadingNook ? (
-                      <div className="rounded-3xl border border-white/5 bg-[#100b12] px-6 py-12 text-center">
-                        <p className="text-sm text-white/30">
-                          Carregando seu Mural...
-                        </p>
-                      </div>
-                    ) : nookPosts.length === 0 ? (
-                      <div className="rounded-3xl border border-dashed border-white/10 bg-[#100b12] px-6 py-12 text-center">
-                        <p className="text-sm font-semibold text-white/50">
-                          Seu Mural ainda está vazio.
-                        </p>
+                    <div className="mt-6">
+                      {loadingNook ? (
+                        <div className="rounded-3xl border border-white/5 bg-[#100b12] px-6 py-12 text-center">
+                          <p className="text-sm text-white/30">
+                            Carregando seu Mural...
+                          </p>
+                        </div>
+                      ) : nookPosts.length ===
+                        0 ? (
+                        <div className="rounded-3xl border border-dashed border-white/10 bg-[#100b12] px-6 py-12 text-center">
+                          <p className="text-sm font-semibold text-white/50">
+                            Seu Mural ainda está vazio.
+                          </p>
 
-                        <p className="mt-1 text-xs text-white/25">
-                          Escreva alguma coisa acima para começar.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {nookPosts.map(
-                          (post) => {
-                            const storyTitle =
-                              getStoryTitle(
-                                post.story_id
-                              );
+                          <p className="mt-1 text-xs text-white/25">
+                            Escreva alguma coisa acima para começar.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {nookPosts.map(
+                            (post) => {
+                              const storyTitle =
+                                getStoryTitle(
+                                  post.story_id
+                                );
 
-                            const isEditing =
-                              editingNookPostId ===
-                              post.id;
+                              const isEditing =
+                                editingNookPostId ===
+                                post.id;
 
-                            const isDeleting =
-                              deletingNookPostId ===
-                              post.id;
+                              const isDeleting =
+                                deletingNookPostId ===
+                                post.id;
 
-                            const social =
-                              reactionData[
-                                post.id
-                              ] || {
-                                counts:
-                                  emptyReactionCounts(),
-
-                                user_reactions:
-                                  [],
-
-                                comments_count:
-                                  0,
-                              };
-
-                            const comments =
-                              commentsByPost[
-                                post.id
-                              ] || [];
-
-                            const topLevelComments =
-                              comments.filter(
-                                (comment) =>
-                                  !comment.parent_id
-                              );
-
-                            return (
-                              <article
-                                key={
+                              const social =
+                                reactionData[
                                   post.id
-                                }
-                                className="relative rounded-3xl border border-white/5 bg-[#100b12] p-4 transition hover:border-[#ff78b9]/15 sm:p-5"
-                              >
-                                {/* AUTOR DO POST */}
+                                ] || {
+                                  counts:
+                                    emptyReactionCounts(),
 
-                                <div className="mb-4 flex items-center gap-3 pr-10">
-                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#ff78b9] text-sm font-black text-[#180d15]">
-                                    {user.avatar_url ? (
-                                      <img
-                                        src={
-                                          user.avatar_url
-                                        }
-                                        alt=""
-                                        className="h-full w-full object-cover"
-                                      />
-                                    ) : (
-                                      user.username
-                                        .charAt(
-                                          0
-                                        )
-                                        .toUpperCase()
-                                    )}
-                                  </div>
+                                  user_reactions:
+                                    [],
 
-                                  <div className="min-w-0">
-                                    <p className="truncate text-sm font-bold text-white/85">
-                                      {user.display_name ||
-                                        user.username}
-                                    </p>
+                                  comments_count:
+                                    0,
+                                };
 
-                                    <p className="truncate text-xs text-[#ff78b9]">
-                                      @{user.username}
-                                    </p>
-                                  </div>
-                                </div>
+                              const comments =
+                                commentsByPost[
+                                  post.id
+                                ] || [];
 
-                                {post.pinned && (
-                                  <div className="mb-3 text-xs font-bold text-[#ff78b9]">
-                                    📌 Post fixado
-                                  </div>
-                                )}
+                              const topLevelComments =
+                                comments.filter(
+                                  (comment) =>
+                                    !comment.parent_id
+                                );
 
-                                {/* MENU */}
+                              return (
+                                <article
+                                  key={
+                                    post.id
+                                  }
+                                  className="relative rounded-3xl border border-white/5 bg-[#100b12] p-4 transition hover:border-white/10 sm:p-5"
+                                >
+                                  {/* AUTOR */}
 
-                                {!isEditing && (
-                                  <div
-                                    className="absolute right-3 top-3 sm:right-4 sm:top-4"
-                                    onClick={(
-                                      event
-                                    ) =>
-                                      event.stopPropagation()
-                                    }
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setMenuOpenPostId(
-                                          menuOpenPostId ===
-                                            post.id
-                                            ? null
-                                            : post.id
-                                        )
-                                      }
-                                      className="flex h-9 w-9 items-center justify-center rounded-full text-lg font-bold text-white/35 transition hover:bg-white/5 hover:text-white"
+                                  <div className="mb-4 flex items-center gap-3 pr-10">
+                                    <div
+                                      className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-black text-[#180d15]"
+                                      style={{
+                                        backgroundColor:
+                                          profileTheme,
+                                      }}
                                     >
-                                      ⋯
-                                    </button>
+                                      {user.avatar_url ? (
+                                        <img
+                                          src={
+                                            user.avatar_url
+                                          }
+                                          alt=""
+                                          className="h-full w-full object-cover"
+                                        />
+                                      ) : (
+                                        user.username
+                                          .charAt(
+                                            0
+                                          )
+                                          .toUpperCase()
+                                      )}
+                                    </div>
 
-                                    {menuOpenPostId ===
-                                      post.id && (
-                                      <div className="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#191219] p-1.5 shadow-2xl">
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handleTogglePinNookPost(
-                                              post
-                                            )
-                                          }
-                                          className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-white/65 transition hover:bg-white/5 hover:text-white"
-                                        >
-                                          {post.pinned
-                                            ? 'Desafixar post'
-                                            : 'Fixar post'}
-                                        </button>
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-bold text-white/85">
+                                        {user.display_name ||
+                                          user.username}
+                                      </p>
 
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            startEditNookPost(
-                                              post
-                                            )
-                                          }
-                                          className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-white/65 transition hover:bg-white/5 hover:text-white"
-                                        >
-                                          Editar
-                                        </button>
-
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handleDeleteNookPost(
-                                              post.id
-                                            )
-                                          }
-                                          disabled={
-                                            isDeleting
-                                          }
-                                          className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-red-300 transition hover:bg-red-400/5 disabled:opacity-40"
-                                        >
-                                          {isDeleting
-                                            ? 'Excluindo...'
-                                            : 'Excluir'}
-                                        </button>
-                                      </div>
-                                    )}
+                                      <p
+                                        className="truncate text-xs"
+                                        style={{
+                                          color:
+                                            profileTheme,
+                                        }}
+                                      >
+                                        @{user.username}
+                                      </p>
+                                    </div>
                                   </div>
-                                )}
 
-                                {isEditing ? (
-                                  <div>
-                                    <textarea
-                                      value={
-                                        editNookBody
-                                      }
-                                      onChange={(
+                                  {post.pinned && (
+                                    <div
+                                      className="mb-3 text-xs font-bold"
+                                      style={{
+                                        color:
+                                          profileTheme,
+                                      }}
+                                    >
+                                      📌 Post fixado
+                                    </div>
+                                  )}
+
+                                  {/* MENU */}
+
+                                  {!isEditing && (
+                                    <div
+                                      className="absolute right-3 top-3 sm:right-4 sm:top-4"
+                                      onClick={(
                                         event
                                       ) =>
-                                        setEditNookBody(
-                                          event.target
-                                            .value
-                                        )
+                                        event.stopPropagation()
                                       }
-                                      maxLength={5000}
-                                      rows={6}
-                                      className="w-full resize-none rounded-2xl border border-white/10 bg-[#191219] px-4 py-3 text-sm leading-7 text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/50"
-                                    />
-
-                                    <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-                                      <select
-                                        value={
-                                          editNookStoryId
-                                        }
-                                        onChange={(
-                                          event
-                                        ) =>
-                                          setEditNookStoryId(
-                                            event.target
-                                              .value
-                                          )
-                                        }
-                                        className="flex-1 rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-[#ff78b9]/50"
-                                      >
-                                        <option value="">
-                                          Sem história vinculada
-                                        </option>
-
-                                        {stories.map(
-                                          (story) => (
-                                            <option
-                                              key={
-                                                story.id
-                                              }
-                                              value={
-                                                story.id
-                                              }
-                                            >
-                                              {
-                                                story.title
-                                              }
-                                            </option>
-                                          )
-                                        )}
-                                      </select>
-
-                                      <span className="text-xs text-white/25">
-                                        {
-                                          editNookBody.length
-                                        }
-                                        /5000
-                                      </span>
-                                    </div>
-
-                                    {renderPostMedia(
-                                      post
-                                    )}
-
-                                    <div className="mt-4 flex gap-3">
-                                      <button
-                                        type="button"
-                                        onClick={
-                                          cancelEditNookPost
-                                        }
-                                        disabled={
-                                          savingNookPost
-                                        }
-                                        className="rounded-full border border-white/10 px-5 py-2.5 text-xs font-semibold text-white/50 transition hover:border-white/20 hover:text-white disabled:opacity-40"
-                                      >
-                                        Cancelar
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={
-                                          handleSaveNookPostEdit
-                                        }
-                                        disabled={
-                                          savingNookPost
-                                        }
-                                        className="rounded-full bg-[#ff78b9] px-5 py-2.5 text-xs font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-40"
-                                      >
-                                        {savingNookPost
-                                          ? 'Salvando...'
-                                          : 'Salvar'}
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <>
-                                    {/* TEXTO */}
-
-                                    {post.body &&
-                                      renderPostBody(
-                                        post.body
-                                      )}
-
-                                    {/* MÍDIAS */}
-
-                                    {renderPostMedia(
-                                      post
-                                    )}
-
-                                    {/* HISTÓRIA */}
-
-                                    {storyTitle && (
+                                    >
                                       <button
                                         type="button"
                                         onClick={() =>
-                                          router.push(
-                                            `/historia/${post.story_id}`
+                                          setMenuOpenPostId(
+                                            menuOpenPostId ===
+                                              post.id
+                                              ? null
+                                              : post.id
                                           )
                                         }
-                                        className="mt-4 max-w-full truncate rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/5 px-4 py-2 text-xs font-semibold text-[#ff78b9] transition hover:bg-[#ff78b9]/10"
+                                        className="flex h-9 w-9 items-center justify-center rounded-full text-lg font-bold text-white/35 transition hover:bg-white/5 hover:text-white"
                                       >
-                                        📖{' '}
-                                        {
-                                          storyTitle
-                                        }
+                                        ⋯
                                       </button>
-                                    )}
 
-                                    {/* REAÇÕES */}
-
-                                    <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-white/5 pt-3">
-                                      {REACTIONS.map(
-                                        (emoji) => {
-                                          const count =
-                                            social.counts[
-                                              emoji
-                                            ] || 0;
-
-                                          const active =
-                                            social.user_reactions.includes(
-                                              emoji
-                                            );
-
-                                          return (
-                                            <button
-                                              key={
-                                                emoji
-                                              }
-                                              type="button"
-                                              onClick={() =>
-                                                handleReaction(
-                                                  post.id,
-                                                  emoji
-                                                )
-                                              }
-                                              className={`flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-xs transition ${
-                                                active
-                                                  ? 'border-[#ff78b9]/50 bg-[#ff78b9]/10'
-                                                  : 'border-white/5 bg-white/[0.02] hover:border-white/15'
-                                              }`}
-                                            >
-                                              <span>
-                                                {
-                                                  emoji
-                                                }
-                                              </span>
-
-                                              {count >
-                                                0 && (
-                                                <span className="text-[10px] font-bold text-white/50">
-                                                  {
-                                                    count
-                                                  }
-                                                </span>
-                                              )}
-                                            </button>
-                                          );
-                                        }
-                                      )}
-
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          toggleComments(
-                                            post.id
-                                          )
-                                        }
-                                        className="ml-auto flex items-center gap-1.5 rounded-full border border-white/5 px-3 py-1.5 text-xs font-semibold text-white/40 transition hover:border-[#ff78b9]/30 hover:text-[#ff78b9]"
-                                      >
-                                        💬
-
-                                        <span>
-                                          {
-                                            social.comments_count
-                                          }
-                                        </span>
-                                      </button>
-                                    </div>
-
-                                    {/* DATA + HORA */}
-
-                                    <div className="mt-3 flex items-center justify-between">
-                                      <span className="text-xs text-white/25">
-                                        {formatPostDateTime(
-                                          post.created_at
-                                        )}
-                                      </span>
-                                    </div>
-
-                                    {/* COMENTÁRIOS */}
-
-                                    {commentsOpen[
-                                      post.id
-                                    ] && (
-                                      <div className="mt-4 border-t border-white/5 pt-4">
-                                        <div className="mb-4 flex gap-2">
-                                          <input
-                                            type="text"
-                                            value={
-                                              commentDrafts[
-                                                post.id
-                                              ] ||
-                                              ''
-                                            }
-                                            onChange={(
-                                              event
-                                            ) =>
-                                              setCommentDrafts(
-                                                (
-                                                  current
-                                                ) => ({
-                                                  ...current,
-
-                                                  [post.id]:
-                                                    event
-                                                      .target
-                                                      .value,
-                                                })
+                                      {menuOpenPostId ===
+                                        post.id && (
+                                        <div className="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#191219] p-1.5 shadow-2xl">
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleTogglePinNookPost(
+                                                post
                                               )
                                             }
-                                            maxLength={
-                                              2000
-                                            }
-                                            placeholder="Escreva um comentário..."
-                                            className="min-w-0 flex-1 rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs text-white outline-none placeholder:text-white/20 focus:border-[#ff78b9]/50"
-                                            onKeyDown={(
-                                              event
-                                            ) => {
-                                              if (
-                                                event.key ===
-                                                'Enter'
-                                              ) {
-                                                handleCreateComment(
-                                                  post.id
-                                                );
-                                              }
-                                            }}
-                                          />
+                                            className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-white/65 transition hover:bg-white/5 hover:text-white"
+                                          >
+                                            {post.pinned
+                                              ? 'Desafixar post'
+                                              : 'Fixar post'}
+                                          </button>
 
                                           <button
                                             type="button"
                                             onClick={() =>
-                                              handleCreateComment(
+                                              startEditNookPost(
+                                                post
+                                              )
+                                            }
+                                            className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-white/65 transition hover:bg-white/5 hover:text-white"
+                                          >
+                                            Editar
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleDeleteNookPost(
                                                 post.id
                                               )
                                             }
                                             disabled={
-                                              savingComment ||
-                                              !(
+                                              isDeleting
+                                            }
+                                            className="block w-full rounded-xl px-4 py-2.5 text-left text-xs font-semibold text-red-300 transition hover:bg-red-400/5 disabled:opacity-40"
+                                          >
+                                            {isDeleting
+                                              ? 'Excluindo...'
+                                              : 'Excluir'}
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {isEditing ? (
+                                    <div>
+                                      <textarea
+                                        value={
+                                          editNookBody
+                                        }
+                                        onChange={(
+                                          event
+                                        ) =>
+                                          setEditNookBody(
+                                            event.target
+                                              .value
+                                          )
+                                        }
+                                        maxLength={5000}
+                                        rows={6}
+                                        className="w-full resize-none rounded-2xl border border-white/10 bg-[#191219] px-4 py-3 text-sm leading-7 text-white outline-none transition placeholder:text-white/20 focus:border-white/20"
+                                      />
+
+                                      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                                        <select
+                                          value={
+                                            editNookStoryId
+                                          }
+                                          onChange={(
+                                            event
+                                          ) =>
+                                            setEditNookStoryId(
+                                              event.target
+                                                .value
+                                            )
+                                          }
+                                          className="flex-1 rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs font-semibold text-white/60 outline-none transition focus:border-white/20"
+                                        >
+                                          <option value="">
+                                            Sem história vinculada
+                                          </option>
+
+                                          {stories.map(
+                                            (story) => (
+                                              <option
+                                                key={
+                                                  story.id
+                                                }
+                                                value={
+                                                  story.id
+                                                }
+                                              >
+                                                {
+                                                  story.title
+                                                }
+                                              </option>
+                                            )
+                                          )}
+                                        </select>
+
+                                        <span className="text-xs text-white/25">
+                                          {
+                                            editNookBody.length
+                                          }
+                                          /5000
+                                        </span>
+                                      </div>
+
+                                      {renderPostMedia(
+                                        post
+                                      )}
+
+                                      <div className="mt-4 flex gap-3">
+                                        <button
+                                          type="button"
+                                          onClick={
+                                            cancelEditNookPost
+                                          }
+                                          disabled={
+                                            savingNookPost
+                                          }
+                                          className="rounded-full border border-white/10 px-5 py-2.5 text-xs font-semibold text-white/50 transition hover:border-white/20 hover:text-white disabled:opacity-40"
+                                        >
+                                          Cancelar
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={
+                                            handleSaveNookPostEdit
+                                          }
+                                          disabled={
+                                            savingNookPost
+                                          }
+                                          className="rounded-full px-5 py-2.5 text-xs font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-40"
+                                          style={{
+                                            backgroundColor:
+                                              profileTheme,
+                                          }}
+                                        >
+                                          {savingNookPost
+                                            ? 'Salvando...'
+                                            : 'Salvar'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      {/* TEXTO */}
+
+                                      {post.body &&
+                                        renderPostBody(
+                                          post.body
+                                        )}
+
+                                      {/* MÍDIAS */}
+
+                                      {renderPostMedia(
+                                        post
+                                      )}
+
+                                      {/* HISTÓRIA */}
+
+                                      {storyTitle && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            router.push(
+                                              `/historia/${post.story_id}`
+                                            )
+                                          }
+                                          className="mt-4 max-w-full truncate rounded-full border px-4 py-2 text-xs font-semibold transition hover:bg-white/5"
+                                          style={{
+                                            borderColor:
+                                              `${profileTheme}30`,
+                                            backgroundColor:
+                                              `${profileTheme}08`,
+                                            color:
+                                              profileTheme,
+                                          }}
+                                        >
+                                          📖{' '}
+                                          {
+                                            storyTitle
+                                          }
+                                        </button>
+                                      )}
+
+                                      {/* REAÇÕES */}
+
+                                      <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-white/5 pt-3">
+                                        {REACTIONS.map(
+                                          (emoji) => {
+                                            const count =
+                                              social.counts[
+                                                emoji
+                                              ] || 0;
+
+                                            const active =
+                                              social.user_reactions.includes(
+                                                emoji
+                                              );
+
+                                            return (
+                                              <button
+                                                key={
+                                                  emoji
+                                                }
+                                                type="button"
+                                                onClick={() =>
+                                                  handleReaction(
+                                                    post.id,
+                                                    emoji
+                                                  )
+                                                }
+                                                className={`flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-xs transition ${
+                                                  active
+                                                    ? 'border-white/20 bg-white/[0.06]'
+                                                    : 'border-white/5 bg-white/[0.02] hover:border-white/15'
+                                                }`}
+                                              >
+                                                <span>
+                                                  {
+                                                    emoji
+                                                  }
+                                                </span>
+
+                                                {count >
+                                                  0 && (
+                                                  <span className="text-[10px] font-bold text-white/50">
+                                                    {
+                                                      count
+                                                    }
+                                                  </span>
+                                                )}
+                                              </button>
+                                            );
+                                          }
+                                        )}
+
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            toggleComments(
+                                              post.id
+                                            )
+                                          }
+                                          className="ml-auto flex items-center gap-1.5 rounded-full border border-white/5 px-3 py-1.5 text-xs font-semibold text-white/40 transition hover:border-white/15 hover:text-white"
+                                        >
+                                          💬
+
+                                          <span>
+                                            {
+                                              social.comments_count
+                                            }
+                                          </span>
+                                        </button>
+                                      </div>
+
+                                      {/* DATA + HORA */}
+
+                                      <div className="mt-3 flex items-center justify-between">
+                                        <span className="text-xs text-white/25">
+                                          {formatPostDateTime(
+                                            post.created_at
+                                          )}
+                                        </span>
+                                      </div>
+
+                                      {/* COMENTÁRIOS */}
+
+                                      {commentsOpen[
+                                        post.id
+                                      ] && (
+                                        <div className="mt-4 border-t border-white/5 pt-4">
+                                          <div className="mb-4 flex gap-2">
+                                            <input
+                                              type="text"
+                                              value={
                                                 commentDrafts[
                                                   post.id
                                                 ] ||
                                                 ''
-                                              ).trim()
-                                            }
-                                            className="rounded-full bg-[#ff78b9] px-4 py-2 text-[10px] font-bold text-[#180d15] disabled:opacity-30"
-                                          >
-                                            Enviar
-                                          </button>
-                                        </div>
-
-                                        {loadingComments[
-                                          post.id
-                                        ] ? (
-                                          <p className="py-5 text-center text-xs text-white/25">
-                                            Carregando comentários...
-                                          </p>
-                                        ) : topLevelComments.length ===
-                                          0 ? (
-                                          <p className="py-5 text-center text-xs text-white/25">
-                                            Ainda não há comentários. Seja o primeiro.
-                                          </p>
-                                        ) : (
-                                          <div className="space-y-4">
-                                            {topLevelComments.map(
-                                              (
-                                                comment
+                                              }
+                                              onChange={(
+                                                event
                                               ) =>
-                                                renderComment(
-                                                  comment,
-                                                  comments
+                                                setCommentDrafts(
+                                                  (
+                                                    current
+                                                  ) => ({
+                                                    ...current,
+
+                                                    [post.id]:
+                                                      event
+                                                        .target
+                                                        .value,
+                                                  })
                                                 )
-                                            )}
+                                              }
+                                              maxLength={
+                                                2000
+                                              }
+                                              placeholder="Escreva um comentário..."
+                                              className="min-w-0 flex-1 rounded-full border border-white/10 bg-[#191219] px-4 py-2.5 text-xs text-white outline-none placeholder:text-white/20 focus:border-white/20"
+                                              onKeyDown={(
+                                                event
+                                              ) => {
+                                                if (
+                                                  event.key ===
+                                                  'Enter'
+                                                ) {
+                                                  handleCreateComment(
+                                                    post.id
+                                                  );
+                                                }
+                                              }}
+                                            />
+
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                handleCreateComment(
+                                                  post.id
+                                                )
+                                              }
+                                              disabled={
+                                                savingComment ||
+                                                !(
+                                                  commentDrafts[
+                                                    post.id
+                                                  ] ||
+                                                  ''
+                                                ).trim()
+                                              }
+                                              className="rounded-full px-4 py-2 text-[10px] font-bold text-[#180d15] disabled:opacity-30"
+                                              style={{
+                                                backgroundColor:
+                                                  profileTheme,
+                                              }}
+                                            >
+                                              Enviar
+                                            </button>
                                           </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </article>
-                            );
-                          }
-                        )}
-                      </div>
-                    )}
+
+                                          {loadingComments[
+                                            post.id
+                                          ] ? (
+                                            <p className="py-5 text-center text-xs text-white/25">
+                                              Carregando comentários...
+                                            </p>
+                                          ) : topLevelComments.length ===
+                                            0 ? (
+                                            <p className="py-5 text-center text-xs text-white/25">
+                                              Ainda não há comentários. Seja o primeiro.
+                                            </p>
+                                          ) : (
+                                            <div className="space-y-4">
+                                              {topLevelComments.map(
+                                                (
+                                                  comment
+                                                ) =>
+                                                  renderComment(
+                                                    comment,
+                                                    comments
+                                                  )
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </article>
+                              );
+                            }
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </section>
@@ -3602,7 +4069,7 @@ export default function PerfilPage() {
                   }
                   maxLength={50}
                   placeholder="Como você quer ser chamado?"
-                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
+                  className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-white/30"
                 />
               </div>
 
@@ -3627,8 +4094,57 @@ export default function PerfilPage() {
                   maxLength={500}
                   rows={5}
                   placeholder="Conte um pouco sobre você..."
-                  className="w-full resize-none rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
+                  className="w-full resize-none rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-white/20 focus:border-white/30"
                 />
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#100b12] p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-white">
+                      Cor do perfil
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-white/35">
+                      Personalização privada. Outras pessoas não verão a sua escolha.
+                    </p>
+                  </div>
+
+                  <div
+                    className="h-8 w-8 shrink-0 rounded-full border border-white/20"
+                    style={{
+                      backgroundColor:
+                        profileTheme,
+                    }}
+                  />
+                </div>
+
+                <div className="mt-4 grid grid-cols-5 gap-2">
+                  {PROFILE_THEME_OPTIONS.map(
+                    (color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() =>
+                          handleThemeChange(
+                            color
+                          )
+                        }
+                        className={`h-8 w-8 rounded-full border-2 transition hover:scale-105 ${
+                          profileTheme ===
+                          color
+                            ? 'border-white'
+                            : 'border-white/10'
+                        }`}
+                        style={{
+                          backgroundColor:
+                            color,
+                        }}
+                        aria-label={`Escolher cor ${color}`}
+                      />
+                    )
+                  )}
+                </div>
               </div>
 
               {error && (
@@ -3657,7 +4173,11 @@ export default function PerfilPage() {
                   type="button"
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 rounded-full bg-[#ff78b9] px-5 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-50"
+                  className="flex-1 rounded-full px-5 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110 disabled:opacity-50"
+                  style={{
+                    backgroundColor:
+                      profileTheme,
+                  }}
                 >
                   {saving
                     ? 'Salvando...'
@@ -3712,7 +4232,11 @@ function formatPostDateTime(
   )}`;
 }
 
-function CloudLogo() {
+function CloudLogo({
+  color = '#FF78B9',
+}: {
+  color?: string;
+}) {
   return (
     <svg
       width="48"
@@ -3724,12 +4248,13 @@ function CloudLogo() {
     >
       <path
         d="M45 79C26 79 14 67 14 51C14 36 25 24 40 23C45 9 58 2 73 2C89 2 102 12 106 27C111 24 117 22 124 22C143 22 158 36 158 54C158 57 158 60 157 63C168 66 174 74 174 84C174 96 164 103 151 103H45C28 103 17 94 17 83C17 81 17 80 18 78C26 79 35 79 45 79Z"
-        fill="#FF78B9"
+        fill={color}
       />
 
       <path
         d="M45 79C26 79 14 67 14 51C14 36 25 24 40 23C45 9 58 2 73 2C89 2 102 12 106 27C111 24 117 22 124 22C143 22 158 36 158 54C158 57 158 60 157 63C168 66 174 74 174 84C174 96 164 103 151 103H45C28 103 17 94 17 83C17 81 17 80 18 78C26 79 35 79 45 79Z"
-        stroke="#FF9BCB"
+        stroke={color}
+        strokeOpacity="0.75"
         strokeWidth="3"
       />
     </svg>
