@@ -3863,4 +3863,3 @@ export default function EditarHistoriaPage() {
     </main>
   );
 }
-```
