@@ -76,6 +76,7 @@ type ChapterResponse = {
   scheduled?: boolean;
   published?: boolean;
   scheduled_for?: string | null;
+  error?: string;
 };
 
 type EditorMedia = {
@@ -140,6 +141,30 @@ function formatDateForInput(value: string | null | undefined) {
   if (Number.isNaN(date.getTime())) {
     return '';
   }
+
+  const year = date.getFullYear();
+
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, '0');
+
+  const day = String(
+    date.getDate()
+  ).padStart(2, '0');
+
+  const hours = String(
+    date.getHours()
+  ).padStart(2, '0');
+
+  const minutes = String(
+    date.getMinutes()
+  ).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function getLocalDateTimeInputMin() {
+  const date = new Date();
 
   const year = date.getFullYear();
 
@@ -584,18 +609,12 @@ export default function EditarHistoriaPage() {
           );
 
         const data =
-          (await response.json()) as
-            | ChapterResponse
-            | {
-                error?: string;
-              };
+          (await response.json()) as ChapterResponse;
 
         if (!response.ok) {
           throw new Error(
-            'error' in data &&
-            data.error
-              ? data.error
-              : 'Não foi possível carregar o capítulo.'
+            data.error ||
+              'Não foi possível carregar o capítulo.'
           );
         }
 
@@ -619,7 +638,11 @@ export default function EditarHistoriaPage() {
           null;
 
         setChapter(
-          loadedChapter
+          {
+            ...loadedChapter,
+            scheduled_for:
+              resolvedScheduledFor,
+          }
         );
 
         setChapterTitle(
@@ -657,7 +680,7 @@ export default function EditarHistoriaPage() {
 
         setChapterMedia(
           loadedMedia.map(
-            (media) => ({
+            (media: ChapterMedia) => ({
               id: media.id,
               url: media.media_url,
               type: media.media_type,
@@ -894,6 +917,15 @@ export default function EditarHistoriaPage() {
                 }
               : current
         );
+
+        if (storyRef.current) {
+          storyRef.current = {
+            ...storyRef.current,
+            cover_url:
+              data.cover_url ||
+              storyRef.current.cover_url,
+          };
+        }
 
         setSuccess(
           'Capa alterada com sucesso.'
@@ -1297,12 +1329,6 @@ export default function EditarHistoriaPage() {
               'br'
             )
           );
-
-          fragment.appendChild(
-            document.createElement(
-              'br'
-            )
-          );
         }
       }
     );
@@ -1414,9 +1440,9 @@ export default function EditarHistoriaPage() {
     const timestamp =
       Date.now();
 
-    const pendingMedia =
+    const pendingMedia: EditorMedia[] =
       files.map(
-        (file, index) => ({
+        (file, index): EditorMedia => ({
           id:
             `pending-${timestamp}-${index}-${Math.random()
               .toString(36)
@@ -1838,20 +1864,20 @@ export default function EditarHistoriaPage() {
           );
 
         const uploadResult =
-          await uploadResponse.json();
+          (await uploadResponse.json()) as ChapterResponse;
 
         if (
           !uploadResponse.ok
         ) {
           throw new Error(
-            uploadResult?.error ||
+            uploadResult.error ||
               'Não foi possível enviar as mídias.'
           );
         }
 
-        const returnedMedia =
-          (uploadResult.media ||
-            []) as ChapterMedia[];
+        const returnedMedia: ChapterMedia[] =
+          uploadResult.media ||
+          [];
 
         const newMedia =
           returnedMedia.filter(
@@ -1878,7 +1904,7 @@ export default function EditarHistoriaPage() {
 
         setChapterMedia(
           returnedMedia.map(
-            (media) => ({
+            (media: ChapterMedia) => ({
               id: media.id,
               url: media.media_url,
               type: media.media_type,
@@ -1958,17 +1984,17 @@ export default function EditarHistoriaPage() {
         );
 
       const data =
-        await response.json();
+        (await response.json()) as ChapterResponse;
 
       if (!response.ok) {
         throw new Error(
-          data?.error ||
+          data.error ||
             'Não foi possível salvar o capítulo.'
         );
       }
 
       const savedChapter =
-        data.chapter as Chapter;
+        data.chapter;
 
       const resolvedScheduledFor =
         data.scheduled_for ??
@@ -2004,10 +2030,8 @@ export default function EditarHistoriaPage() {
         data.media
       ) {
         setChapterMedia(
-          (
-            data.media as ChapterMedia[]
-          ).map(
-            (media) => ({
+          data.media.map(
+            (media: ChapterMedia) => ({
               id: media.id,
               url: media.media_url,
               type: media.media_type,
@@ -3431,7 +3455,7 @@ export default function EditarHistoriaPage() {
 
                       <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                         {chapterMedia.map(
-                          (media) => (
+                          (media: EditorMedia) => (
                             <div
                               key={
                                 media.id
@@ -3572,12 +3596,7 @@ export default function EditarHistoriaPage() {
                           onChange={
                             handleScheduleChange
                           }
-                          min={new Date()
-                            .toISOString()
-                            .slice(
-                              0,
-                              16
-                            )}
+                          min={getLocalDateTimeInputMin()}
                           className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-violet-400/40"
                         />
 
