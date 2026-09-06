@@ -85,11 +85,15 @@ type Tab = 'stories' | 'nook';
 
 const LIKE_REACTION = '❤️';
 
-const URL_REGEX =
-/https?://[^\s<]+/g;
+const URL_REGEX = new RegExp(
+  'https?://[^\\s<]+',
+  'g'
+);
 
-const SPOTIFY_URL_REGEX =
-/https?://(?:open.)?spotify.com/(?:intl-[a-zA-Z-]+/)?(?:track|album|playlist|artist|episode|show)/[A-Za-z0-9]+(?:?[^\s<]+)?/g;
+const SPOTIFY_URL_REGEX = new RegExp(
+  'https?://(?:open\\.)?spotify\\.com/(?:intl-[a-zA-Z-]+/)?(?:track|album|playlist|artist|episode|show)/[A-Za-z0-9]+(?:\\?[^\\s<]+)?',
+  'g'
+);
 
 function formatDate(value: string) {
 try {
