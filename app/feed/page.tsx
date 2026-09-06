@@ -9,6 +9,10 @@ import {
 import Link from 'next/link';
 import NookPostComposer from '@/components/NookPostComposer';
 
+/* =========================================================
+   TIPOS
+========================================================= */
+
 type Profile = {
   id: string;
   username: string;
@@ -54,18 +58,33 @@ type Post = {
   pinned: boolean;
   created_at: string;
   updated_at: string;
-
   author: Profile | null;
-
   media: Media[];
-
   reaction_counts: Record<string, number>;
-
   user_reactions: string[];
-
   comments_count: number;
-
   saved: boolean;
+};
+
+/* =========================================================
+   STORIES
+========================================================= */
+
+type StoryUser = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+};
+
+type UserStory = {
+  id: string;
+  user_id: string;
+  media_url: string;
+  media_type?: 'image' | 'gif' | 'video';
+  created_at: string;
+  expires_at?: string;
+  user: StoryUser;
 };
 
 const LIKE_REACTION = '❤️';
@@ -326,6 +345,28 @@ function BookIcon() {
   );
 }
 
+function LibraryIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M5 4v16" />
+      <path d="M9 4v16" />
+      <path d="M13 4v16" />
+      <path d="M17 6.5V20" />
+      <path d="M5 4h4" />
+      <path d="M13 4h4" />
+    </svg>
+  );
+}
+
 function CalendarIcon() {
   return (
     <svg
@@ -387,6 +428,43 @@ function SettingsIcon() {
   );
 }
 
+function MessageIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H8l-4 2v-4.5a7.5 7.5 0 0 1-1.5-4.5A7.5 7.5 0 0 1 10 4.5h2.5A7.5 7.5 0 0 1 20 11.5Z" />
+    </svg>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19c.7-3.5 2.5-5 5.5-5s4.8 1.5 5.5 5" />
+      <path d="M16 6.5a2.7 2.7 0 0 1 0 5.2" />
+      <path d="M16 14c2.5.3 4 1.8 4.5 4.5" />
+    </svg>
+  );
+}
+
 function LogoutIcon() {
   return (
     <svg
@@ -413,25 +491,19 @@ function LogoutIcon() {
 function formatPostDateTime(date: string) {
   const value = new Date(date);
 
-  return `${value.toLocaleDateString(
-    'pt-BR',
-    {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }
-  )} • ${value.toLocaleTimeString(
-    'en-US',
-    {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    }
-  )}`;
+  return `${value.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })} • ${value.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })}`;
 }
 
 function getInitial(
-  profile: Profile | CurrentUser | null
+  profile: Profile | CurrentUser | StoryUser | null
 ) {
   if (!profile) {
     return '?';
@@ -474,13 +546,15 @@ function Avatar({
   profile,
   size = 'normal',
 }: {
-  profile: Profile | CurrentUser | null;
-  size?: 'small' | 'normal';
+  profile: Profile | CurrentUser | StoryUser | null;
+  size?: 'small' | 'normal' | 'large';
 }) {
   const sizeClass =
     size === 'small'
       ? 'h-9 w-9'
-      : 'h-11 w-11';
+      : size === 'large'
+        ? 'h-16 w-16'
+        : 'h-11 w-11';
 
   return (
     <div
@@ -495,6 +569,153 @@ function Avatar({
       ) : (
         getInitial(profile)
       )}
+    </div>
+  );
+}
+
+/* =========================================================
+   STORIES
+========================================================= */
+
+function StoriesRow({
+  stories,
+  onOpen,
+}: {
+  stories: UserStory[];
+  onOpen: (story: UserStory) => void;
+}) {
+  const groupedStories = useMemo(() => {
+    const map = new Map<string, UserStory>();
+
+    for (const story of stories) {
+      if (!map.has(story.user_id)) {
+        map.set(story.user_id, story);
+      }
+    }
+
+    return Array.from(map.values());
+  }, [stories]);
+
+  return (
+    <section className="mb-7 overflow-hidden rounded-[28px] border border-white/[0.07] bg-[#100c11]/85 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff78b9]">
+            Stories
+          </p>
+
+          <h2 className="mt-1 text-sm font-bold text-white">
+            O que estão fazendo por aqui
+          </h2>
+        </div>
+
+        <Link
+          href="/stories"
+          className="text-[10px] font-bold text-white/30 transition hover:text-[#ff78b9]"
+        >
+          Ver todos
+        </Link>
+      </div>
+
+      <div className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {groupedStories.length === 0 ? (
+          <div className="flex min-h-[92px] items-center text-xs text-white/30">
+            Ainda não há stories de quem você segue.
+          </div>
+        ) : (
+          groupedStories.map((story) => (
+            <button
+              key={story.user_id}
+              type="button"
+              onClick={() => onOpen(story)}
+              className="group flex w-[72px] shrink-0 flex-col items-center"
+            >
+              <div className="rounded-full bg-gradient-to-br from-[#ff4d9d] via-[#ff78b9] to-[#c63dff] p-[2px] shadow-[0_0_18px_rgba(255,120,185,0.18)]">
+                <div className="rounded-full bg-[#100c11] p-[2px]">
+                  <Avatar
+                    profile={story.user}
+                    size="large"
+                  />
+                </div>
+              </div>
+
+              <p className="mt-2 w-full truncate text-center text-[10px] font-semibold text-white/55 transition group-hover:text-white">
+                @{story.user.username}
+              </p>
+            </button>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* =========================================================
+   STORY VIEWER
+========================================================= */
+
+function StoryViewer({
+  story,
+  onClose,
+}: {
+  story: UserStory | null;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!story) {
+      return;
+    }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+    };
+  }, [story]);
+
+  if (!story) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-5 top-5 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/60 transition hover:bg-white/10 hover:text-white"
+        aria-label="Fechar story"
+      >
+        <CloseIcon />
+      </button>
+
+      <div className="relative flex h-[min(820px,92vh)] w-full max-w-[430px] overflow-hidden rounded-[30px] border border-white/10 bg-[#100c11] shadow-[0_30px_120px_rgba(0,0,0,0.65)]">
+        <div className="absolute left-4 right-4 top-4 z-10">
+          <div className="h-1 overflow-hidden rounded-full bg-white/20">
+            <div className="h-full w-1/3 rounded-full bg-[#ff78b9]" />
+          </div>
+
+          <div className="mt-4 flex items-center gap-3">
+            <Avatar
+              profile={story.user}
+              size="small"
+            />
+
+            <p className="text-sm font-bold text-white">
+              @{story.user.username}
+            </p>
+          </div>
+        </div>
+
+        <img
+          src={story.media_url}
+          alt=""
+          className="h-full w-full object-contain"
+        />
+      </div>
     </div>
   );
 }
@@ -566,10 +787,7 @@ function getCalendarDays(
     0
   ).getDate();
 
-  const days: (
-    | number
-    | null
-  )[] = [];
+  const days: (number | null)[] = [];
 
   for (let i = 0; i < firstDay; i++) {
     days.push(null);
@@ -589,28 +807,11 @@ function getCalendarDays(
 function formatScheduledTime(
   date: string
 ) {
-  return new Date(
-    date
-  ).toLocaleTimeString(
+  return new Date(date).toLocaleTimeString(
     'pt-BR',
     {
       hour: '2-digit',
       minute: '2-digit',
-    }
-  );
-}
-
-function formatScheduledDate(
-  date: string
-) {
-  return new Date(
-    date
-  ).toLocaleDateString(
-    'pt-BR',
-    {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
     }
   );
 }
@@ -651,15 +852,14 @@ function UpcomingUpdatesContent({
       }
     );
 
-  const calendarDays =
-    useMemo(
-      () =>
-        getCalendarDays(
-          year,
-          month
-        ),
-      [year, month]
-    );
+  const calendarDays = useMemo(
+    () =>
+      getCalendarDays(
+        year,
+        month
+      ),
+    [year, month]
+  );
 
   const updatesForMonth =
     useMemo(() => {
@@ -690,39 +890,14 @@ function UpcomingUpdatesContent({
       month,
     ]);
 
-  function goPreviousMonth() {
-    setCalendarDate(
-      new Date(
-        year,
-        month - 1,
-        1
-      )
-    );
-  }
-
-  function goNextMonth() {
-    setCalendarDate(
-      new Date(
-        year,
-        month + 1,
-        1
-      )
-    );
-  }
-
   function getUpdatesForDay(
     day: number
   ) {
     return updatesForMonth.filter(
-      (update) => {
-        const date = new Date(
+      (update) =>
+        new Date(
           update.scheduled_for
-        );
-
-        return (
-          date.getDate() === day
-        );
-      }
+        ).getDate() === day
     );
   }
 
@@ -738,9 +913,7 @@ function UpcomingUpdatesContent({
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <CloudIcon
-                className="h-5 w-5 text-[#ff78b9]"
-              />
+              <CloudIcon className="h-5 w-5 text-[#ff78b9]" />
 
               <h2 className="text-sm font-black uppercase tracking-[0.12em] text-white">
                 Próximas ATTs
@@ -748,8 +921,7 @@ function UpcomingUpdatesContent({
             </div>
 
             <p className="mt-1.5 text-[11px] leading-4 text-white/35">
-              Acompanhe as próximas
-              atualizações.
+              Acompanhe as próximas atualizações.
             </p>
           </div>
 
@@ -757,7 +929,7 @@ function UpcomingUpdatesContent({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/35 transition hover:bg-white/[0.05] hover:text-white"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-white/35 transition hover:bg-white/[0.05] hover:text-white"
               aria-label="Fechar calendário"
             >
               <CloseIcon />
@@ -770,9 +942,16 @@ function UpcomingUpdatesContent({
         <div className="mb-4 flex items-center justify-between">
           <button
             type="button"
-            onClick={goPreviousMonth}
+            onClick={() =>
+              setCalendarDate(
+                new Date(
+                  year,
+                  month - 1,
+                  1
+                )
+              )
+            }
             className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.05] hover:text-[#ff78b9]"
-            aria-label="Mês anterior"
           >
             <ChevronLeftIcon />
           </button>
@@ -786,9 +965,16 @@ function UpcomingUpdatesContent({
 
           <button
             type="button"
-            onClick={goNextMonth}
+            onClick={() =>
+              setCalendarDate(
+                new Date(
+                  year,
+                  month + 1,
+                  1
+                )
+              )
+            }
             className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.05] hover:text-[#ff78b9]"
-            aria-label="Próximo mês"
           >
             <ChevronRightIcon />
           </button>
@@ -836,9 +1022,7 @@ function UpcomingUpdatesContent({
               }
 
               const dayUpdates =
-                getUpdatesForDay(
-                  day
-                );
+                getUpdatesForDay(day);
 
               const today =
                 new Date();
@@ -853,50 +1037,35 @@ function UpcomingUpdatesContent({
 
               return (
                 <div
-                  key={day}
-                  className={`relative flex h-10 items-center justify-center rounded-xl text-[10px] transition ${
+                  key={`${year}-${month}-${day}`}
+                  className={`relative flex h-10 items-center justify-center rounded-xl text-[10px] ${
                     isToday
                       ? 'bg-[#ff78b9]/[0.09] font-black text-[#ff78b9]'
-                      : 'text-white/45 hover:bg-white/[0.025]'
+                      : 'text-white/45'
                   }`}
                 >
-                  <span
-                    className={
-                      dayUpdates.length
-                        ? 'relative z-10'
-                        : ''
-                    }
-                  >
-                    {day}
-                  </span>
+                  {day}
 
                   {dayUpdates.length >
                     0 && (
-                    <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-[2px]">
+                    <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-[2px]">
                       {dayUpdates
                         .slice(
                           0,
                           3
                         )
                         .map(
-                          (
-                            update
-                          ) => (
+                          (update) => (
                             <span
                               key={
                                 update.id
                               }
-                              className="relative block h-[6px] w-[9px]"
                               style={{
                                 color:
                                   update.color,
-                                filter: `drop-shadow(0 0 4px ${update.color})`,
                               }}
-                              title={`${update.author.display_name || update.author.username} — ${update.chapter_title}`}
                             >
-                              <CloudIcon
-                                className="h-[7px] w-[10px]"
-                              />
+                              <CloudIcon className="h-[7px] w-[9px]" />
                             </span>
                           )
                         )}
@@ -925,113 +1094,85 @@ function UpcomingUpdatesContent({
           0 ? (
             updatesForMonth
               .slice(0, 8)
-              .map(
-                (update) => {
-                  const date =
-                    new Date(
-                      update.scheduled_for
-                    );
-
-                  const day =
-                    date.getDate();
-
-                  return (
-                    <Link
-                      key={
-                        update.id
-                      }
-                      href={`/historia/${update.story_id}`}
-                      onClick={
-                        onClose
-                      }
-                      className="group flex items-start gap-2.5 rounded-xl p-1.5 -mx-1.5 transition hover:bg-white/[0.035]"
-                    >
-                      <div
-                        className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.035]"
-                        style={{
-                          color:
-                            update.color,
-                          filter: `drop-shadow(0 0 5px ${update.color}55)`,
-                        }}
-                      >
-                        <CloudIcon
-                          className="h-4 w-4"
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <p className="truncate text-[11px] font-bold text-white transition group-hover:text-[#ff78b9]">
-                            @
-                            {
-                              update
-                                .author
-                                .username
-                            }
-                          </p>
-
-                          <span
-                            className="shrink-0 text-[9px] font-bold"
-                            style={{
-                              color:
-                                update.color,
-                            }}
-                          >
-                            {day}{' '}
-                            {date.toLocaleDateString(
-                              'pt-BR',
-                              {
-                                month:
-                                  'short',
-                              }
-                            )}
-                          </span>
-                        </div>
-
-                        <p className="mt-0.5 truncate text-[10px] text-white/45">
-                          {update.story_title}
-                          {' · '}
-                          Cap.{' '}
-                          {
-                            update.chapter_number
-                          }
-                        </p>
-
-                        <p className="mt-0.5 text-[9px] text-white/25">
-                          {
-                            update.chapter_title
-                          }{' '}
-                          ·{' '}
-                          {formatScheduledTime(
-                            update.scheduled_for
-                          )}
-                        </p>
-                      </div>
-                    </Link>
+              .map((update) => {
+                const date =
+                  new Date(
+                    update.scheduled_for
                   );
-                }
-              )
+
+                return (
+                  <Link
+                    key={update.id}
+                    href={`/historia/${update.story_id}`}
+                    onClick={onClose}
+                    className="group flex items-start gap-2.5 rounded-xl p-1.5 transition hover:bg-white/[0.035]"
+                  >
+                    <div
+                      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.035]"
+                      style={{
+                        color:
+                          update.color,
+                      }}
+                    >
+                      <CloudIcon className="h-4 w-4" />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="truncate text-[11px] font-bold text-white group-hover:text-[#ff78b9]">
+                          @{update.author.username}
+                        </p>
+
+                        <span
+                          className="shrink-0 text-[9px] font-bold"
+                          style={{
+                            color:
+                              update.color,
+                          }}
+                        >
+                          {date.getDate()}{' '}
+                          {date.toLocaleDateString(
+                            'pt-BR',
+                            {
+                              month:
+                                'short',
+                            }
+                          )}
+                        </span>
+                      </div>
+
+                      <p className="mt-0.5 truncate text-[10px] text-white/45">
+                        {update.story_title}
+                        {' · '}
+                        Cap.{' '}
+                        {
+                          update.chapter_number
+                        }
+                      </p>
+
+                      <p className="mt-0.5 text-[9px] text-white/25">
+                        {
+                          update.chapter_title
+                        }{' '}
+                        ·{' '}
+                        {formatScheduledTime(
+                          update.scheduled_for
+                        )}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })
           ) : (
             <div className="py-5 text-center">
-              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.035] text-white/20">
-                <CloudIcon />
-              </div>
+              <CloudIcon className="mx-auto h-9 w-9 text-white/15" />
 
               <p className="mt-3 text-[10px] text-white/25">
-                Nenhuma atualização
-                programada para este
-                mês.
+                Nenhuma atualização programada para este mês.
               </p>
             </div>
           )}
         </div>
-      </div>
-
-      <div className="border-t border-white/[0.06] px-5 py-3">
-        <p className="text-center text-[9px] leading-4 text-white/20">
-          As nuvens mostram quando
-          suas autoras vão atualizar.
-        </p>
       </div>
     </div>
   );
@@ -1043,7 +1184,7 @@ function UpcomingUpdatesCard({
   updates: UpcomingUpdate[];
 }) {
   return (
-    <aside className="hidden w-[270px] shrink-0 lg:block">
+    <aside className="hidden w-[270px] shrink-0 xl:block">
       <div className="sticky top-6 overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
         <UpcomingUpdatesContent
           updates={updates}
@@ -1144,8 +1285,7 @@ function SpotifyPreview({
         </span>
 
         <p className="mt-1 truncate text-sm font-bold text-white">
-          {data.title ||
-            'Música no Spotify'}
+          {data.title || 'Música no Spotify'}
         </p>
 
         {data.author_name && (
@@ -1279,10 +1419,8 @@ function CommentItem({
               }
               className="text-sm font-bold text-white transition hover:text-[#ff78b9]"
             >
-              {comment.author
-                ?.display_name ||
-                comment.author
-                  ?.username ||
+              {comment.author?.display_name ||
+                comment.author?.username ||
                 'Usuário'}
             </Link>
 
@@ -1777,16 +1915,11 @@ function FeedPost({
     }, [comments]);
 
   const mainComments =
-    commentsByParent.get(
-      null
-    ) || [];
+    commentsByParent.get(null) || [];
 
   return (
     <article className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
       <div className="p-5 sm:p-6">
-
-        {/* AUTHOR */}
-
         <div className="flex items-start gap-3">
           <Link
             href={
@@ -1826,10 +1959,7 @@ function FeedPost({
                   }
                   className="block truncate text-xs text-[#ff78b9]/80 transition hover:text-[#ff78b9]"
                 >
-                  @
-                  {post.author
-                    ?.username ||
-                    'usuario'}
+                  @{post.author?.username || 'usuario'}
                 </Link>
               </div>
 
@@ -1842,56 +1972,29 @@ function FeedPost({
           </div>
         </div>
 
-        {/* BODY */}
+        <PostBody body={post.body} />
 
-        <PostBody
-          body={post.body}
-        />
-
-        {/* MEDIA */}
-
-        <PostMedia
-          post={post}
-        />
-
-        {/* ACTIONS */}
+        <PostMedia post={post} />
 
         <div className="mt-5 flex items-center justify-between border-t border-white/[0.06] pt-3">
-
-          {/* LIKE */}
-
           <button
             type="button"
             onClick={toggleLike}
             disabled={liking}
-            aria-label="Curtir"
-            title="Curtir"
             className={`group flex h-11 min-w-[64px] items-center justify-center gap-1.5 rounded-xl px-3 transition active:scale-95 ${
               liked
                 ? 'text-[#ff78b9]'
                 : 'text-white/45 hover:bg-white/[0.04] hover:text-[#ff78b9]'
             }`}
           >
-            <span
-              className={`transition-transform ${
-                liked
-                  ? 'scale-110'
-                  : 'group-hover:scale-110'
-              }`}
-            >
-              <CloudIcon
-                filled={liked}
-              />
-            </span>
+            <CloudIcon filled={liked} />
 
             {likeCount > 0 && (
-              <span className="text-[11px] font-semibold text-current">
+              <span className="text-[11px] font-semibold">
                 {likeCount}
               </span>
             )}
           </button>
-
-          {/* COMMENT */}
 
           <button
             type="button"
@@ -1900,95 +2003,63 @@ function FeedPost({
                 (value) => !value
               )
             }
-            aria-label="Comentar"
-            title="Comentar"
-            className="group flex h-11 min-w-[64px] items-center justify-center gap-1.5 rounded-xl px-3 text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9] active:scale-95"
+            className="group flex h-11 min-w-[64px] items-center justify-center gap-1.5 rounded-xl px-3 text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9]"
           >
-            <span className="transition-transform group-hover:scale-110">
-              <CommentIcon />
-            </span>
+            <CommentIcon />
 
             {post.comments_count > 0 && (
-              <span className="text-[11px] font-semibold text-current">
+              <span className="text-[11px] font-semibold">
                 {post.comments_count}
               </span>
             )}
           </button>
 
-          {/* SHARE */}
-
           <button
             type="button"
             onClick={sharePost}
-            aria-label="Compartilhar"
-            title="Compartilhar"
-            className="group relative flex h-11 min-w-[64px] items-center justify-center rounded-xl px-3 text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9] active:scale-95"
+            className="group relative flex h-11 min-w-[64px] items-center justify-center rounded-xl px-3 text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9]"
           >
-            <span className="transition-transform group-hover:scale-110">
-              <ShareIcon />
-            </span>
+            <ShareIcon />
 
             {shareMessage && (
-              <span className="absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#ff78b9] px-3 py-1.5 text-[10px] font-bold text-[#190d16] shadow-xl">
+              <span className="absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#ff78b9] px-3 py-1.5 text-[10px] font-bold text-[#190d16]">
                 {shareMessage}
               </span>
             )}
           </button>
 
-          {/* SAVE */}
-
           <button
             type="button"
             onClick={toggleSave}
             disabled={saving}
-            aria-label={
-              post.saved
-                ? 'Remover dos salvos'
-                : 'Salvar'
-            }
-            title={
-              post.saved
-                ? 'Remover dos salvos'
-                : 'Salvar'
-            }
-            className={`group flex h-11 min-w-[64px] items-center justify-center rounded-xl px-3 transition active:scale-95 ${
+            className={`group flex h-11 min-w-[64px] items-center justify-center rounded-xl px-3 transition ${
               post.saved
                 ? 'text-[#ff78b9]'
                 : 'text-white/45 hover:bg-white/[0.04] hover:text-[#ff78b9]'
             }`}
           >
-            <span className="transition-transform group-hover:scale-110">
-              <BookmarkIcon
-                filled={post.saved}
-              />
-            </span>
+            <BookmarkIcon
+              filled={post.saved}
+            />
           </button>
         </div>
       </div>
 
-      {/* COMMENTS */}
-
       {commentsOpen && (
         <div className="border-t border-white/[0.06] bg-black/10 px-5 py-5 sm:px-6">
-
           {replyingTo && (
             <div className="mb-3 flex items-center justify-between rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05] px-3 py-2">
               <span className="text-xs text-white/50">
                 Respondendo a{' '}
                 <strong className="text-[#ff78b9]">
-                  @
-                  {replyingTo.author
-                    ?.username ||
-                    'usuario'}
+                  @{replyingTo.author?.username || 'usuario'}
                 </strong>
               </span>
 
               <button
                 type="button"
                 onClick={() =>
-                  setReplyingTo(
-                    null
-                  )
+                  setReplyingTo(null)
                 }
                 className="text-xs font-bold text-white/40 hover:text-white"
               >
@@ -2039,8 +2110,7 @@ function FeedPost({
                   !commentText.trim() ||
                   sendingComment
                 }
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ff78b9] text-[#190d16] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30"
-                aria-label="Enviar comentário"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ff78b9] text-[#190d16] transition hover:brightness-110 disabled:opacity-30"
               >
                 <SendIcon />
               </button>
@@ -2051,16 +2121,14 @@ function FeedPost({
             <div className="py-6 text-center text-xs text-white/30">
               Carregando comentários...
             </div>
-          ) : mainComments.length ===
-            0 ? (
+          ) : mainComments.length === 0 ? (
             <div className="py-6 text-center">
               <p className="text-sm font-semibold text-white/45">
                 Ainda não há comentários.
               </p>
 
               <p className="mt-1 text-xs text-white/25">
-                Seja a primeira pessoa a
-                comentar.
+                Seja a primeira pessoa a comentar.
               </p>
             </div>
           ) : (
@@ -2090,6 +2158,184 @@ function FeedPost({
 }
 
 /* =========================================================
+   MENU LATERAL DESKTOP
+========================================================= */
+
+function SideMenu({
+  open,
+  currentUser,
+  onClose,
+  onOpenCalendar,
+}: {
+  open: boolean;
+  currentUser: CurrentUser | null;
+  onClose: () => void;
+  onOpenCalendar: () => void;
+}) {
+  return (
+    <aside
+      className={`fixed left-0 top-0 z-[90] hidden h-screen overflow-hidden border-r border-white/[0.08] bg-[#100c11]/98 shadow-[20px_0_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl transition-all duration-300 lg:flex ${
+        open
+          ? 'w-[285px]'
+          : 'pointer-events-none w-0 border-r-0'
+      }`}
+    >
+      <div className="flex min-w-[285px] flex-col">
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-5">
+          <Link
+            href="/feed"
+            className="flex items-center gap-3"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9]">
+              <CloudIcon />
+            </div>
+
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#ff78b9]/70">
+                Nooklie
+              </p>
+
+              <p className="mt-0.5 text-xs text-white/40">
+                Entre escritores
+              </p>
+            </div>
+          </Link>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.05] hover:text-white"
+            aria-label="Fechar menu"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <Link
+          href="/perfil"
+          className="mx-4 mt-5 flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3 transition hover:border-[#ff78b9]/20 hover:bg-white/[0.04]"
+        >
+          <Avatar
+            profile={currentUser}
+          />
+
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-white">
+              {currentUser?.display_name ||
+                currentUser?.username ||
+                'Usuário'}
+            </p>
+
+            <p className="mt-0.5 truncate text-xs text-[#ff78b9]/70">
+              @{currentUser?.username || 'usuario'}
+            </p>
+          </div>
+        </Link>
+
+        <nav className="flex-1 overflow-y-auto px-3 py-5">
+          <p className="px-4 pb-2 text-[9px] font-black uppercase tracking-[0.2em] text-white/20">
+            Navegação
+          </p>
+
+          <div className="space-y-1">
+            <Link
+              href="/feed"
+              className="flex items-center gap-3 rounded-2xl bg-[#ff78b9]/[0.08] px-4 py-3.5 text-sm font-bold text-[#ff78b9]"
+            >
+              <HomeIcon />
+              Início
+            </Link>
+
+            <Link
+              href="/minhas-historias"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/60 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <BookIcon />
+              Minhas histórias
+            </Link>
+
+            <Link
+              href="/biblioteca"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/60 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <LibraryIcon />
+              Minha biblioteca
+            </Link>
+
+            <Link
+              href="/listas-de-leitura"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/60 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <BookmarkMenuIcon />
+              Minhas listas de leitura
+            </Link>
+
+            <button
+              type="button"
+              onClick={onOpenCalendar}
+              className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-sm font-semibold text-white/60 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <CalendarIcon />
+              Próximas atualizações
+            </button>
+
+            <Link
+              href="/fandoms"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/60 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <UsersIcon />
+              Meus fandoms
+            </Link>
+
+            <Link
+              href="/ler-depois"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/60 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <BookmarkMenuIcon />
+              Ler depois
+            </Link>
+
+            <Link
+              href="/chat"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/60 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <MessageIcon />
+              Chat
+            </Link>
+
+            <Link
+              href="/clubes"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/60 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <UsersIcon />
+              Clubes de fic
+            </Link>
+
+            <Link
+              href="/configuracoes"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/60 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+            >
+              <SettingsIcon />
+              Configurações
+            </Link>
+          </div>
+        </nav>
+
+        <div className="border-t border-white/[0.06] p-3">
+          <Link
+            href="/logout"
+            className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/35 transition hover:bg-red-400/[0.05] hover:text-red-300"
+          >
+            <LogoutIcon />
+            Sair
+          </Link>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+/* =========================================================
    MENU MOBILE
 ========================================================= */
 
@@ -2113,12 +2359,11 @@ function MobileDrawer({
       <button
         type="button"
         onClick={onClose}
-        aria-label="Fechar menu"
         className="fixed inset-0 z-[80] bg-black/65 backdrop-blur-[2px] lg:hidden"
+        aria-label="Fechar menu"
       />
 
       <aside className="fixed left-0 top-0 z-[90] flex h-screen w-[84%] max-w-[360px] flex-col overflow-hidden rounded-r-[30px] border-r border-white/[0.08] bg-[#100c11] shadow-[20px_0_80px_rgba(0,0,0,0.45)] lg:hidden">
-
         <div className="border-b border-white/[0.06] px-5 pb-5 pt-6">
           <div className="flex items-center justify-between">
             <Link
@@ -2145,22 +2390,18 @@ function MobileDrawer({
               type="button"
               onClick={onClose}
               className="flex h-9 w-9 items-center justify-center rounded-full text-white/35 transition hover:bg-white/[0.05] hover:text-white"
-              aria-label="Fechar menu"
             >
               <CloseIcon />
             </button>
           </div>
 
-          {/* USER */}
-
           <Link
             href="/perfil"
             onClick={onClose}
-            className="mt-6 flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3 transition hover:border-[#ff78b9]/20 hover:bg-white/[0.04]"
+            className="mt-6 flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3"
           >
             <Avatar
               profile={currentUser}
-              size="normal"
             />
 
             <div className="min-w-0">
@@ -2171,43 +2412,48 @@ function MobileDrawer({
               </p>
 
               <p className="mt-0.5 truncate text-xs text-[#ff78b9]/70">
-                @
-                {currentUser?.username ||
-                  'usuario'}
+                @{currentUser?.username || 'usuario'}
               </p>
             </div>
           </Link>
         </div>
-
-        {/* NAVIGATION */}
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <div className="space-y-1">
             <Link
               href="/feed"
               onClick={onClose}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+              className="flex items-center gap-3 rounded-2xl bg-[#ff78b9]/[0.08] px-4 py-3.5 text-sm font-bold text-[#ff78b9]"
             >
               <HomeIcon />
-              <span>Início</span>
-            </Link>
-
-            <Link
-              href="/perfil"
-              onClick={onClose}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
-            >
-              <UserIcon />
-              <span>Meu perfil</span>
+              Início
             </Link>
 
             <Link
               href="/minhas-historias"
               onClick={onClose}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65"
             >
               <BookIcon />
-              <span>Minhas histórias</span>
+              Minhas histórias
+            </Link>
+
+            <Link
+              href="/biblioteca"
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65"
+            >
+              <LibraryIcon />
+              Minha biblioteca
+            </Link>
+
+            <Link
+              href="/listas-de-leitura"
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65"
+            >
+              <BookmarkMenuIcon />
+              Minhas listas de leitura
             </Link>
 
             <button
@@ -2216,42 +2462,67 @@ function MobileDrawer({
                 onClose();
                 onOpenCalendar();
               }}
-              className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-sm font-semibold text-white/65 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+              className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-sm font-semibold text-white/65"
             >
               <CalendarIcon />
-              <span>Próximas atualizações</span>
+              Próximas atualizações
             </button>
 
             <Link
-              href="/salvos"
+              href="/fandoms"
               onClick={onClose}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65"
+            >
+              <UsersIcon />
+              Meus fandoms
+            </Link>
+
+            <Link
+              href="/ler-depois"
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65"
             >
               <BookmarkMenuIcon />
-              <span>Salvos</span>
+              Ler depois
+            </Link>
+
+            <Link
+              href="/chat"
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65"
+            >
+              <MessageIcon />
+              Chat
+            </Link>
+
+            <Link
+              href="/clubes"
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65"
+            >
+              <UsersIcon />
+              Clubes de fic
             </Link>
 
             <Link
               href="/configuracoes"
               onClick={onClose}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65 transition hover:bg-[#ff78b9]/[0.07] hover:text-[#ff78b9]"
+              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/65"
             >
               <SettingsIcon />
-              <span>Configurações</span>
+              Configurações
             </Link>
           </div>
         </nav>
-
-        {/* LOGOUT */}
 
         <div className="border-t border-white/[0.06] p-3">
           <Link
             href="/logout"
             onClick={onClose}
-            className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/40 transition hover:bg-red-400/[0.05] hover:text-red-300"
+            className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold text-white/40 hover:text-red-300"
           >
             <LogoutIcon />
-            <span>Sair</span>
+            Sair
           </Link>
         </div>
       </aside>
@@ -2295,7 +2566,7 @@ function MobileCalendarModal({
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/70 p-3 backdrop-blur-sm lg:hidden">
-      <div className="mx-auto flex h-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#100c11] shadow-[0_25px_100px_rgba(0,0,0,0.5)]">
+      <div className="mx-auto flex h-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#100c11]">
         <UpcomingUpdatesContent
           updates={updates}
           onClose={onClose}
@@ -2318,6 +2589,18 @@ export default function FeedPage() {
     currentUser,
     setCurrentUser,
   ] = useState<CurrentUser | null>(
+    null
+  );
+
+  const [
+    stories,
+    setStories,
+  ] = useState<UserStory[]>([]);
+
+  const [
+    activeStory,
+    setActiveStory,
+  ] = useState<UserStory | null>(
     null
   );
 
@@ -2398,7 +2681,7 @@ export default function FeedPage() {
     }, []);
 
   /* =======================================================
-     CARREGAR FEED
+     FEED
   ======================================================= */
 
   const loadFeed =
@@ -2453,7 +2736,52 @@ export default function FeedPage() {
     );
 
   /* =======================================================
-     CARREGAR PRÓXIMAS ATUALIZAÇÕES
+     STORIES
+     
+     O endpoint é opcional por enquanto.
+     Se ele ainda não existir, a Home continua funcionando
+     normalmente e simplesmente não mostra stories.
+  ======================================================= */
+
+  const loadStories =
+    useCallback(async () => {
+      try {
+        const response =
+          await fetch(
+            '/api/stories',
+            {
+              cache: 'no-store',
+            }
+          );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data =
+          await response.json();
+
+        const incomingStories =
+          Array.isArray(data)
+            ? data
+            : data.stories;
+
+        if (
+          Array.isArray(
+            incomingStories
+          )
+        ) {
+          setStories(
+            incomingStories
+          );
+        }
+      } catch {
+        // Stories não devem impedir o carregamento do Feed.
+      }
+    }, []);
+
+  /* =======================================================
+     PRÓXIMAS ATUALIZAÇÕES
   ======================================================= */
 
   const loadUpcomingUpdates =
@@ -2518,10 +2846,12 @@ export default function FeedPage() {
   useEffect(() => {
     loadCurrentUser();
     loadFeed();
+    loadStories();
     loadUpcomingUpdates();
   }, [
     loadCurrentUser,
     loadFeed,
+    loadStories,
     loadUpcomingUpdates,
   ]);
 
@@ -2533,6 +2863,7 @@ export default function FeedPage() {
           'visible'
         ) {
           loadUpcomingUpdates();
+          loadStories();
         }
       };
 
@@ -2549,6 +2880,7 @@ export default function FeedPage() {
     };
   }, [
     loadUpcomingUpdates,
+    loadStories,
   ]);
 
   function updatePost(
@@ -2568,10 +2900,16 @@ export default function FeedPage() {
     );
   }
 
+  const greetingName =
+    currentUser?.username ||
+    currentUser?.display_name ||
+    'escritor';
+
   return (
     <main className="min-h-screen bg-[#080609] text-white">
-
-      {/* BACKGROUND GLOW */}
+      {/* =================================================
+          BACKGROUND
+      ================================================= */}
 
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-40 top-[-180px] h-[500px] w-[500px] rounded-full bg-[#ff4d9d]/[0.08] blur-[130px]" />
@@ -2581,279 +2919,461 @@ export default function FeedPage() {
         <div className="absolute bottom-[-200px] left-[35%] h-[450px] w-[450px] rounded-full bg-[#ff78b9]/[0.035] blur-[130px]" />
       </div>
 
-      {/* MOBILE DRAWER */}
+      {/* =================================================
+          DESKTOP MENU
+      ================================================= */}
 
-      <MobileDrawer
+      <SideMenu
         open={drawerOpen}
+        currentUser={currentUser}
         onClose={() =>
           setDrawerOpen(false)
-        }
-        currentUser={
-          currentUser
         }
         onOpenCalendar={() =>
           setCalendarOpen(true)
         }
       />
 
-      {/* MOBILE CALENDAR */}
+      {/* =================================================
+          MOBILE MENU
+      ================================================= */}
+
+      <MobileDrawer
+        open={drawerOpen}
+        onClose={() =>
+          setDrawerOpen(false)
+        }
+        currentUser={currentUser}
+        onOpenCalendar={() =>
+          setCalendarOpen(true)
+        }
+      />
+
+      {/* =================================================
+          MOBILE CALENDAR
+      ================================================= */}
 
       <MobileCalendarModal
         open={calendarOpen}
-        updates={
-          upcomingUpdates
-        }
+        updates={upcomingUpdates}
         onClose={() =>
           setCalendarOpen(false)
         }
       />
 
-      <div className="relative mx-auto min-h-screen w-full max-w-6xl px-4 pb-20 pt-4 sm:px-6 lg:px-8 lg:pt-5">
+      {/* =================================================
+          STORY VIEWER
+      ================================================= */}
 
-        {/* HEADER */}
+      <StoryViewer
+        story={activeStory}
+        onClose={() =>
+          setActiveStory(null)
+        }
+      />
 
-        <header className="mb-6 flex items-center justify-between">
+      <div
+        className={`relative min-h-screen w-full px-4 pb-20 pt-4 transition-all duration-300 sm:px-6 lg:px-8 lg:pt-6 ${
+          drawerOpen
+            ? 'lg:pl-[320px]'
+            : ''
+        }`}
+      >
+        <div className="mx-auto max-w-[1380px]">
+          {/* =================================================
+              TOP BAR
+          ================================================= */}
 
-          {/* MOBILE AVATAR */}
-
-          <button
-            type="button"
-            onClick={() =>
-              setDrawerOpen(true)
-            }
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#ff78b9]/20 bg-[#ff78b9]/[0.06] p-[2px] lg:hidden"
-            aria-label="Abrir menu"
-          >
-            <Avatar
-              profile={currentUser}
-              size="small"
-            />
-          </button>
-
-          {/* BRAND */}
-
-          <div className="flex items-center gap-3">
-            <div className="hidden h-9 w-9 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9] sm:flex">
-              <CloudIcon />
-            </div>
-
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#ff78b9]/70">
-                Nooklie
-              </p>
-
-              <p className="mt-0.5 text-sm font-semibold text-white/65">
-                Entre escritores
-              </p>
-            </div>
-          </div>
-
-          {/* REFRESH */}
-
-          <button
-            type="button"
-            onClick={() => {
-              loadFeed(true);
-              loadUpcomingUpdates();
-            }}
-            disabled={refreshing}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/45 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9] disabled:opacity-40 sm:h-11 sm:w-11"
-            aria-label="Atualizar Feed"
-            title="Atualizar"
-          >
-            <span
-              className={
-                refreshing
-                  ? 'animate-spin'
-                  : ''
-              }
-            >
-              <RefreshIcon />
-            </span>
-          </button>
-        </header>
-
-        {/* =================================================
-            LAYOUT PRINCIPAL
-        ================================================= */}
-
-        <div className="flex items-start justify-center gap-7">
-
-          {/* COLUNA CENTRAL */}
-
-          <div className="w-full max-w-[680px]">
-
-            {/* CREATE POST */}
-
-            <div className="mb-7 w-full">
+          <header className="mb-8 flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
                 onClick={() =>
-                  setComposerOpen(true)
+                  setDrawerOpen(
+                    (value) => !value
+                  )
                 }
-                className="group w-full overflow-hidden rounded-[26px] border border-[#ff78b9]/15 bg-gradient-to-br from-[#ff78b9]/[0.09] via-white/[0.035] to-[#c63dff]/[0.05] p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition duration-300 hover:border-[#ff78b9]/35 hover:shadow-[0_20px_70px_rgba(255,120,185,0.08)] sm:p-6"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] text-white/55 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9]"
+                aria-label="Abrir menu"
               >
-                <div className="flex items-center gap-4">
-
-                  {/* AVATAR */}
-
-                  <div className="relative shrink-0">
-                    <div className="h-14 w-14 overflow-hidden rounded-full border-2 border-[#ff78b9]/30 bg-[#ff78b9] font-black text-lg text-[#190d16] shadow-[0_0_25px_rgba(255,120,185,0.12)] sm:h-16 sm:w-16">
-                      {currentUser?.avatar_url ? (
-                        <img
-                          src={
-                            currentUser.avatar_url
-                          }
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          {getInitial(
-                            currentUser
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#100c11] bg-[#ff78b9] text-[#190d16]">
-                      <span className="text-base leading-none">
-                        +
-                      </span>
-                    </span>
-                  </div>
-
-                  {/* TEXTO */}
-
-                  <div className="min-w-0 flex-1">
-                    <p className="text-base font-black text-white sm:text-lg">
-                      Compartilhe alguma coisa
-                    </p>
-
-                    <p className="mt-1 text-sm leading-5 text-white/40">
-                      Uma ideia, uma descoberta,
-                      uma história...
-                    </p>
-                  </div>
-
-                  {/* INDICADOR */}
-
-                  <div className="hidden shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-white/45 transition group-hover:border-[#ff78b9]/25 group-hover:bg-[#ff78b9]/[0.08] group-hover:text-[#ff78b9] sm:flex">
-                    Publicar
-                  </div>
-                </div>
-
-                {/* LINHA INFERIOR */}
-
-                <div className="mt-5 border-t border-white/[0.07] pt-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-white/25">
-                      O que está passando pela sua
-                      cabeça?
-                    </span>
-
-                    <span className="text-xs font-semibold text-[#ff78b9]/50 transition group-hover:text-[#ff78b9]">
-                      Criar publicação →
-                    </span>
-                  </div>
-                </div>
+                <MenuIcon />
               </button>
-            </div>
 
-            {/* ERROR */}
+              <div className="hidden h-10 w-10 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9] sm:flex">
+                <CloudIcon />
+              </div>
 
-            {error && (
-              <div className="mb-6 rounded-2xl border border-red-400/15 bg-red-400/[0.05] px-5 py-4">
-                <p className="text-sm font-semibold text-red-300">
-                  {error}
+              <div className="min-w-0">
+                <p className="truncate text-[10px] font-black uppercase tracking-[0.28em] text-[#ff78b9]/70">
+                  Nooklie
                 </p>
 
+                <h1 className="mt-1 truncate text-xl font-black tracking-tight text-white sm:text-2xl">
+                  Oi, {greetingName}
+                </h1>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Link
+                href="/perfil"
+                className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] sm:flex"
+              >
+                <Avatar
+                  profile={currentUser}
+                  size="small"
+                />
+
+                <span className="max-w-[120px] truncate text-xs font-bold text-white/60">
+                  @{currentUser?.username ||
+                    'usuario'}
+                </span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => {
+                  loadFeed(true);
+                  loadStories();
+                  loadUpcomingUpdates();
+                }}
+                disabled={refreshing}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] text-white/45 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9] disabled:opacity-40"
+                aria-label="Atualizar"
+              >
+                <span
+                  className={
+                    refreshing
+                      ? 'animate-spin'
+                      : ''
+                  }
+                >
+                  <RefreshIcon />
+                </span>
+              </button>
+            </div>
+          </header>
+
+          {/* =================================================
+              HERO / BOAS-VINDAS
+          ================================================= */}
+
+          <section className="mb-7 overflow-hidden rounded-[30px] border border-[#ff78b9]/10 bg-gradient-to-br from-[#ff78b9]/[0.09] via-[#100c11]/90 to-[#c63dff]/[0.05] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.24)] sm:p-8">
+            <div className="max-w-3xl">
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#ff78b9]">
+                Seu espaço
+              </p>
+
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
+                Um lugar para escrever,
+                ler e encontrar gente
+                que entende você.
+              </h2>
+
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/40 sm:text-[15px]">
+                Acompanhe seus escritores,
+                descubra histórias novas e
+                compartilhe o que está passando
+                pela sua cabeça.
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() =>
-                    loadFeed()
+                    setComposerOpen(true)
                   }
-                  className="mt-2 text-xs font-bold text-red-300 underline underline-offset-2"
+                  className="rounded-full bg-[#ff78b9] px-5 py-2.5 text-xs font-black text-[#190d16] transition hover:brightness-110"
                 >
-                  Tentar novamente
+                  Escrever no Mural
                 </button>
+
+                <Link
+                  href="/explorar"
+                  className="rounded-full border border-white/10 bg-white/[0.035] px-5 py-2.5 text-xs font-bold text-white/60 transition hover:border-[#ff78b9]/25 hover:text-[#ff78b9]"
+                >
+                  Explorar histórias
+                </Link>
               </div>
-            )}
-
-            {/* LOADING */}
-
-            {loading ? (
-              <div className="w-full space-y-5">
-                {[1, 2, 3].map(
-                  (item) => (
-                    <div
-                      key={item}
-                      className="animate-pulse rounded-[26px] border border-white/[0.06] bg-white/[0.025] p-6"
-                    >
-                      <div className="flex gap-3">
-                        <div className="h-11 w-11 rounded-full bg-white/[0.06]" />
-
-                        <div className="flex-1">
-                          <div className="h-3 w-32 rounded bg-white/[0.06]" />
-
-                          <div className="mt-2 h-2 w-20 rounded bg-white/[0.04]" />
-                        </div>
-                      </div>
-
-                      <div className="mt-5 h-4 w-4/5 rounded bg-white/[0.05]" />
-
-                      <div className="mt-3 h-4 w-3/5 rounded bg-white/[0.04]" />
-
-                      <div className="mt-5 h-32 rounded-2xl bg-white/[0.04]" />
-                    </div>
-                  )
-                )}
-              </div>
-            ) : posts.length ===
-              0 ? (
-              <div className="flex min-h-[55vh] items-center justify-center">
-                <div className="max-w-md text-center">
-
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05]">
-                    <CloudIcon />
-                  </div>
-
-                  <h2 className="mt-6 text-xl font-black text-white">
-                    O Feed está quieto.
-                  </h2>
-
-                  <p className="mt-2 text-sm leading-6 text-white/35">
-                    Ainda não há publicações por
-                    aqui. Quando os escritores
-                    começarem a postar, elas
-                    aparecerão aqui.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="w-full space-y-5">
-                {posts.map((post) => (
-                  <FeedPost
-                    key={post.id}
-                    post={post}
-                    onPostUpdated={
-                      updatePost
-                    }
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+            </div>
+          </section>
 
           {/* =================================================
-              PRÓXIMAS ATUALIZAÇÕES DESKTOP
+              STORIES
           ================================================= */}
 
-          <UpcomingUpdatesCard
-            updates={
-              upcomingUpdates
-            }
+          <StoriesRow
+            stories={stories}
+            onOpen={setActiveStory}
           />
+
+          {/* =================================================
+              LAYOUT
+          ================================================= */}
+
+          <div className="flex items-start justify-center gap-7">
+            {/* =================================================
+                COLUNA CENTRAL
+            ================================================= */}
+
+            <div className="w-full max-w-[680px]">
+              {/* CREATE POST */}
+
+              <div className="mb-7 w-full">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setComposerOpen(true)
+                  }
+                  className="group w-full overflow-hidden rounded-[26px] border border-[#ff78b9]/15 bg-gradient-to-br from-[#ff78b9]/[0.09] via-white/[0.035] to-[#c63dff]/[0.05] p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition duration-300 hover:border-[#ff78b9]/35 hover:shadow-[0_20px_70px_rgba(255,120,185,0.08)] sm:p-6"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="relative shrink-0">
+                      <div className="h-14 w-14 overflow-hidden rounded-full border-2 border-[#ff78b9]/30 bg-[#ff78b9] font-black text-lg text-[#190d16] shadow-[0_0_25px_rgba(255,120,185,0.12)] sm:h-16 sm:w-16">
+                        {currentUser?.avatar_url ? (
+                          <img
+                            src={
+                              currentUser.avatar_url
+                            }
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">
+                            {getInitial(
+                              currentUser
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#100c11] bg-[#ff78b9] text-[#190d16]">
+                        +
+                      </span>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-black text-white sm:text-lg">
+                        Compartilhe alguma coisa
+                      </p>
+
+                      <p className="mt-1 text-sm leading-5 text-white/40">
+                        Uma ideia, uma descoberta,
+                        uma história...
+                      </p>
+                    </div>
+
+                    <div className="hidden shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-white/45 transition group-hover:border-[#ff78b9]/25 group-hover:bg-[#ff78b9]/[0.08] group-hover:text-[#ff78b9] sm:block">
+                      Publicar
+                    </div>
+                  </div>
+
+                  <div className="mt-5 border-t border-white/[0.07] pt-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xs text-white/25">
+                        O que está passando pela sua
+                        cabeça?
+                      </span>
+
+                      <span className="text-xs font-semibold text-[#ff78b9]/50 transition group-hover:text-[#ff78b9]">
+                        Criar publicação →
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* ERROR */}
+
+              {error && (
+                <div className="mb-6 rounded-2xl border border-red-400/15 bg-red-400/[0.05] px-5 py-4">
+                  <p className="text-sm font-semibold text-red-300">
+                    {error}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      loadFeed()
+                    }
+                    className="mt-2 text-xs font-bold text-red-300 underline underline-offset-2"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
+
+              {/* MURAL */}
+
+              <div className="mb-5 flex items-end justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff78b9]">
+                    Mural
+                  </p>
+
+                  <h2 className="mt-1 text-xl font-black text-white">
+                    O que está acontecendo
+                  </h2>
+                </div>
+
+                <span className="text-[10px] text-white/20">
+                  Publicações
+                </span>
+              </div>
+
+              {loading ? (
+                <div className="w-full space-y-5">
+                  {[1, 2, 3].map(
+                    (item) => (
+                      <div
+                        key={item}
+                        className="animate-pulse rounded-[26px] border border-white/[0.06] bg-white/[0.025] p-6"
+                      >
+                        <div className="flex gap-3">
+                          <div className="h-11 w-11 rounded-full bg-white/[0.06]" />
+
+                          <div className="flex-1">
+                            <div className="h-3 w-32 rounded bg-white/[0.06]" />
+
+                            <div className="mt-2 h-2 w-20 rounded bg-white/[0.04]" />
+                          </div>
+                        </div>
+
+                        <div className="mt-5 h-4 w-4/5 rounded bg-white/[0.05]" />
+
+                        <div className="mt-3 h-4 w-3/5 rounded bg-white/[0.04]" />
+
+                        <div className="mt-5 h-32 rounded-2xl bg-white/[0.04]" />
+                      </div>
+                    )
+                  )}
+                </div>
+              ) : posts.length === 0 ? (
+                <div className="flex min-h-[45vh] items-center justify-center rounded-[26px] border border-white/[0.06] bg-white/[0.015]">
+                  <div className="max-w-md px-6 text-center">
+                    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05] text-[#ff78b9]/50">
+                      <CloudIcon />
+                    </div>
+
+                    <h2 className="mt-6 text-xl font-black text-white">
+                      O Mural está quieto.
+                    </h2>
+
+                    <p className="mt-2 text-sm leading-6 text-white/35">
+                      Ainda não há publicações por
+                      aqui. Quando os escritores
+                      começarem a postar, elas
+                      aparecerão aqui.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full space-y-5">
+                  {posts.map(
+                    (post) => (
+                      <FeedPost
+                        key={post.id}
+                        post={post}
+                        onPostUpdated={
+                          updatePost
+                        }
+                      />
+                    )
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* =================================================
+                LATERAL DIREITA
+            ================================================= */}
+
+            <div className="hidden w-[270px] shrink-0 xl:block">
+              <div className="sticky top-6 space-y-5">
+                {/* MINI STORIES */}
+
+                <aside className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#ff78b9]">
+                        Stories
+                      </p>
+
+                      <p className="mt-1 text-sm font-black text-white">
+                        Quem você segue
+                      </p>
+                    </div>
+
+                    <Link
+                      href="/stories"
+                      className="text-[9px] font-bold text-white/25 hover:text-[#ff78b9]"
+                    >
+                      Ver todos
+                    </Link>
+                  </div>
+
+                  {stories.length === 0 ? (
+                    <p className="py-4 text-center text-[10px] leading-5 text-white/25">
+                      Nenhum story novo.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {Array.from(
+                        new Map(
+                          stories.map(
+                            (story) => [
+                              story.user_id,
+                              story,
+                            ]
+                          )
+                        ).values()
+                      )
+                        .slice(0, 6)
+                        .map(
+                          (story) => (
+                            <button
+                              key={
+                                story.user_id
+                              }
+                              type="button"
+                              onClick={() =>
+                                setActiveStory(
+                                  story
+                                )
+                              }
+                              className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition hover:bg-white/[0.04]"
+                            >
+                              <div className="rounded-full bg-gradient-to-br from-[#ff4d9d] via-[#ff78b9] to-[#c63dff] p-[2px]">
+                                <div className="rounded-full bg-[#100c11] p-[2px]">
+                                  <Avatar
+                                    profile={
+                                      story.user
+                                    }
+                                    size="small"
+                                  />
+                                </div>
+                              </div>
+
+                              <span className="min-w-0 flex-1 truncate text-xs font-bold text-white/65">
+                                @{story.user.username}
+                              </span>
+                            </button>
+                          )
+                        )}
+                    </div>
+                  )}
+                </aside>
+
+                {/* CALENDÁRIO */}
+
+                <UpcomingUpdatesCard
+                  updates={
+                    upcomingUpdates
+                  }
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2869,6 +3389,7 @@ export default function FeedPage() {
         onPublished={() => {
           setComposerOpen(false);
           loadFeed(true);
+          loadStories();
           loadUpcomingUpdates();
         }}
       />
