@@ -1,9 +1,11 @@
+```tsx
 'use client';
 
 import {
   useEffect,
   useRef,
   useState,
+  type ChangeEvent,
 } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -72,72 +74,40 @@ export default function CapituloPage() {
 
   const id = params.id as string;
 
-  const fileInputRef =
-    useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [chapter, setChapter] =
-    useState<Chapter | null>(null);
-
-  const [media, setMedia] =
-    useState<ChapterMedia[]>([]);
-
+  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [media, setMedia] = useState<ChapterMedia[]>([]);
   const [previousChapter, setPreviousChapter] =
     useState<Chapter | null>(null);
-
   const [nextChapter, setNextChapter] =
     useState<Chapter | null>(null);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [stickers, setStickers] = useState<Sticker[]>([]);
 
-  const [chapters, setChapters] =
-    useState<Chapter[]>([]);
+  const [showContents, setShowContents] = useState(false);
 
-  const [comments, setComments] =
-    useState<Comment[]>([]);
-
-  const [stickers, setStickers] =
-    useState<Sticker[]>([]);
-
-  const [showContents, setShowContents] =
-    useState(false);
-
-  const [selectedText, setSelectedText] =
-    useState('');
-
+  const [selectedText, setSelectedText] = useState('');
   const [selectionOffset, setSelectionOffset] =
     useState<number | null>(null);
 
-  const [showCommentBox, setShowCommentBox] =
-    useState(false);
+  const [showCommentBox, setShowCommentBox] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [sendingComment, setSendingComment] = useState(false);
 
-  const [commentText, setCommentText] =
-    useState('');
-
-  const [sendingComment, setSendingComment] =
-    useState(false);
-
-  const [showStickers, setShowStickers] =
-    useState(false);
-
+  const [showStickers, setShowStickers] = useState(false);
   const [selectedSticker, setSelectedSticker] =
     useState<Sticker | null>(null);
-
   const [uploadingSticker, setUploadingSticker] =
     useState(false);
 
   const [activeCommentGroup, setActiveCommentGroup] =
     useState<Comment[]>([]);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const [error, setError] =
-    useState('');
-
-  /*
-   * CARREGA O CAPÍTULO PRIMEIRO.
-   *
-   * Comentários, figurinhas e sumário não podem
-   * bloquear a renderização do capítulo.
-   */
   useEffect(() => {
     if (!id) {
       return;
@@ -150,12 +120,9 @@ export default function CapituloPage() {
         setLoading(true);
         setError('');
 
-        const response = await fetch(
-          `/api/chapters/${id}`,
-          {
-            cache: 'no-store',
-          }
-        );
+        const response = await fetch(`/api/chapters/${id}`, {
+          cache: 'no-store',
+        });
 
         const text = await response.text();
 
@@ -177,9 +144,7 @@ export default function CapituloPage() {
         }
 
         if (!data?.chapter) {
-          throw new Error(
-            'Capítulo não encontrado.'
-          );
+          throw new Error('Capítulo não encontrado.');
         }
 
         if (cancelled) {
@@ -187,24 +152,22 @@ export default function CapituloPage() {
         }
 
         setChapter(data.chapter);
-        setMedia(data.media || []);
+        setMedia(
+          Array.isArray(data.media)
+            ? data.media
+            : []
+        );
+
         setPreviousChapter(
           data.previousChapter || null
         );
+
         setNextChapter(
           data.nextChapter || null
         );
 
-        /*
-         * MUITO IMPORTANTE:
-         *
-         * O capítulo já pode aparecer agora.
-         */
         setLoading(false);
 
-        /*
-         * O restante carrega separadamente.
-         */
         loadStory(data.chapter.story_id);
         loadComments();
         loadStickers();
@@ -223,9 +186,7 @@ export default function CapituloPage() {
       }
     }
 
-    async function loadStory(
-      storyId?: string
-    ) {
+    async function loadStory(storyId?: string) {
       if (!storyId) {
         return;
       }
@@ -245,13 +206,14 @@ export default function CapituloPage() {
         const data = await response.json();
 
         if (!cancelled) {
-          setChapters(data.chapters || []);
+          setChapters(
+            Array.isArray(data.chapters)
+              ? data.chapters
+              : []
+          );
         }
       } catch {
-        /*
-         * O sumário não pode impedir
-         * a leitura do capítulo.
-         */
+        // O sumário é opcional.
       }
     }
 
@@ -271,23 +233,22 @@ export default function CapituloPage() {
         const data = await response.json();
 
         if (!cancelled) {
-          setComments(data.comments || []);
+          setComments(
+            Array.isArray(data.comments)
+              ? data.comments
+              : []
+          );
         }
       } catch {
-        /*
-         * Comentários são opcionais.
-         */
+        // Comentários são opcionais.
       }
     }
 
     async function loadStickers() {
       try {
-        const response = await fetch(
-          '/api/stickers',
-          {
-            cache: 'no-store',
-          }
-        );
+        const response = await fetch('/api/stickers', {
+          cache: 'no-store',
+        });
 
         if (!response.ok) {
           return;
@@ -296,12 +257,14 @@ export default function CapituloPage() {
         const data = await response.json();
 
         if (!cancelled) {
-          setStickers(data.stickers || []);
+          setStickers(
+            Array.isArray(data.stickers)
+              ? data.stickers
+              : []
+          );
         }
       } catch {
-        /*
-         * Figurinhas são opcionais.
-         */
+        // Figurinhas são opcionais.
       }
     }
 
@@ -329,10 +292,6 @@ export default function CapituloPage() {
       return;
     }
 
-    /*
-     * Para comentários antigos que usam texto puro,
-     * tentamos encontrar o trecho no conteúdo.
-     */
     const plainBody = chapter.body.replace(
       /<[^>]*>/g,
       ''
@@ -361,7 +320,7 @@ export default function CapituloPage() {
   }
 
   async function handleStickerUpload(
-    event: React.ChangeEvent<HTMLInputElement>
+    event: ChangeEvent<HTMLInputElement>
   ) {
     const file = event.target.files?.[0];
 
@@ -378,13 +337,10 @@ export default function CapituloPage() {
 
       formData.append('file', file);
 
-      const response = await fetch(
-        '/api/stickers',
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
+      const response = await fetch('/api/stickers', {
+        method: 'POST',
+        body: formData,
+      });
 
       const data = await response.json();
 
@@ -403,8 +359,7 @@ export default function CapituloPage() {
         return;
       }
 
-      const newSticker =
-        data.sticker as Sticker;
+      const newSticker = data.sticker as Sticker;
 
       setStickers((current) => [
         newSticker,
@@ -444,25 +399,22 @@ export default function CapituloPage() {
     try {
       setSendingComment(true);
 
-      const response = await fetch(
-        '/api/comments',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chapter_id: id,
-            body:
-              commentText.trim() || ' ',
-            selected_text:
-              selectedText || null,
-            start_offset: selectionOffset,
-            sticker_id:
-              selectedSticker?.id || null,
-          }),
-        }
-      );
+      const response = await fetch('/api/comments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chapter_id: id,
+          body:
+            commentText.trim() || ' ',
+          selected_text:
+            selectedText || null,
+          start_offset: selectionOffset,
+          sticker_id:
+            selectedSticker?.id || null,
+        }),
+      });
 
       const data = await response.json();
 
@@ -583,13 +535,7 @@ export default function CapituloPage() {
       );
   }
 
-  /*
-   * Retorna a URL da mídia independente
-   * de como a API nomeou o campo.
-   */
-  function getMediaUrl(
-    item: ChapterMedia
-  ) {
+  function getMediaUrl(item: ChapterMedia) {
     return (
       item.url ||
       item.image_url ||
@@ -598,14 +544,6 @@ export default function CapituloPage() {
     );
   }
 
-  /*
-   * Renderiza o conteúdo produzido pelo editor.
-   *
-   * Se o body for HTML, usamos HTML.
-   *
-   * Se for texto antigo, continuamos
-   * mostrando normalmente.
-   */
   function renderChapterBody() {
     if (!chapter?.body) {
       return (
@@ -719,10 +657,18 @@ export default function CapituloPage() {
     })
     .slice(0, 12);
 
+  const sortedMedia = [...media].sort(
+    (a, b) =>
+      (a.position || 0) -
+      (b.position || 0)
+  );
+
+  const commentGroups = getCommentGroups();
+
   return (
     <main className="min-h-screen bg-[#0d0d0d] text-white">
 
-      <style jsx global>{`
+      <style>{`
         .chapter-content {
           max-width: 100%;
           overflow-wrap: anywhere;
@@ -782,7 +728,7 @@ export default function CapituloPage() {
 
         .chapter-content hr {
           border: 0;
-          border-top: 1px solid rgba(255,255,255,.12);
+          border-top: 1px solid rgba(255, 255, 255, 0.12);
           margin: 2rem 0;
         }
 
@@ -800,7 +746,7 @@ export default function CapituloPage() {
         .chapter-content figcaption {
           text-align: center;
           color: #666;
-          font-size: .8rem;
+          font-size: 0.8rem;
         }
 
         .chapter-content ul {
@@ -894,41 +840,34 @@ export default function CapituloPage() {
 
         {/* MÍDIAS DO CAPÍTULO */}
 
-        {media.length > 0 && (
+        {sortedMedia.length > 0 && (
           <section className="mt-10 space-y-5">
 
-            {media
-              .sort(
-                (a, b) =>
-                  (a.position || 0) -
-                  (b.position || 0)
-              )
-              .map((item) => {
-                const url =
-                  getMediaUrl(item);
+            {sortedMedia.map((item) => {
+              const url = getMediaUrl(item);
 
-                if (!url) {
-                  return null;
-                }
+              if (!url) {
+                return null;
+              }
 
-                return (
-                  <div
-                    key={item.id}
-                    className="flex justify-center"
-                  >
-                    <img
-                      src={url}
-                      alt=""
-                      className="
-                        max-w-full
-                        max-h-[800px]
-                        rounded-2xl
-                        object-contain
-                      "
-                    />
-                  </div>
-                );
-              })}
+              return (
+                <div
+                  key={item.id}
+                  className="flex justify-center"
+                >
+                  <img
+                    src={url}
+                    alt=""
+                    className="
+                      max-w-full
+                      max-h-[800px]
+                      rounded-2xl
+                      object-contain
+                    "
+                  />
+                </div>
+              );
+            })}
 
           </section>
         )}
@@ -936,54 +875,64 @@ export default function CapituloPage() {
         {/* CAIXA DE COMENTÁRIO */}
 
         {showCommentBox && (
-          <div className="
-            fixed
-            inset-0
-            z-50
-            bg-black/70
-            flex
-            items-end
-            md:items-center
-            justify-center
-            p-4
-          ">
+          <div
+            className="
+              fixed
+              inset-0
+              z-50
+              bg-black/70
+              flex
+              items-end
+              md:items-center
+              justify-center
+              p-4
+            "
+          >
 
-            <div className="
-              w-full
-              max-w-xl
-              bg-[#151515]
-              border
-              border-white/10
-              rounded-2xl
-              p-5
-              shadow-2xl
-            ">
+            <div
+              className="
+                w-full
+                max-w-xl
+                bg-[#151515]
+                border
+                border-white/10
+                rounded-2xl
+                p-5
+                shadow-2xl
+              "
+            >
 
-              <div className="
-                flex
-                items-start
-                justify-between
-                gap-4
-                mb-5
-              ">
+              <div
+                className="
+                  flex
+                  items-start
+                  justify-between
+                  gap-4
+                  mb-5
+                "
+              >
 
                 <div>
-                  <p className="
-                    text-xs
-                    text-[#ff4f9a]
-                    uppercase
-                    tracking-wider
-                    mb-2
-                  ">
+                  <p
+                    className="
+                      text-xs
+                      text-[#ff4f9a]
+                      uppercase
+                      tracking-wider
+                      mb-2
+                    "
+                  >
                     Comentando o trecho
                   </p>
 
-                  <p className="
-                    text-sm
-                    text-gray-300
-                    italic
-                    leading-6
-                  ">
+                  <p
+                    className="
+                      text-sm
+                      text-gray-300
+                      italic
+                      leading-6
+                    "
+                  >
                     “{selectedText}”
                   </p>
                 </div>
@@ -1056,37 +1005,45 @@ export default function CapituloPage() {
                 </button>
 
                 {showStickers && (
-                  <div className="
-                    mt-3
-                    rounded-2xl
-                    bg-[#101010]
-                    border
-                    border-white/10
-                    p-4
-                  ">
+                  <div
+                    className="
+                      mt-3
+                      rounded-2xl
+                      bg-[#101010]
+                      border
+                      border-white/10
+                      p-4
+                    "
+                  >
 
-                    <div className="
-                      flex
-                      items-center
-                      justify-between
-                      gap-3
-                      mb-4
-                    ">
+                    <div
+                      className="
+                        flex
+                        items-center
+                        justify-between
+                        gap-3
+                        mb-4
+                      "
+                    >
 
                       <div>
-                        <p className="
-                          text-sm
-                          font-semibold
-                          text-white
-                        ">
+                        <p
+                          className="
+                            text-sm
+                            font-semibold
+                            text-white
+                          "
+                        >
                           Usadas recentemente
                         </p>
 
-                        <p className="
-                          text-xs
-                          text-gray-600
-                          mt-1
-                        ">
+                        <p
+                          className="
+                            text-xs
+                            text-gray-600
+                            mt-1
+                          "
+                        >
                           Escolha uma figurinha ou crie uma nova.
                         </p>
                       </div>
@@ -1118,38 +1075,46 @@ export default function CapituloPage() {
                     </div>
 
                     {recentStickers.length === 0 ? (
-                      <div className="
-                        rounded-xl
-                        bg-white/5
-                        border
-                        border-white/10
-                        p-5
-                        text-center
-                      ">
+                      <div
+                        className="
+                          rounded-xl
+                          bg-white/5
+                          border
+                          border-white/10
+                          p-5
+                          text-center
+                        "
+                      >
 
-                        <p className="
-                          text-sm
-                          text-gray-500
-                        ">
+                        <p
+                          className="
+                            text-sm
+                            text-gray-500
+                          "
+                        >
                           Você ainda não tem figurinhas.
                         </p>
 
-                        <p className="
-                          text-xs
-                          text-gray-600
-                          mt-1
-                        ">
+                        <p
+                          className="
+                            text-xs
+                            text-gray-600
+                            mt-1
+                          "
+                        >
                           Crie a primeira usando uma imagem da sua galeria.
                         </p>
 
                       </div>
                     ) : (
-                      <div className="
-                        grid
-                        grid-cols-4
-                        sm:grid-cols-6
-                        gap-3
-                      ">
+                      <div
+                        className="
+                          grid
+                          grid-cols-4
+                          sm:grid-cols-6
+                          gap-3
+                        "
+                      >
 
                         {recentStickers.map(
                           (sticker) => (
@@ -1200,26 +1165,32 @@ export default function CapituloPage() {
               />
 
               {selectedSticker && (
-                <div className="
-                  mt-4
-                  rounded-xl
-                  bg-white/5
-                  border
-                  border-white/10
-                  p-3
-                ">
+                <div
+                  className="
+                    mt-4
+                    rounded-xl
+                    bg-white/5
+                    border
+                    border-white/10
+                    p-3
+                  "
+                >
 
-                  <div className="
-                    flex
-                    items-center
-                    justify-between
-                    mb-2
-                  ">
+                  <div
+                    className="
+                      flex
+                      items-center
+                      justify-between
+                      mb-2
+                    "
+                  >
 
-                    <p className="
-                      text-xs
-                      text-gray-500
-                    ">
+                    <p
+                      className="
+                        text-xs
+                        text-gray-500
+                      "
+                    >
                       Figurinha selecionada
                     </p>
 
@@ -1258,12 +1229,14 @@ export default function CapituloPage() {
                 </div>
               )}
 
-              <div className="
-                flex
-                justify-end
-                gap-3
-                mt-4
-              ">
+              <div
+                className="
+                  flex
+                  justify-end
+                  gap-3
+                  mt-4
+                "
+              >
 
                 <button
                   type="button"
@@ -1350,29 +1323,35 @@ export default function CapituloPage() {
               }
             >
 
-              <div className="
-                flex
-                items-center
-                justify-between
-                gap-4
-                mb-5
-              ">
+              <div
+                className="
+                  flex
+                  items-center
+                  justify-between
+                  gap-4
+                  mb-5
+                "
+              >
 
                 <div>
-                  <p className="
-                    text-xs
-                    text-gray-500
-                    uppercase
-                    tracking-wider
-                    mb-1
-                  ">
+                  <p
+                    className="
+                      text-xs
+                      text-gray-500
+                      uppercase
+                      tracking-wider
+                      mb-1
+                    "
+                  >
                     Comentários do trecho
                   </p>
 
-                  <p className="
-                    text-sm
-                    text-white
-                  ">
+                  <p
+                    className="
+                      text-sm
+                      text-white
+                    "
+                  >
                     {activeCommentGroup[0]
                       ?.selected_text
                       ? `“${activeCommentGroup[0].selected_text}”`
@@ -1411,12 +1390,14 @@ export default function CapituloPage() {
                       "
                     >
 
-                      <div className="
-                        flex
-                        items-center
-                        gap-3
-                        mb-3
-                      ">
+                      <div
+                        className="
+                          flex
+                          items-center
+                          gap-3
+                          mb-3
+                        "
+                      >
 
                         {comment.profiles
                           ?.avatar_url ? (
@@ -1434,18 +1415,20 @@ export default function CapituloPage() {
                             "
                           />
                         ) : (
-                          <div className="
-                            w-8
-                            h-8
-                            rounded-full
-                            bg-[#ff4f9a]/20
-                            flex
-                            items-center
-                            justify-center
-                            text-[#ff4f9a]
-                            text-xs
-                            font-bold
-                          ">
+                          <div
+                            className="
+                              w-8
+                              h-8
+                              rounded-full
+                              bg-[#ff4f9a]/20
+                              flex
+                              items-center
+                              justify-center
+                              text-[#ff4f9a]
+                              text-xs
+                              font-bold
+                            "
+                          >
                             {(
                               comment.profiles
                                 ?.display_name ||
@@ -1460,11 +1443,13 @@ export default function CapituloPage() {
 
                         <div>
 
-                          <p className="
-                            text-sm
-                            font-semibold
-                            text-white
-                          ">
+                          <p
+                            className="
+                              text-sm
+                              font-semibold
+                              text-white
+                            "
+                          >
                             {comment.profiles
                               ?.display_name ||
                               comment.profiles
@@ -1474,10 +1459,12 @@ export default function CapituloPage() {
 
                           {comment.profiles
                             ?.username && (
-                            <p className="
-                              text-xs
-                              text-gray-600
-                            ">
+                            <p
+                              className="
+                                text-xs
+                                text-gray-600
+                              "
+                            >
                               @
                               {
                                 comment.profiles
@@ -1491,10 +1478,12 @@ export default function CapituloPage() {
                       </div>
 
                       {comment.body.trim() && (
-                        <p className="
-                          text-gray-300
-                          leading-7
-                        ">
+                        <p
+                          className="
+                            text-gray-300
+                            leading-7
+                          "
+                        >
                           {comment.body}
                         </p>
                       )}
@@ -1533,42 +1522,52 @@ export default function CapituloPage() {
 
         {/* COMENTÁRIOS */}
 
-        <section className="
-          mt-16
-          pt-10
-          border-t
-          border-white/10
-        ">
+        <section
+          className="
+            mt-16
+            pt-10
+            border-t
+            border-white/10
+          "
+        >
 
-          <h2 className="
-            text-2xl
-            font-bold
-            mb-6
-          ">
+          <h2
+            className="
+              text-2xl
+              font-bold
+              mb-6
+            "
+          >
             Comentários
           </h2>
 
           {comments.length === 0 ? (
-            <div className="
-              rounded-2xl
-              bg-white/5
-              border
-              border-white/10
-              p-6
-            ">
+            <div
+              className="
+                rounded-2xl
+                bg-white/5
+                border
+                border-white/10
+                p-6
+              "
+            >
 
-              <p className="
-                text-gray-500
-                text-sm
-              ">
+              <p
+                className="
+                  text-gray-500
+                  text-sm
+                "
+              >
                 Ainda não há comentários neste capítulo.
               </p>
 
-              <p className="
-                text-gray-600
-                text-xs
-                mt-2
-              ">
+              <p
+                className="
+                  text-gray-600
+                  text-xs
+                  mt-2
+                "
+              >
                 Selecione um trecho do texto para ser o primeiro.
               </p>
 
@@ -1589,38 +1588,46 @@ export default function CapituloPage() {
                 >
 
                   {comment.selected_text && (
-                    <div className="
-                      border-l-2
-                      border-[#ff4f9a]
-                      pl-4
-                      mb-4
-                    ">
+                    <div
+                      className="
+                        border-l-2
+                        border-[#ff4f9a]
+                        pl-4
+                        mb-4
+                      "
+                    >
 
-                      <p className="
-                        text-xs
-                        text-gray-500
-                        mb-1
-                      ">
+                      <p
+                        className="
+                          text-xs
+                          text-gray-500
+                          mb-1
+                        "
+                      >
                         Trecho comentado
                       </p>
 
-                      <p className="
-                        text-sm
-                        text-gray-300
-                        italic
-                      ">
+                      <p
+                        className="
+                          text-sm
+                          text-gray-300
+                          italic
+                        "
+                      >
                         “{comment.selected_text}”
                       </p>
 
                     </div>
                   )}
 
-                  <div className="
-                    flex
-                    items-center
-                    gap-3
-                    mb-3
-                  ">
+                  <div
+                    className="
+                      flex
+                      items-center
+                      gap-3
+                      mb-3
+                    "
+                  >
 
                     {comment.profiles
                       ?.avatar_url ? (
@@ -1638,18 +1645,20 @@ export default function CapituloPage() {
                         "
                       />
                     ) : (
-                      <div className="
-                        w-8
-                        h-8
-                        rounded-full
-                        bg-[#ff4f9a]/20
-                        flex
-                        items-center
-                        justify-center
-                        text-[#ff4f9a]
-                        text-xs
-                        font-bold
-                      ">
+                      <div
+                        className="
+                          w-8
+                          h-8
+                          rounded-full
+                          bg-[#ff4f9a]/20
+                          flex
+                          items-center
+                          justify-center
+                          text-[#ff4f9a]
+                          text-xs
+                          font-bold
+                        "
+                      >
                         {(
                           comment.profiles
                             ?.display_name ||
@@ -1664,11 +1673,13 @@ export default function CapituloPage() {
 
                     <div>
 
-                      <p className="
-                        text-sm
-                        font-semibold
-                        text-white
-                      ">
+                      <p
+                        className="
+                          text-sm
+                          font-semibold
+                          text-white
+                        "
+                      >
                         {comment.profiles
                           ?.display_name ||
                           comment.profiles
@@ -1678,10 +1689,12 @@ export default function CapituloPage() {
 
                       {comment.profiles
                         ?.username && (
-                        <p className="
-                          text-xs
-                          text-gray-600
-                        ">
+                        <p
+                          className="
+                            text-xs
+                            text-gray-600
+                          "
+                        >
                           @
                           {
                             comment.profiles
@@ -1695,10 +1708,12 @@ export default function CapituloPage() {
                   </div>
 
                   {comment.body.trim() && (
-                    <p className="
-                      text-gray-300
-                      leading-7
-                    ">
+                    <p
+                      className="
+                        text-gray-300
+                        leading-7
+                      "
+                    >
                       {comment.body}
                     </p>
                   )}
@@ -1735,16 +1750,18 @@ export default function CapituloPage() {
 
         {/* NAVEGAÇÃO */}
 
-        <nav className="
-          mt-14
-          pt-8
-          border-t
-          border-white/10
-          flex
-          items-center
-          justify-between
-          gap-4
-        ">
+        <nav
+          className="
+            mt-14
+            pt-8
+            border-t
+            border-white/10
+            flex
+            items-center
+            justify-between
+            gap-4
+          "
+        >
 
           {previousChapter ? (
             <button
@@ -1768,20 +1785,24 @@ export default function CapituloPage() {
               "
             >
 
-              <span className="
-                block
-                text-xs
-                text-gray-500
-                mb-1
-              ">
+              <span
+                className="
+                  block
+                  text-xs
+                  text-gray-500
+                  mb-1
+                "
+              >
                 Capítulo anterior
               </span>
 
-              <span className="
-                text-sm
-                font-semibold
-                text-white
-              ">
+              <span
+                className="
+                  text-sm
+                  font-semibold
+                  text-white
+                "
+              >
                 ← Capítulo{' '}
                 {previousChapter.chapter_number}
               </span>
@@ -1813,20 +1834,24 @@ export default function CapituloPage() {
               "
             >
 
-              <span className="
-                block
-                text-xs
-                text-gray-500
-                mb-1
-              ">
+              <span
+                className="
+                  block
+                  text-xs
+                  text-gray-500
+                  mb-1
+                "
+              >
                 Próximo capítulo
               </span>
 
-              <span className="
-                text-sm
-                font-semibold
-                text-white
-              ">
+              <span
+                className="
+                  text-sm
+                  font-semibold
+                  text-white
+                "
+              >
                 Capítulo{' '}
                 {nextChapter.chapter_number}
                 {' '}→
@@ -1874,35 +1899,41 @@ export default function CapituloPage() {
             }
           >
 
-            <div className="
-              sticky
-              top-0
-              bg-[#111111]
-              border-b
-              border-white/10
-              px-6
-              py-5
-              flex
-              items-center
-              justify-between
-            ">
+            <div
+              className="
+                sticky
+                top-0
+                bg-[#111111]
+                border-b
+                border-white/10
+                px-6
+                py-5
+                flex
+                items-center
+                justify-between
+              "
+            >
 
               <div>
 
-                <p className="
-                  text-xs
-                  text-[#ff4f9a]
-                  uppercase
-                  tracking-wider
-                ">
+                <p
+                  className="
+                    text-xs
+                    text-[#ff4f9a]
+                    uppercase
+                    tracking-wider
+                  "
+                >
                   História
                 </p>
 
-                <h2 className="
-                  text-xl
-                  font-bold
-                  mt-1
-                ">
+                <h2
+                  className="
+                    text-xl
+                    font-bold
+                    mt-1
+                  "
+                >
                   Sumário
                 </h2>
 
@@ -1927,12 +1958,14 @@ export default function CapituloPage() {
             <div className="p-4">
 
               {chapters.length === 0 ? (
-                <p className="
-                  text-gray-500
-                  text-sm
-                  px-2
-                  py-4
-                ">
+                <p
+                  className="
+                    text-gray-500
+                    text-sm
+                    px-2
+                    py-4
+                  "
+                >
                   Nenhum capítulo encontrado.
                 </p>
               ) : (
@@ -1962,11 +1995,13 @@ export default function CapituloPage() {
                         }`}
                       >
 
-                        <div className="
-                          flex
-                          items-center
-                          gap-3
-                        ">
+                        <div
+                          className="
+                            flex
+                            items-center
+                            gap-3
+                          "
+                        >
 
                           <span
                             className={`text-xs font-semibold ${
@@ -1978,9 +2013,11 @@ export default function CapituloPage() {
                             {item.chapter_number}
                           </span>
 
-                          <div className="
-                            min-w-0
-                          ">
+                          <div
+                            className="
+                              min-w-0
+                            "
+                          >
 
                             <p
                               className={`font-semibold truncate ${
@@ -1993,11 +2030,13 @@ export default function CapituloPage() {
                             </p>
 
                             {isCurrent && (
-                              <p className="
-                                text-xs
-                                text-gray-500
-                                mt-1
-                              ">
+                              <p
+                                className="
+                                  text-xs
+                                  text-gray-500
+                                  mt-1
+                                "
+                              >
                                 Você está aqui
                               </p>
                             )}
@@ -2020,6 +2059,15 @@ export default function CapituloPage() {
         </div>
       )}
 
+      {/* ESTILOS DOS COMENTÁRIOS NO TEXTO */}
+
+      {commentGroups.length > 0 && (
+        <div className="hidden">
+          {commentGroups.length}
+        </div>
+      )}
+
     </main>
   );
 }
+```
