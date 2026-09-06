@@ -676,8 +676,269 @@ function StoriesRow({
 
 function StoryViewer({
   story,
+  stories,
+  onSelect,
   onClose,
 }: {
+  story: UserStory | null;
+  stories: UserStory[];
+  onSelect: (story: UserStory) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!story) {
+      return;
+    }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (
+      event: KeyboardEvent
+    ) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener(
+      'keydown',
+      handleKeyDown
+    );
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        'keydown',
+        handleKeyDown
+      );
+    };
+  }, [story, onClose]);
+
+  if (!story) {
+    return null;
+  }
+
+  /*
+   * Pega TODOS os Stories da pessoa que está sendo visualizada.
+   * O mais antigo fica primeiro e o mais novo por último.
+   */
+  const userStories = stories
+    .filter(
+      (item) =>
+        item.user_id === story.user_id
+    )
+    .sort(
+      (a, b) =>
+        new Date(
+          a.created_at
+        ).getTime() -
+        new Date(
+          b.created_at
+        ).getTime()
+    );
+
+  /*
+   * Descobre qual Story está aberto.
+   */
+  const currentIndex = Math.max(
+    0,
+    userStories.findIndex(
+      (item) =>
+        item.id === story.id
+    )
+  );
+
+  const currentStory =
+    userStories[currentIndex] ?? story;
+
+  /*
+   * Story anterior.
+   */
+  const goPrevious = () => {
+    if (currentIndex > 0) {
+      onSelect(
+        userStories[
+          currentIndex - 1
+        ]
+      );
+    }
+  };
+
+  /*
+   * Próximo Story.
+   * Se já estiver no último, fecha o visualizador.
+   */
+  const goNext = () => {
+    if (
+      currentIndex <
+      userStories.length - 1
+    ) {
+      onSelect(
+        userStories[
+          currentIndex + 1
+        ]
+      );
+    } else {
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+      {/* FECHAR */}
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-5 top-5 z-[110] flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/60 transition hover:bg-white/10 hover:text-white"
+        aria-label="Fechar story"
+      >
+        <CloseIcon />
+      </button>
+
+      {/* VISUALIZADOR */}
+      <div className="relative flex h-[min(820px,92vh)] w-full max-w-[430px] overflow-hidden rounded-[30px] border border-white/10 bg-[#100c11] shadow-[0_30px_120px_rgba(0,0,0,0.65)]">
+
+        {/* BARRAS DE PROGRESSO */}
+        <div className="absolute left-4 right-4 top-4 z-20 flex gap-1.5">
+          {userStories.map(
+            (item, index) => (
+              <div
+                key={item.id}
+                className="h-1 flex-1 overflow-hidden rounded-full bg-white/20"
+              >
+                <div
+                  className={`h-full rounded-full ${
+                    index <= currentIndex
+                      ? 'w-full bg-[#ff78b9]'
+                      : 'w-0'
+                  }`}
+                />
+              </div>
+            )
+          )}
+        </div>
+
+        {/* USUÁRIO */}
+        <div className="absolute left-4 right-14 top-8 z-20 flex items-center gap-3">
+          <Avatar
+            profile={
+              currentStory.user
+            }
+            size="small"
+          />
+
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-white">
+              @
+              {
+                currentStory.user
+                  .username
+              }
+            </p>
+
+            <p className="text-[10px] text-white/45">
+              {new Date(
+                currentStory.created_at
+              ).toLocaleTimeString(
+                'pt-BR',
+                {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* MÍDIA */}
+        <div className="relative flex h-full w-full items-center justify-center">
+
+          {currentStory.media_type ===
+          'video' ? (
+            <video
+              key={currentStory.id}
+              src={
+                currentStory.media_url
+              }
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <img
+              key={currentStory.id}
+              src={
+                currentStory.media_url
+              }
+              alt=""
+              className="h-full w-full object-contain"
+            />
+          )}
+
+          {/* ÁREA ESQUERDA — STORY ANTERIOR */}
+          <button
+            type="button"
+            onClick={goPrevious}
+            className="absolute inset-y-0 left-0 z-10 w-1/3"
+            aria-label="Story anterior"
+          />
+
+          {/* ÁREA DIREITA — PRÓXIMO STORY */}
+          <button
+            type="button"
+            onClick={goNext}
+            className="absolute inset-y-0 right-0 z-10 w-1/3"
+            aria-label="Próximo story"
+          />
+
+          {/* SETA ESQUERDA */}
+          {currentIndex > 0 && (
+            <button
+              type="button"
+              onClick={goPrevious}
+              className="absolute left-3 top-1/2 z-30 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/30 text-2xl text-white backdrop-blur-sm transition hover:bg-black/50"
+              aria-label="Story anterior"
+            >
+              ‹
+            </button>
+          )}
+
+          {/* SETA DIREITA */}
+          {currentIndex <
+            userStories.length -
+              1 && (
+            <button
+              type="button"
+              onClick={goNext}
+              className="absolute right-3 top-1/2 z-30 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/30 text-2xl text-white backdrop-blur-sm transition hover:bg-black/50"
+              aria-label="Próximo story"
+            >
+              ›
+            </button>
+          )}
+        </div>
+
+        {/* PENSAMENTO / TEXTO DO STORY */}
+        {currentStory.thought && (
+          <div className="absolute bottom-6 left-5 right-5 z-30">
+            <div className="rounded-2xl bg-black/55 px-4 py-3 text-center text-sm text-white backdrop-blur-md">
+              {
+                currentStory.thought
+              }
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
   story: UserStory | null;
   onClose: () => void;
 }) {
