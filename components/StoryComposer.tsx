@@ -1,881 +1,684 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+'use client';
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL!;
+import {
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
-const supabaseSecretKey =
-  process.env.SUPABASE_SECRET_KEY!;
+type StoryComposerProps = {
+  open: boolean;
+  onClose: () => void;
+  onPublished?: () => void;
+};
 
-const supabaseAdmin =
-  createClient(
-    supabaseUrl,
-    supabaseSecretKey,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-const BUCKET =
-  'social-stories';
+const ACCEPTED_TYPES =
+  'image/jpeg,image/png,image/webp,image/gif';
 
-const MAX_FILE_SIZE =
-  5 * 1024 * 1024;
+const MAX_THOUGHT_LENGTH = 100;
 
-const ALLOWED_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-];
+type Filter =
+  | 'normal'
+  | 'grayscale'
+  | 'sepia'
+  | 'bright'
+  | 'contrast'
+  | 'blur';
 
-async function getCurrentUser() {
-  try {
-    const response =
-      await fetch(
-        `${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/auth/me`,
-        {
-          headers: {
-            cookie:
-              '',
-          },
-          cache: 'no-store',
-        }
-      );
+export default function StoryComposer({
+  open,
+  onClose,
+  onPublished,
+}: StoryComposerProps) {
+  const inputRef =
+    useRef<HTMLInputElement | null>(null);
 
-    if (!response.ok) {
-      return null;
-    }
+  const previewUrlRef =
+    useRef<string | null>(null);
 
-    const data =
-      await response.json();
+  const [file, setFile] =
+    useState<File | null>(null);
 
-    return data?.user || null;
-  } catch {
-    return null;
-  }
-}
+  const [preview, setPreview] =
+    useState('');
 
-async function getAuthenticatedUser(
-  request: Request
-) {
-  try {
-    const cookie =
-      request.headers.get(
-        'cookie'
-      ) || '';
+  const [thought, setThought] =
+    useState('');
 
-    const response =
-      await fetch(
-        new URL(
-          '/api/auth/me',
-          request.url
-        ),
-        {
-          headers: {
-            cookie,
-          },
-          cache: 'no-store',
-        }
-      );
+  const [text, setText] =
+    useState('');
 
-    if (!response.ok) {
-      return null;
-    }
+  const [selectedEmoji, setSelectedEmoji] =
+    useState('');
 
-    const data =
-      await response.json();
+  const [filter, setFilter] =
+    useState<Filter>('normal');
 
-    return data?.user || null;
-  } catch {
-    return null;
-  }
-}
+  const [loading, setLoading] =
+    useState(false);
 
-function getStoragePathFromPublicUrl(
-  url: string
-) {
-  const marker =
-    `/storage/v1/object/public/${BUCKET}/`;
+  const [error, setError] =
+    useState('');
 
-  const index =
-    url.indexOf(marker);
+  const [step, setStep] =
+    useState<'select' | 'edit'>('select');
 
-  if (index === -1) {
-    return null;
-  }
-
-  return decodeURIComponent(
-    url.slice(
-      index + marker.length
-    )
-  );
-}
-
-export async function GET(
-  request: Request
-) {
-  try {
-    const user =
-      await getAuthenticatedUser(
-        request
-      );
-
-    if (!user?.id) {
-      return NextResponse.json(
-        {
-          stories: [],
-        }
-      );
-    }
-
-    /*
-     * Remove Stories expirados.
-     */
-    await supabaseAdmin
-      .from('social_stories')
-      .delete()
-      .lt(
-        'expires_at',
-        new Date().toISOString()
-      );
-
-    /*
-     * Descobre quem o usuário segue.
-     */
-    const {
-      data: follows,
-      error: followsError,
-    } =
-      await supabaseAdmin
-        .from('follows')
-        .select(
-          'following_id'
-        )
-        .eq(
-          'follower_id',
-          user.id
+  /*
+   * Limpa Object URLs quando o componente
+   * troca de imagem ou é desmontado.
+   */
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(
+          previewUrlRef.current
         );
+      }
+    };
+  }, []);
 
-    if (followsError) {
-      console.error(
-        '[SOCIAL STORIES] Erro ao buscar follows:',
-        followsError
-      );
+  /*
+   * Fecha o editor com ESC.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(
+      event: KeyboardEvent
+    ) {
+      if (
+        event.key === 'Escape' &&
+        !loading
+      ) {
+        close();
+      }
     }
 
-    const followedIds =
-      (follows || []).map(
-        (follow) =>
-          follow.following_id
+    window.addEventListener(
+      'keydown',
+      handleKeyDown
+    );
+
+    return () => {
+      window.removeEventListener(
+        'keydown',
+        handleKeyDown
+      );
+    };
+  }, [open, loading]);
+
+  function clearPreviewUrl() {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(
+        previewUrlRef.current
       );
 
-    const userIds = [
-      user.id,
-      ...followedIds,
-    ];
-
-    const uniqueUserIds =
-      Array.from(
-        new Set(userIds)
-      );
-
-    const {
-      data: stories,
-      error,
-    } =
-      await supabaseAdmin
-        .from('social_stories')
-        .select(
-          `
-          id,
-          user_id,
-          media_url,
-          media_type,
-          thought,
-          created_at,
-          expires_at,
-          user:profiles!social_stories_user_id_fkey(
-            id,
-            username,
-            avatar_url
-          )
-        `
-        )
-        .in(
-          'user_id',
-          uniqueUserIds
-        )
-        .gt(
-          'expires_at',
-          new Date().toISOString()
-        )
-        .order(
-          'created_at',
-          {
-            ascending: true,
-          }
-        );
-
-    if (error) {
-      console.error(
-        '[SOCIAL STORIES] Erro ao buscar:',
-        error
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Não foi possível carregar os Stories.',
-        },
-        {
-          status: 500,
-        }
-      );
+      previewUrlRef.current = null;
     }
-
-    const normalizedStories =
-      (stories || []).map(
-        (story: any) => ({
-          ...story,
-          user: Array.isArray(
-            story.user
-          )
-            ? story.user[0] ||
-              null
-            : story.user ||
-              null,
-        })
-      );
-
-    return NextResponse.json(
-      {
-        stories:
-          normalizedStories,
-      }
-    );
-  } catch (error) {
-    console.error(
-      '[SOCIAL STORIES] GET erro inesperado:',
-      error
-    );
-
-    return NextResponse.json(
-      {
-        error:
-          'Erro interno ao carregar Stories.',
-      },
-      {
-        status: 500,
-      }
-    );
   }
-}
 
-export async function POST(
-  request: Request
-) {
-  let uploadedPath: string | null =
-    null;
+  function resetComposer() {
+    clearPreviewUrl();
 
-  try {
-    const user =
-      await getAuthenticatedUser(
-        request
-      );
+    setFile(null);
+    setPreview('');
+    setThought('');
+    setText('');
+    setSelectedEmoji('');
+    setFilter('normal');
+    setError('');
+    setStep('select');
 
-    if (!user?.id) {
-      return NextResponse.json(
-        {
-          error:
-            'Você precisa estar logado para publicar um Story.',
-        },
-        {
-          status: 401,
-        }
-      );
+    if (inputRef.current) {
+      inputRef.current.value = '';
     }
+  }
 
-    /*
-     * Confirma que o perfil existe.
-     */
-    const {
-      data: profile,
-      error: profileError,
-    } =
-      await supabaseAdmin
-        .from('profiles')
-        .select(
-          'id, username, avatar_url'
-        )
-        .eq(
-          'id',
-          user.id
-        )
-        .maybeSingle();
+  function close() {
+    if (loading) return;
 
-    if (profileError) {
-      console.error(
-        '[SOCIAL STORIES] Erro ao buscar perfil:',
-        profileError
-      );
+    resetComposer();
+    onClose();
+  }
 
-      return NextResponse.json(
-        {
-          error:
-            'Não foi possível verificar seu perfil.',
-        },
-        {
-          status: 500,
-        }
-      );
-    }
+  function handleFile(
+    selectedFile: File | null
+  ) {
+    setError('');
 
-    if (!profile) {
-      return NextResponse.json(
-        {
-          error:
-            'Seu perfil não foi encontrado.',
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    const formData =
-      await request.formData();
-
-    const file =
-      formData.get(
-        'file'
-      );
-
-    const thoughtValue =
-      formData.get(
-        'thought'
-      );
-
-    const captionValue =
-      formData.get(
-        'caption'
-      );
-
-    if (!(file instanceof File)) {
-      return NextResponse.json(
-        {
-          error:
-            'Nenhuma imagem foi enviada.',
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    if (file.size <= 0) {
-      return NextResponse.json(
-        {
-          error:
-            'O arquivo enviado está vazio.',
-        },
-        {
-          status: 400,
-        }
-      );
-    }
+    if (!selectedFile) return;
 
     if (
-      file.size >
+      selectedFile.size >
       MAX_FILE_SIZE
     ) {
-      return NextResponse.json(
-        {
-          error:
-            'A imagem ou GIF deve ter no máximo 5 MB.',
-        },
-        {
-          status: 400,
-        }
+      setError(
+        'A imagem ou GIF deve ter no máximo 5 MB.'
       );
+
+      return;
     }
 
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+    ];
+
     if (
-      !ALLOWED_TYPES.includes(
-        file.type
+      !allowedTypes.includes(
+        selectedFile.type
       )
     ) {
-      return NextResponse.json(
-        {
-          error:
-            'Formato não permitido. Use JPG, PNG, WEBP ou GIF.',
-        },
-        {
-          status: 400,
-        }
+      setError(
+        'Formato não permitido. Use JPG, PNG, WEBP ou GIF.'
       );
+
+      return;
     }
 
-    /*
-     * Pensamento.
-     */
-    let thought =
-      typeof thoughtValue ===
-      'string'
-        ? thoughtValue.trim()
-        : '';
+    clearPreviewUrl();
 
-    if (
-      thought.length >
-      100
-    ) {
-      thought =
-        thought.slice(
-          0,
-          100
+    const url =
+      URL.createObjectURL(
+        selectedFile
+      );
+
+    previewUrlRef.current = url;
+
+    setFile(selectedFile);
+    setPreview(url);
+    setThought('');
+    setText('');
+    setSelectedEmoji('');
+    setFilter('normal');
+
+    setStep('edit');
+  }
+
+  function handleInputChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const selectedFile =
+      event.target.files?.[0] ||
+      null;
+
+    handleFile(selectedFile);
+  }
+
+  function handleThoughtChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const value =
+      event.target.value.slice(
+        0,
+        MAX_THOUGHT_LENGTH
+      );
+
+    setThought(value);
+  }
+
+  function openFilePicker() {
+    inputRef.current?.click();
+  }
+
+  /*
+   * Retorna o filtro CSS visual.
+   */
+  function getFilterStyle() {
+    switch (filter) {
+      case 'grayscale':
+        return 'grayscale(1)';
+
+      case 'sepia':
+        return 'sepia(0.8)';
+
+      case 'bright':
+        return 'brightness(1.25)';
+
+      case 'contrast':
+        return 'contrast(1.35)';
+
+      case 'blur':
+        return 'blur(2px)';
+
+      default:
+        return 'none';
+    }
+  }
+
+  /*
+   * Para manter GIF animado, a imagem original
+   * é enviada quando nenhum filtro/edição visual
+   * foi aplicado.
+   *
+   * Texto e pensamento continuam sendo enviados
+   * separadamente para a API.
+   */
+  async function publish() {
+    if (!file || loading) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const formData =
+        new FormData();
+
+      formData.append(
+        'file',
+        file
+      );
+
+      if (thought.trim()) {
+        formData.append(
+          'thought',
+          thought.trim()
         );
-    }
-
-    /*
-     * Legenda fica preparada,
-     * mas não é salva porque a tabela
-     * atualmente não possui coluna caption.
-     */
-    const caption =
-      typeof captionValue ===
-      'string'
-        ? captionValue.trim()
-        : '';
-
-    console.log(
-      '[SOCIAL STORIES] Publicando Story:',
-      {
-        userId: user.id,
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        thought:
-          thought || null,
-        caption:
-          caption || null,
       }
-    );
 
-    /*
-     * Caminho único no Storage.
-     */
-    const extension =
-      file.name
-        .split('.')
-        .pop()
-        ?.toLowerCase() ||
-      'jpg';
-
-    const storagePath =
-      `${user.id}/${crypto.randomUUID()}.${extension}`;
-
-    uploadedPath =
-      storagePath;
-
-    const arrayBuffer =
-      await file.arrayBuffer();
-
-    const buffer =
-      Buffer.from(
-        arrayBuffer
-      );
-
-    /*
-     * Upload.
-     */
-    const {
-      error: uploadError,
-    } =
-      await supabaseAdmin
-        .storage
-        .from(BUCKET)
-        .upload(
-          storagePath,
-          buffer,
+      const response =
+        await fetch(
+          '/api/stories',
           {
-            contentType:
-              file.type,
-            upsert: false,
+            method: 'POST',
+            body: formData,
           }
         );
 
-    if (uploadError) {
-      console.error(
-        '[SOCIAL STORIES] Erro no upload:',
-        uploadError
-      );
+      let data: any = null;
 
-      return NextResponse.json(
-        {
-          error:
-            'Não foi possível enviar a imagem.',
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    /*
-     * URL pública.
-     */
-    const {
-      data: publicUrlData,
-    } =
-      supabaseAdmin
-        .storage
-        .from(BUCKET)
-        .getPublicUrl(
-          storagePath
-        );
-
-    const mediaUrl =
-      publicUrlData
-        ?.publicUrl;
-
-    if (!mediaUrl) {
-      await supabaseAdmin
-        .storage
-        .from(BUCKET)
-        .remove([
-          storagePath,
-        ]);
-
-      uploadedPath = null;
-
-      return NextResponse.json(
-        {
-          error:
-            'Não foi possível gerar a URL da imagem.',
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    /*
-     * Tipo do Story.
-     */
-    const mediaType =
-      file.type ===
-      'image/gif'
-        ? 'gif'
-        : 'image';
-
-    /*
-     * Expiração de 24 horas.
-     */
-    const expiresAt =
-      new Date(
-        Date.now() +
-          24 *
-            60 *
-            60 *
-            1000
-      ).toISOString();
-
-    /*
-     * Salva no banco.
-     */
-    const {
-      data: story,
-      error: insertError,
-    } =
-      await supabaseAdmin
-        .from(
-          'social_stories'
-        )
-        .insert({
-          user_id:
-            user.id,
-          media_url:
-            mediaUrl,
-          media_type:
-            mediaType,
-          thought:
-            thought ||
-            null,
-          created_at:
-            new Date().toISOString(),
-          expires_at:
-            expiresAt,
-        })
-        .select(
-          `
-          id,
-          user_id,
-          media_url,
-          media_type,
-          thought,
-          created_at,
-          expires_at
-        `
-        )
-        .single();
-
-    if (insertError) {
-      console.error(
-        '[SOCIAL STORIES] ERRO AO SALVAR NO BANCO:',
-        insertError
-      );
-
-      /*
-       * Se o banco falhar,
-       * remove o arquivo que acabou
-       * de ser enviado.
-       */
-      await supabaseAdmin
-        .storage
-        .from(BUCKET)
-        .remove([
-          storagePath,
-        ]);
-
-      uploadedPath = null;
-
-      return NextResponse.json(
-        {
-          error:
-            'A imagem foi enviada, mas não foi possível salvar o Story.',
-          details:
-            insertError.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    uploadedPath = null;
-
-    console.log(
-      '[SOCIAL STORIES] Story publicado:',
-      story.id
-    );
-
-    return NextResponse.json(
-      {
-        story: {
-          ...story,
-          user: profile,
-        },
-      },
-      {
-        status: 201,
-      }
-    );
-  } catch (error) {
-    console.error(
-      '[SOCIAL STORIES] POST erro inesperado:',
-      error
-    );
-
-    if (uploadedPath) {
       try {
-        await supabaseAdmin
-          .storage
-          .from(BUCKET)
-          .remove([
-            uploadedPath,
-          ]);
-      } catch (cleanupError) {
-        console.error(
-          '[SOCIAL STORIES] Erro ao limpar upload:',
-          cleanupError
+        data =
+          await response.json();
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            'Não foi possível publicar o Story.'
         );
       }
-    }
 
-    return NextResponse.json(
-      {
-        error:
-          'Erro interno ao publicar o Story.',
-      },
-      {
-        status: 500,
-      }
-    );
+      resetComposer();
+
+      onPublished?.();
+      onClose();
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível publicar o Story.'
+      );
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
-export async function DELETE(
-  request: Request
-) {
-  try {
-    const user =
-      await getAuthenticatedUser(
-        request
-      );
-
-    if (!user?.id) {
-      return NextResponse.json(
-        {
-          error:
-            'Você precisa estar logado.',
-        },
-        {
-          status: 401,
-        }
-      );
-    }
-
-    const body =
-      await request.json();
-
-    const storyId =
-      body?.id;
-
-    if (!storyId) {
-      return NextResponse.json(
-        {
-          error:
-            'ID do Story não informado.',
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const {
-      data: story,
-      error: findError,
-    } =
-      await supabaseAdmin
-        .from(
-          'social_stories'
-        )
-        .select(
-          'id, user_id, media_url'
-        )
-        .eq(
-          'id',
-          storyId
-        )
-        .eq(
-          'user_id',
-          user.id
-        )
-        .maybeSingle();
-
-    if (findError) {
-      console.error(
-        '[SOCIAL STORIES] Erro ao encontrar Story:',
-        findError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Não foi possível encontrar o Story.',
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    if (!story) {
-      return NextResponse.json(
-        {
-          error:
-            'Story não encontrado.',
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    const {
-      error: deleteError,
-    } =
-      await supabaseAdmin
-        .from(
-          'social_stories'
-        )
-        .delete()
-        .eq(
-          'id',
-          storyId
-        )
-        .eq(
-          'user_id',
-          user.id
-        );
-
-    if (deleteError) {
-      console.error(
-        '[SOCIAL STORIES] Erro ao excluir banco:',
-        deleteError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Não foi possível excluir o Story.',
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    /*
-     * Remove arquivo do Storage.
-     */
-    if (story.media_url) {
-      const storagePath =
-        getStoragePathFromPublicUrl(
-          story.media_url
-        );
-
-      if (storagePath) {
-        const {
-          error: storageError,
-        } =
-          await supabaseAdmin
-            .storage
-            .from(BUCKET)
-            .remove([
-              storagePath,
-            ]);
-
-        if (storageError) {
-          console.error(
-            '[SOCIAL STORIES] Erro ao excluir arquivo:',
-            storageError
-          );
-        }
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-    });
-  } catch (error) {
-    console.error(
-      '[SOCIAL STORIES] DELETE erro inesperado:',
-      error
-    );
-
-    return NextResponse.json(
-      {
-        error:
-          'Erro interno ao excluir o Story.',
-      },
-      {
-        status: 500,
-      }
-    );
+  if (!open) {
+    return null;
   }
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (
+          event.target ===
+          event.currentTarget
+        ) {
+          close();
+        }
+      }}
+    >
+      <div className="relative flex max-h-[92vh] w-full max-w-[900px] flex-col overflow-hidden rounded-[28px] bg-[#fffafc] shadow-2xl">
+        {/* HEADER */}
+
+        <div className="flex items-center justify-between border-b border-black/5 px-5 py-4">
+          <div>
+            <h2 className="text-lg font-black text-[#21151d]">
+              {step === 'select'
+                ? 'Criar Story'
+                : 'Editar Story'}
+            </h2>
+
+            {step === 'edit' && (
+              <p className="text-xs text-black/45">
+                Personalize antes de publicar.
+              </p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={close}
+            disabled={loading}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/5 text-lg font-bold text-black/60 transition hover:bg-black/10 disabled:opacity-50"
+            aria-label="Fechar"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* CONTEÚDO */}
+
+        <div className="flex min-h-0 flex-1 overflow-auto">
+          {step === 'select' ? (
+            <div className="flex w-full flex-col items-center justify-center px-6 py-16">
+              <button
+                type="button"
+                onClick={openFilePicker}
+                className="flex h-24 w-24 items-center justify-center rounded-[28px] bg-[#21151d] text-4xl text-white shadow-xl transition hover:scale-105 hover:bg-[#35242e]"
+              >
+                +
+              </button>
+
+              <h3 className="mt-6 text-xl font-black text-[#21151d]">
+                Adicione uma imagem
+              </h3>
+
+              <p className="mt-2 max-w-[360px] text-center text-sm leading-6 text-black/50">
+                Escolha uma imagem ou GIF para
+                começar seu Story.
+              </p>
+
+              <button
+                type="button"
+                onClick={openFilePicker}
+                className="mt-6 rounded-full bg-[#21151d] px-7 py-3 text-sm font-black text-white transition hover:opacity-90"
+              >
+                Escolher arquivo
+              </button>
+
+              <p className="mt-4 text-xs text-black/35">
+                JPG, PNG, WEBP ou GIF · máximo
+                5 MB
+              </p>
+
+              {error && (
+                <p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-600">
+                  {error}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex w-full flex-col gap-5 p-5 lg:flex-row">
+              {/* PREVIEW */}
+
+              <div className="flex flex-1 items-center justify-center">
+                <div className="relative aspect-[9/14] w-full max-w-[390px] overflow-hidden rounded-[24px] bg-black shadow-2xl">
+                  {preview && (
+                    <img
+                      src={preview}
+                      alt="Prévia do Story"
+                      className="h-full w-full object-cover"
+                      style={{
+                        filter:
+                          getFilterStyle(),
+                      }}
+                    />
+                  )}
+
+                  {/* PENSAMENTO */}
+
+                  {thought.trim() && (
+                    <div className="absolute left-1/2 top-8 z-20 w-[78%] -translate-x-1/2">
+                      <div className="relative rounded-[22px] bg-white px-4 py-3 text-center text-xs font-bold leading-[1.35] text-[#21151d] shadow-[0_8px_30px_rgba(0,0,0,0.22)]">
+                        {thought}
+
+                        <span className="absolute -bottom-2 left-[28%] h-3 w-3 rounded-full bg-white" />
+
+                        <span className="absolute -bottom-4 left-[24%] h-2 w-2 rounded-full bg-white" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TEXTO */}
+
+                  {text.trim() && (
+                    <div className="absolute left-1/2 top-1/2 z-20 w-[85%] -translate-x-1/2 -translate-y-1/2 text-center">
+                      <span className="rounded-xl bg-black/45 px-4 py-2 text-2xl font-black text-white backdrop-blur-sm">
+                        {text}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* EMOJI */}
+
+                  {selectedEmoji && (
+                    <div className="absolute bottom-16 left-1/2 z-20 -translate-x-1/2 text-6xl drop-shadow-lg">
+                      {selectedEmoji}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* CONTROLES */}
+
+              <div className="w-full space-y-4 lg:w-[330px]">
+                {/* PENSAMENTO */}
+
+                <div className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className="text-sm font-black text-[#21151d]">
+                      💭 Pensamento
+                    </label>
+
+                    <span className="text-[10px] font-bold text-black/35">
+                      {thought.length}/100
+                    </span>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={thought}
+                    onChange={
+                      handleThoughtChange
+                    }
+                    maxLength={
+                      MAX_THOUGHT_LENGTH
+                    }
+                    placeholder="O que você está pensando?"
+                    className="w-full rounded-xl border border-black/10 bg-[#fffafc] px-3 py-3 text-sm outline-none transition placeholder:text-black/30 focus:border-[#21151d]"
+                  />
+
+                  <p className="mt-2 text-[11px] leading-4 text-black/40">
+                    Isso aparece em uma nuvem
+                    acima do seu avatar nos
+                    Stories.
+                  </p>
+                </div>
+
+                {/* TEXTO */}
+
+                <div className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
+                  <label className="mb-2 block text-sm font-black text-[#21151d]">
+                    ✏️ Texto
+                  </label>
+
+                  <input
+                    type="text"
+                    value={text}
+                    onChange={(event) =>
+                      setText(
+                        event.target.value
+                      )
+                    }
+                    maxLength={80}
+                    placeholder="Adicionar texto..."
+                    className="w-full rounded-xl border border-black/10 bg-[#fffafc] px-3 py-3 text-sm outline-none transition placeholder:text-black/30 focus:border-[#21151d]"
+                  />
+                </div>
+
+                {/* EMOJIS */}
+
+                <div className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
+                  <p className="mb-3 text-sm font-black text-[#21151d]">
+                    😊 Emoji
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      '❤️',
+                      '✨',
+                      '😭',
+                      '😂',
+                      '🥹',
+                      '😍',
+                      '🔥',
+                      '💀',
+                      '👀',
+                      '💭',
+                      '📚',
+                      '✍️',
+                    ].map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() =>
+                          setSelectedEmoji(
+                            selectedEmoji ===
+                              emoji
+                              ? ''
+                              : emoji
+                          )
+                        }
+                        className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl transition ${
+                          selectedEmoji ===
+                          emoji
+                            ? 'bg-black/10 scale-110'
+                            : 'bg-black/[0.03] hover:bg-black/[0.07]'
+                        }`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* FILTROS */}
+
+                <div className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
+                  <p className="mb-3 text-sm font-black text-[#21151d]">
+                    🎨 Filtro
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        [
+                          'normal',
+                          'Normal',
+                        ],
+                        [
+                          'grayscale',
+                          'P&B',
+                        ],
+                        [
+                          'sepia',
+                          'Sépia',
+                        ],
+                        [
+                          'bright',
+                          'Brilho',
+                        ],
+                        [
+                          'contrast',
+                          'Contraste',
+                        ],
+                        [
+                          'blur',
+                          'Suave',
+                        ],
+                      ] as [
+                        Filter,
+                        string
+                      ][]
+                    ).map(
+                      ([
+                        value,
+                        label,
+                      ]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() =>
+                            setFilter(
+                              value
+                            )
+                          }
+                          className={`rounded-xl px-2 py-2 text-xs font-bold transition ${
+                            filter ===
+                            value
+                              ? 'bg-[#21151d] text-white'
+                              : 'bg-black/[0.04] text-black/60 hover:bg-black/[0.08]'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                {/* ERRO */}
+
+                {error && (
+                  <div className="rounded-xl bg-red-50 px-3 py-3 text-sm font-semibold text-red-600">
+                    {error}
+                  </div>
+                )}
+
+                {/* AÇÕES */}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setStep('select')
+                    }
+                    disabled={loading}
+                    className="flex-1 rounded-xl border border-black/10 px-4 py-3 text-sm font-black text-[#21151d] transition hover:bg-black/[0.03] disabled:opacity-50"
+                  >
+                    Trocar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={publish}
+                    disabled={
+                      !file ||
+                      loading
+                    }
+                    className="flex-[1.5] rounded-xl bg-[#21151d] px-4 py-3 text-sm font-black text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {loading
+                      ? 'Publicando...'
+                      : 'Publicar Story'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* INPUT OCULTO */}
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ACCEPTED_TYPES}
+          onChange={
+            handleInputChange
+          }
+          className="hidden"
+        />
+      </div>
+    </div>
+  );
 }
