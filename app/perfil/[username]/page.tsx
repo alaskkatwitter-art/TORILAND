@@ -1,10 +1,6 @@
 'use client';
 
-import {
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 type User = {
@@ -99,11 +95,6 @@ const SPOTIFY_URL_REGEX = new RegExp(
   'g'
 );
 
-const TRAILING_URL_PUNCTUATION = new RegExp(
-  '[.,!?;:)\\]}]+$',
-  'g'
-);
-
 function formatDate(value: string) {
   try {
     return new Date(value).toLocaleDateString(
@@ -167,15 +158,11 @@ function getInitial(
 }
 
 function cleanUrl(url: string) {
-  return url.replace(
-    TRAILING_URL_PUNCTUATION,
-    ''
-  );
+  return url.replace(/[.,!?;:)\]}]+$/g, '');
 }
 
 function isSpotifyUrl(url: string) {
   SPOTIFY_URL_REGEX.lastIndex = 0;
-
   return SPOTIFY_URL_REGEX.test(url);
 }
 
@@ -447,8 +434,6 @@ function PostBody({
 }) {
   if (!body) return null;
 
-  URL_REGEX.lastIndex = 0;
-
   const matches = Array.from(
     body.matchAll(URL_REGEX)
   );
@@ -461,7 +446,7 @@ function PostBody({
     );
   }
 
-  const elements: ReactNode[] = [];
+  const elements: React.ReactNode[] = [];
 
   let lastIndex = 0;
 
@@ -583,7 +568,9 @@ function CommentItem({
 
           <div className="mt-1 flex items-center gap-3 px-1">
             <span className="text-[11px] text-white/25">
-              {formatDateTime(comment.created_at)}
+              {formatDateTime(
+                comment.created_at
+              )}
             </span>
 
             <button
@@ -895,7 +882,10 @@ function PublicPost({
         typeof navigator.share === 'function'
       ) {
         await navigator.share({
-          title: `Publicação de ${owner.display_name || owner.username}`,
+          title: `Publicação de ${
+            owner.display_name ||
+            owner.username
+          }`,
           url,
         });
 
@@ -1205,7 +1195,10 @@ export default function PublicProfilePage() {
     useState(false);
 
   useEffect(() => {
-    if (!username) {
+    if (
+      typeof username !== 'string' ||
+      !username
+    ) {
       setLoading(false);
       setError('Perfil não encontrado.');
       return;
