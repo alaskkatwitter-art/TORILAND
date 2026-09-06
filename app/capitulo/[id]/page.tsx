@@ -120,9 +120,9 @@ export default function CapituloPage() {
         setLoading(true);
         setError('');
 
-        const response = await fetch(`/api/chapters/${id}`, {
-          cache: 'no-store',
-        });
+      const response = await fetch('/api/chapters/' + id, {
+  cache: 'no-store',
+});
 
         const text = await response.text();
 
