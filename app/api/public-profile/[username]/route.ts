@@ -1,55 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Variáveis do Supabase não configuradas.');
+  throw new Error("Variáveis do Supabase não configuradas.");
 }
 
 const supabase = createClient(
   supabaseUrl,
   supabaseServiceKey
 );
-
-const ALLOWED_REACTIONS = [
-  '❤️',
-  '😂',
-  '😭',
-  '😱',
-  '👀',
-  '🔥',
-];
-
-async function getCurrentUserId(request: Request) {
-  try {
-    const meResponse = await fetch(
-      new URL('/api/auth/me', request.url),
-      {
-        headers: {
-          cookie: (await cookies()).toString(),
-        },
-        cache: 'no-store',
-      }
-    );
-
-    const meData = await meResponse.json();
-
-    if (
-      !meResponse.ok ||
-      !meData.authenticated ||
-      !meData.user?.id
-    ) {
-      return null;
-    }
-
-    return meData.user.id as string;
-  } catch {
-    return null;
-  }
-}
 
 export async function GET(
   request: NextRequest,
@@ -60,37 +22,29 @@ export async function GET(
 
     if (!username) {
       return NextResponse.json(
-        { error: 'Username não informado.' },
+        { error: "Username não informado." },
         { status: 400 }
       );
     }
 
-    const decodedUsername = decodeURIComponent(username).trim();
+    const decodedUsername = decodeURIComponent(
+      username
+    ).trim();
 
     if (!decodedUsername) {
       return NextResponse.json(
-        { error: 'Username inválido.' },
+        { error: "Username inválido." },
         { status: 400 }
       );
     }
 
-    /*
-     * =========================================================
-     * USUÁRIO ATUAL
-     * =========================================================
-     */
-
-    const currentUserId = await getCurrentUserId(request);
-
-    /*
-     * =========================================================
-     * PERFIL
-     * =========================================================
-     */
+    // =========================================================
+    // 1. PERFIL
+    // =========================================================
 
     const { data: profile, error: profileError } =
       await supabase
-        .from('profiles')
+        .from("profiles")
         .select(
           `
           id,
@@ -98,68 +52,63 @@ export async function GET(
           display_name,
           bio,
           avatar_url,
-          cover_url,
-          theme_color
+          cover_url
           `
         )
-        .eq('username', decodedUsername)
+        .eq("username", decodedUsername)
         .maybeSingle();
 
     if (profileError) {
       console.error(
-        'Erro ao buscar perfil:',
+        "Erro ao buscar perfil:",
         profileError
       );
 
       return NextResponse.json(
-        { error: 'Erro ao buscar perfil.' },
+        { error: "Erro ao buscar perfil." },
         { status: 500 }
       );
     }
 
     if (!profile) {
       return NextResponse.json(
-        { error: 'Perfil não encontrado.' },
+        { error: "Perfil não encontrado." },
         { status: 404 }
       );
     }
 
-    /*
-     * =========================================================
-     * HISTÓRIAS
-     * =========================================================
-     */
+    // =========================================================
+    // 2. HISTÓRIAS
+    // =========================================================
 
     const { data: stories, error: storiesError } =
       await supabase
-        .from('stories')
-        .select('*')
-        .eq('author_id', profile.id)
-        .order('updated_at', {
+        .from("stories")
+        .select("*")
+        .eq("author_id", profile.id)
+        .order("updated_at", {
           ascending: false,
         });
 
     if (storiesError) {
       console.error(
-        'Erro ao buscar histórias:',
+        "Erro ao buscar histórias:",
         storiesError
       );
 
       return NextResponse.json(
-        { error: 'Erro ao buscar histórias.' },
+        { error: "Erro ao buscar histórias." },
         { status: 500 }
       );
     }
 
-    /*
-     * =========================================================
-     * POSTS
-     * =========================================================
-     */
+    // =========================================================
+    // 3. MURAL
+    // =========================================================
 
     const { data: posts, error: postsError } =
       await supabase
-        .from('nook_posts')
+        .from("nook_posts")
         .select(
           `
           id,
@@ -172,245 +121,396 @@ export async function GET(
           updated_at
           `
         )
-        .eq('user_id', profile.id)
-        .order('pinned', {
+        .eq("user_id", profile.id)
+        .order("pinned", {
           ascending: false,
         })
-        .order('created_at', {
+        .order("created_at", {
           ascending: false,
         });
 
     if (postsError) {
       console.error(
-        'Erro ao buscar posts:',
+        "Erro ao buscar posts:",
         postsError
       );
 
       return NextResponse.json(
-        { error: 'Erro ao buscar posts.' },
+        { error: "Erro ao buscar posts." },
         { status: 500 }
       );
     }
 
-    const safePosts = posts || [];
-    const postIds = safePosts.map((post) => post.id);
+    // =========================================================
+    // 4. MÍDIAS DO MURAL
+    // =========================================================
 
-    if (postIds.length === 0) {
-      return NextResponse.json({
-        user: profile,
-        stories: stories || [],
-        posts: [],
-      });
+    const postIds = (posts || []).map(
+      (post) => post.id
+    );
+
+    let media: any[] = [];
+
+    if (postIds.length > 0) {
+      const {
+        data: mediaData,
+        error: mediaError,
+      } = await supabase
+        .from("nook_post_media")
+        .select("*")
+        .in("post_id", postIds)
+        .order("position", {
+          ascending: true,
+        });
+
+      if (mediaError) {
+        console.error(
+          "Erro ao buscar mídias:",
+          mediaError
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              "Erro ao buscar mídias dos posts.",
+          },
+          { status: 500 }
+        );
+      }
+
+      media = mediaData || [];
     }
 
-    /*
-     * =========================================================
-     * MÍDIAS
-     * =========================================================
-     */
-
-    const {
-      data: media,
-      error: mediaError,
-    } = await supabase
-      .from('nook_post_media')
-      .select(
-        `
-        id,
-        post_id,
-        media_url,
-        media_type,
-        created_at
-        `
-      )
-      .in('post_id', postIds)
-      .order('created_at', {
-        ascending: true,
-      });
-
-    if (mediaError) {
-      console.error(
-        'Erro ao buscar mídias:',
-        mediaError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Erro ao buscar mídias dos posts.',
-        },
-        { status: 500 }
-      );
-    }
-
-    /*
-     * =========================================================
-     * REAÇÕES
-     * =========================================================
-     */
-
-    const {
-      data: reactions,
-      error: reactionsError,
-    } = await supabase
-      .from('nook_post_reactions')
-      .select(
-        `
-        post_id,
-        user_id,
-        emoji
-        `
-      )
-      .in('post_id', postIds);
-
-    if (reactionsError) {
-      console.error(
-        'Erro ao buscar reações:',
-        reactionsError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Erro ao buscar reações dos posts.',
-        },
-        { status: 500 }
-      );
-    }
-
-    /*
-     * =========================================================
-     * COMENTÁRIOS
-     * =========================================================
-     */
-
-    const {
-      data: comments,
-      error: commentsError,
-    } = await supabase
-      .from('nook_comments')
-      .select(
-        `
-        id,
-        post_id
-        `
-      )
-      .in('post_id', postIds);
-
-    if (commentsError) {
-      console.error(
-        'Erro ao buscar comentários:',
-        commentsError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Erro ao buscar comentários dos posts.',
-        },
-        { status: 500 }
-      );
-    }
-
-    /*
-     * =========================================================
-     * ENRIQUECER POSTS
-     * =========================================================
-     */
-
-    const postsWithData = safePosts.map((post) => {
-      const postMedia =
-        media
-          ?.filter(
+    const postsWithMedia = (posts || []).map(
+      (post) => {
+        const postMedia = media
+          .filter(
             (item) =>
               item.post_id === post.id
           )
-          .slice(0, 4) || [];
+          .slice(0, 4);
 
-      const postReactions =
-        reactions?.filter(
-          (reaction) =>
-            reaction.post_id === post.id
-        ) || [];
+        return {
+          ...post,
+          media: postMedia,
+        };
+      }
+    );
 
-      const postComments =
-        comments?.filter(
-          (comment) =>
-            comment.post_id === post.id
-        ) || [];
+    // =========================================================
+    // 5. LISTAS DE LEITURA
+    //
+    // IMPORTANTE:
+    // Só retornamos listas públicas.
+    // Mesmo que alguém tente manipular a requisição,
+    // o filtro acontece no servidor.
+    // =========================================================
 
-      const reactionCounts: Record<
-        string,
-        number
-      > = {};
+    const {
+      data: readingLists,
+      error: readingListsError,
+    } = await supabase
+      .from("reading_lists")
+      .select(
+        `
+        id,
+        user_id,
+        name,
+        description,
+        is_public,
+        created_at
+        `
+      )
+      .eq("user_id", profile.id)
+      .eq("is_public", true)
+      .order("created_at", {
+        ascending: false,
+      });
 
-      for (const reaction of ALLOWED_REACTIONS) {
-        reactionCounts[reaction] = 0;
+    if (readingListsError) {
+      console.error(
+        "Erro ao buscar listas:",
+        readingListsError
+      );
+
+      return NextResponse.json(
+        { error: "Erro ao buscar listas de leitura." },
+        { status: 500 }
+      );
+    }
+
+    const listIds = (readingLists || []).map(
+      (list) => list.id
+    );
+
+    let readingListItems: any[] = [];
+
+    if (listIds.length > 0) {
+      const {
+        data: items,
+        error: itemsError,
+      } = await supabase
+        .from("reading_list_items")
+        .select(
+          `
+          id,
+          list_id,
+          story_id,
+          added_at
+          `
+        )
+        .in("list_id", listIds)
+        .order("added_at", {
+          ascending: false,
+        });
+
+      if (itemsError) {
+        console.error(
+          "Erro ao buscar itens das listas:",
+          itemsError
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              "Erro ao buscar histórias das listas.",
+          },
+          { status: 500 }
+        );
       }
 
-      const userReactions: string[] = [];
+      readingListItems = items || [];
+    }
 
-      for (const reaction of postReactions) {
-        if (
-          typeof reaction.emoji === 'string' &&
-          ALLOWED_REACTIONS.includes(
-            reaction.emoji
+    const listStoryIds = Array.from(
+      new Set(
+        readingListItems.map(
+          (item) => item.story_id
+        )
+      )
+    );
+
+    let listStories: any[] = [];
+
+    if (listStoryIds.length > 0) {
+      const {
+        data: storiesData,
+        error: listStoriesError,
+      } = await supabase
+        .from("stories")
+        .select(
+          `
+          id,
+          title,
+          description,
+          cover_url,
+          status,
+          rating,
+          created_at,
+          updated_at
+          `
+        )
+        .in("id", listStoryIds);
+
+      if (listStoriesError) {
+        console.error(
+          "Erro ao buscar histórias das listas:",
+          listStoriesError
+        );
+      } else {
+        listStories = storiesData || [];
+      }
+    }
+
+    const readingListsWithItems =
+      (readingLists || []).map((list) => ({
+        ...list,
+        items: readingListItems
+          .filter(
+            (item) =>
+              item.list_id === list.id
           )
-        ) {
-          reactionCounts[reaction.emoji] =
-            (reactionCounts[reaction.emoji] || 0) +
-            1;
-        }
+          .map((item) => ({
+            ...item,
+            story:
+              listStories.find(
+                (story) =>
+                  story.id ===
+                  item.story_id
+              ) || null,
+          })),
+      }));
 
-        if (
-          currentUserId &&
-          reaction.user_id === currentUserId
-        ) {
-          userReactions.push(reaction.emoji);
-        }
+    // =========================================================
+    // 6. CLUBES DAS FIC
+    //
+    // Primeiro encontramos os clubes vinculados
+    // às histórias do perfil.
+    // Depois descobrimos em quais deles o usuário
+    // realmente participa.
+    // =========================================================
+
+    const {
+      data: clubs,
+      error: clubsError,
+    } = await supabase
+      .from("fic_clubs")
+      .select(
+        `
+        id,
+        story_id,
+        creator_id,
+        name,
+        description,
+        created_at
+        `
+      )
+      .in(
+        "story_id",
+        (stories || []).map(
+          (story) => story.id
+        )
+      )
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (clubsError) {
+      console.error(
+        "Erro ao buscar clubes:",
+        clubsError
+      );
+    }
+
+    const clubRows = clubs || [];
+
+    const clubIds = clubRows.map(
+      (club) => club.id
+    );
+
+    let memberships: any[] = [];
+
+    if (clubIds.length > 0) {
+      const {
+        data: members,
+        error: membersError,
+      } = await supabase
+        .from("fic_club_members")
+        .select(
+          `
+          id,
+          club_id,
+          user_id,
+          joined_at
+          `
+        )
+        .in("club_id", clubIds);
+
+      if (membersError) {
+        console.error(
+          "Erro ao buscar membros dos clubes:",
+          membersError
+        );
+      } else {
+        memberships = members || [];
       }
+    }
 
-      return {
-        ...post,
+    const participatingClubIds =
+      new Set(
+        memberships
+          .filter(
+            (member) =>
+              member.user_id ===
+              profile.id
+          )
+          .map(
+            (member) =>
+              member.club_id
+          )
+      );
 
-        author: {
-          id: profile.id,
-          username: profile.username,
-          display_name: profile.display_name,
-          avatar_url: profile.avatar_url,
-        },
+    const clubStoryIds = Array.from(
+      new Set(
+        clubRows.map(
+          (club) => club.story_id
+        )
+      )
+    );
 
-        media: postMedia,
+    let clubStories: any[] = [];
 
-        reaction_counts: reactionCounts,
+    if (clubStoryIds.length > 0) {
+      const {
+        data: clubStoriesData,
+        error: clubStoriesError,
+      } = await supabase
+        .from("stories")
+        .select(
+          `
+          id,
+          title,
+          description,
+          cover_url,
+          status,
+          rating,
+          created_at,
+          updated_at
+          `
+        )
+        .in("id", clubStoryIds);
 
-        user_reactions: userReactions,
+      if (!clubStoriesError) {
+        clubStories =
+          clubStoriesData || [];
+      }
+    }
 
-        comments_count:
-          postComments.length,
-      };
-    });
+    const ficClubs =
+      clubRows
+        .filter((club) =>
+          participatingClubIds.has(
+            club.id
+          )
+        )
+        .map((club) => ({
+          ...club,
+          member_count:
+            memberships.filter(
+              (member) =>
+                member.club_id ===
+                club.id
+            ).length,
+          story:
+            clubStories.find(
+              (story) =>
+                story.id ===
+                club.story_id
+            ) || null,
+        }));
 
-    /*
-     * =========================================================
-     * RESPOSTA
-     * =========================================================
-     */
+    // =========================================================
+    // 7. RESPOSTA
+    // =========================================================
 
     return NextResponse.json({
       user: profile,
       stories: stories || [],
-      posts: postsWithData,
+      posts: postsWithMedia,
+      reading_lists:
+        readingListsWithItems,
+      fic_clubs: ficClubs,
     });
   } catch (error) {
     console.error(
-      'Erro inesperado no perfil público:',
+      "Erro inesperado no perfil público:",
       error
     );
 
     return NextResponse.json(
       {
-        error: 'Erro interno do servidor.',
+        error:
+          "Erro interno do servidor.",
       },
       { status: 500 }
     );
