@@ -27,6 +27,7 @@ type Story = {
   cover_url: string | null;
   status: string | null;
   rating: string | null;
+  fandom_name?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -919,7 +920,7 @@ function PublicPost({
     commentsByParent.get(null) || [];
 
   return (
-    <article className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]">
+    <article className="mx-auto w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-[#151015]">
       <div className="p-5 sm:p-6">
         <div className="flex items-center gap-3">
           <Avatar profile={owner} />
@@ -1144,6 +1145,148 @@ function PublicPost({
         )}
       </div>
     </article>
+  );
+}
+
+function StoryStatus({
+  status,
+}: {
+  status: string | null;
+}) {
+  if (!status) return null;
+
+  const normalized =
+    status.trim().toLowerCase();
+
+  const isOngoing =
+    normalized === 'em andamento';
+
+  const isCompleted =
+    normalized === 'concluída' ||
+    normalized === 'concluida';
+
+  const isHiatus =
+    normalized === 'hiatus';
+
+  if (isOngoing) {
+    return (
+      <span className="inline-flex items-center rounded-full border border-[#ff78b9]/45 bg-[#ff78b9]/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#ff9aca] shadow-[0_0_18px_rgba(255,120,185,0.12)]">
+        EM ANDAMENTO
+      </span>
+    );
+  }
+
+  if (isCompleted) {
+    return (
+      <span className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/65">
+        CONCLUÍDA
+      </span>
+    );
+  }
+
+  if (isHiatus) {
+    return (
+      <span className="inline-flex items-center rounded-full border border-[#b88cff]/30 bg-[#b88cff]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#c9adff]">
+        HIATUS
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/50">
+      {status}
+    </span>
+  );
+}
+
+function StoryListItem({
+  story,
+  onOpen,
+}: {
+  story: Story;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group w-full overflow-hidden rounded-3xl border border-white/10 bg-[#151015] text-left transition hover:border-[#ff78b9]/25 hover:bg-[#181218]"
+    >
+      <div className="flex flex-col sm:flex-row">
+        <div className="relative h-52 w-full shrink-0 overflow-hidden bg-[#211a21] sm:h-44 sm:w-32 md:w-40">
+          {story.cover_url ? (
+            <img
+              src={story.cover_url}
+              alt=""
+              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-3xl font-black text-white/20">
+              +
+            </div>
+          )}
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent sm:bg-gradient-to-r" />
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col justify-center p-5 sm:p-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <StoryStatus status={story.status} />
+
+            {story.rating && (
+              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white/35">
+                {story.rating}
+              </span>
+            )}
+          </div>
+
+          <h3 className="mt-3 text-xl font-black tracking-tight text-white transition group-hover:text-[#ff9aca] sm:text-2xl">
+            {story.title}
+          </h3>
+
+          {story.description ? (
+            <p className="mt-2 line-clamp-3 max-w-3xl text-sm leading-6 text-white/45">
+              {story.description}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm italic text-white/25">
+              Esta história ainda não possui uma sinopse.
+            </p>
+          )}
+
+          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+            <div>
+              <span className="mr-1.5 font-bold uppercase tracking-[0.12em] text-white/25">
+                Fandom principal
+              </span>
+
+              <span className="font-semibold text-white/55">
+                {story.fandom_name ||
+                  'Ainda não informado'}
+              </span>
+            </div>
+
+            <div className="h-3 w-px bg-white/10" />
+
+            <span className="text-white/25">
+              Atualizada em{' '}
+              <span className="text-white/45">
+                {formatDate(
+                  story.updated_at ||
+                    story.created_at
+                )}
+              </span>
+            </span>
+          </div>
+        </div>
+
+        <div className="hidden items-center pr-5 text-white/20 transition group-hover:text-[#ff78b9] sm:flex">
+          <span className="text-2xl">
+            →
+          </span>
+        </div>
+      </div>
+    </button>
   );
 }
 
@@ -1607,7 +1750,7 @@ export default function PublicProfilePage() {
           </div>
         </div>
 
-        <section className="mt-5">
+        <section className="mx-auto mt-5 w-full max-w-4xl">
           {activeTab === 'stories' && (
             <>
               {stories.length === 0 ? (
@@ -1627,67 +1770,17 @@ export default function PublicProfilePage() {
                   </p>
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="mx-auto w-full max-w-3xl space-y-3">
                   {stories.map((story) => (
-                    <button
-                      type="button"
+                    <StoryListItem
                       key={story.id}
-                      onClick={() =>
+                      story={story}
+                      onOpen={() =>
                         router.push(
                           `/historia/${story.id}`
                         )
                       }
-                      className="group overflow-hidden rounded-3xl border border-white/10 bg-[#151015] text-left transition hover:-translate-y-0.5 hover:border-white/20"
-                    >
-                      <div className="relative aspect-[16/9] overflow-hidden bg-[#211a21]">
-                        {story.cover_url ? (
-                          <img
-                            src={story.cover_url}
-                            alt=""
-                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-3xl font-black text-white/20">
-                            +
-                          </div>
-                        )}
-
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-
-                        {story.status && (
-                          <span className="absolute bottom-3 left-3 rounded-full bg-black/60 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-white backdrop-blur">
-                            {story.status}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="p-5">
-                        <h3 className="line-clamp-2 text-lg font-black text-white">
-                          {story.title}
-                        </h3>
-
-                        {story.description && (
-                          <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/45">
-                            {story.description}
-                          </p>
-                        )}
-
-                        <div className="mt-4 flex items-center justify-between text-xs text-white/30">
-                          <span>
-                            {story.rating
-                              ? `Classificação ${story.rating}`
-                              : 'História'}
-                          </span>
-
-                          <span>
-                            {formatDate(
-                              story.updated_at ||
-                                story.created_at
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
+                    />
                   ))}
                 </div>
               )}
@@ -1697,7 +1790,7 @@ export default function PublicProfilePage() {
           {activeTab === 'nook' && (
             <>
               {posts.length === 0 ? (
-                <div className="rounded-3xl border border-white/10 bg-[#151015] px-6 py-14 text-center">
+                <div className="mx-auto max-w-2xl rounded-3xl border border-white/10 bg-[#151015] px-6 py-14 text-center">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
                     <span className="text-lg font-black text-white/40">
                       +
