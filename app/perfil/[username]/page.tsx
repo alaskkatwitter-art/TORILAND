@@ -2,8 +2,10 @@
 
 import {
   useEffect,
+  useRef,
   useState,
   type ReactNode,
+  type TouchEvent,
 } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -33,6 +35,10 @@ type Story = {
   rating: string | null;
   created_at: string;
   updated_at: string;
+
+  main_fandom?: string | null;
+  fandom?: string | null;
+  fandom_name?: string | null;
 };
 
 type PostMedia = {
@@ -70,6 +76,35 @@ type NookPost = {
   comments_count: number;
 };
 
+type ReadingListItem = {
+  id: string;
+  story_id: string;
+  added_at: string;
+  story?: Story | null;
+};
+
+type ReadingList = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  is_public: boolean;
+  created_at: string;
+  items: ReadingListItem[];
+};
+
+type FicClub = {
+  id: string;
+  story_id: string;
+  creator_id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  story?: Story | null;
+  member_count?: number;
+  is_member?: boolean;
+};
+
 type ProfileResponse = {
   user?: User;
   stories?: Story[];
@@ -85,7 +120,28 @@ type FollowResponse = {
   error?: string;
 };
 
-type Tab = 'stories' | 'nook';
+type ReadingListsResponse = {
+  lists?: ReadingList[];
+  error?: string;
+};
+
+type FicClubsResponse = {
+  clubs?: FicClub[];
+  error?: string;
+};
+
+type Tab =
+  | 'stories'
+  | 'nook'
+  | 'lists'
+  | 'clubs';
+
+const TABS: Tab[] = [
+  'stories',
+  'nook',
+  'lists',
+  'clubs',
+];
 
 const LIKE_REACTION = '❤️';
 
@@ -172,6 +228,32 @@ function isSpotifyUrl(url: string) {
   SPOTIFY_URL_REGEX.lastIndex = 0;
 
   return SPOTIFY_URL_REGEX.test(url);
+}
+
+function getStoryFandom(story: Story) {
+  return (
+    story.main_fandom?.trim() ||
+    story.fandom?.trim() ||
+    story.fandom_name?.trim() ||
+    ''
+  );
+}
+
+function isStoryInProgress(
+  status: string | null
+) {
+  if (!status) return false;
+
+  const normalized = status
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+
+  return (
+    normalized.includes('ANDAMENTO') ||
+    normalized.includes('EM ANDAMENTO') ||
+    normalized.includes('ONGOING')
+  );
 }
 
 function CloudIcon({
@@ -335,6 +417,81 @@ function FollowIcon({
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M19 8v6M16 11h6"
+      />
+    </svg>
+  );
+}
+
+function ListIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M5 6h14M5 12h14M5 18h9"
+      />
+    </svg>
+  );
+}
+
+function ClubIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16 20a4 4 0 0 0-8 0"
+      />
+      <circle
+        cx="12"
+        cy="8"
+        r="3"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19 20a3.5 3.5 0 0 0-2.5-3.36M17 5.2a3 3 0 0 1 0 5.6M5 20a3.5 3.5 0 0 1 2.5-3.36M7 5.2a3 3 0 0 0 0 5.6"
+      />
+    </svg>
+  );
+}
+
+function ChevronIcon({
+  direction = 'right',
+}: {
+  direction?: 'left' | 'right';
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d={
+          direction === 'left'
+            ? 'm15 18-6-6 6-6'
+            : 'm9 18 6-6-6-6'
+        }
       />
     </svg>
   );
@@ -1168,6 +1325,331 @@ function PublicPost({
   );
 }
 
+function EmptyState({
+  icon,
+  title,
+  description,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-[#151015] px-6 py-14 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-white/40">
+        {icon}
+      </div>
+
+      <h2 className="mt-5 text-lg font-black">
+        {title}
+      </h2>
+
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/40">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function StoryCard({
+  story,
+  onOpen,
+}: {
+  story: Story;
+  onOpen: () => void;
+}) {
+  const fandom = getStoryFandom(story);
+  const inProgress = isStoryInProgress(
+    story.status
+  );
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group flex w-full overflow-hidden rounded-2xl border border-white/10 bg-[#151015] text-left transition hover:border-white/20 hover:bg-[#191419]"
+    >
+      <div className="relative h-32 w-24 shrink-0 overflow-hidden bg-[#211a21] sm:h-40 sm:w-28">
+        {story.cover_url ? (
+          <img
+            src={story.cover_url}
+            alt=""
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-2xl font-black text-white/20">
+            +
+          </div>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1 p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="line-clamp-2 text-base font-black text-white sm:text-lg">
+            {story.title}
+          </h3>
+
+          {story.status && (
+            <span
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${
+                inProgress
+                  ? 'border border-[#ff78b9]/40 bg-gradient-to-r from-[#ff4f9a] via-[#ff78b9] to-[#ffb3d8] text-[#180d15] shadow-[0_0_18px_rgba(255,120,185,0.45)]'
+                  : 'border border-white/10 bg-white/5 text-white/45'
+              }`}
+            >
+              {story.status}
+            </span>
+          )}
+        </div>
+
+        {story.description && (
+          <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/45">
+            {story.description}
+          </p>
+        )}
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-white/30">
+          {fandom && (
+            <span className="rounded-full border border-[#ff78b9]/20 bg-[#ff78b9]/5 px-2.5 py-1 font-bold text-[#ff9aca]">
+              {fandom}
+            </span>
+          )}
+
+          {story.rating && (
+            <span>
+              Classificação {story.rating}
+            </span>
+          )}
+
+          <span>
+            {formatDate(
+              story.updated_at ||
+                story.created_at
+            )}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function ReadingListCard({
+  list,
+  onStoryOpen,
+}: {
+  list: ReadingList;
+  onStoryOpen: (storyId: string) => void;
+}) {
+  const items = Array.isArray(list.items)
+    ? list.items
+    : [];
+
+  return (
+    <article className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]">
+      <div className="border-b border-white/10 px-5 py-5 sm:px-6">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#ff78b9]/10 text-[#ff9aca]">
+            <ListIcon />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-lg font-black text-white">
+                {list.name}
+              </h3>
+
+              <span className="shrink-0 rounded-full border border-[#ff78b9]/20 bg-[#ff78b9]/5 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#ff9aca]">
+                Pública
+              </span>
+            </div>
+
+            {list.description && (
+              <p className="mt-2 text-sm leading-6 text-white/45">
+                {list.description}
+              </p>
+            )}
+
+            <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">
+              {items.length}{' '}
+              {items.length === 1
+                ? 'história'
+                : 'histórias'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {items.length > 0 ? (
+        <div className="divide-y divide-white/5">
+          {items.map((item) => {
+            const story = item.story;
+
+            if (!story) {
+              return (
+                <div
+                  key={item.id}
+                  className="px-5 py-4 text-sm text-white/30"
+                >
+                  História indisponível
+                </div>
+              );
+            }
+
+            return (
+              <button
+                type="button"
+                key={item.id}
+                onClick={() =>
+                  onStoryOpen(story.id)
+                }
+                className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-white/[0.03]"
+              >
+                <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-[#211a21]">
+                  {story.cover_url ? (
+                    <img
+                      src={story.cover_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs font-black text-white/20">
+                      +
+                    </div>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-black text-white">
+                    {story.title}
+                  </p>
+
+                  <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-white/30">
+                    {getStoryFandom(story) && (
+                      <span>
+                        {getStoryFandom(story)}
+                      </span>
+                    )}
+
+                    {story.status && (
+                      <span>
+                        {story.status}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <ChevronIcon />
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="px-5 py-7 text-center text-sm text-white/30">
+          Esta lista ainda não possui histórias.
+        </div>
+      )}
+    </article>
+  );
+}
+
+function FicClubCard({
+  club,
+  onStoryOpen,
+}: {
+  club: FicClub;
+  onStoryOpen: (storyId: string) => void;
+}) {
+  return (
+    <article className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]">
+      <div className="p-5 sm:p-6">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff78b9]/20 to-[#b77cff]/20 text-[#ff9aca]">
+            <ClubIcon />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-black text-white">
+              {club.name}
+            </h3>
+
+            {club.description && (
+              <p className="mt-2 text-sm leading-6 text-white/45">
+                {club.description}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {club.story && (
+          <button
+            type="button"
+            onClick={() =>
+              onStoryOpen(
+                club.story!.id
+              )
+            }
+            className="mt-5 flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.025] p-3 text-left transition hover:bg-white/[0.05]"
+          >
+            <div className="h-16 w-12 shrink-0 overflow-hidden rounded-xl bg-[#211a21]">
+              {club.story.cover_url ? (
+                <img
+                  src={club.story.cover_url}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-xs font-black text-white/20">
+                  +
+                </div>
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#ff9aca]">
+                Clube da fic
+              </p>
+
+              <p className="mt-1 truncate text-sm font-black text-white">
+                {club.story.title}
+              </p>
+
+              {getStoryFandom(
+                club.story
+              ) && (
+                <p className="mt-1 truncate text-xs text-white/35">
+                  {getStoryFandom(
+                    club.story
+                  )}
+                </p>
+              )}
+            </div>
+
+            <ChevronIcon />
+          </button>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-white/30">
+          {typeof club.member_count ===
+            'number' && (
+            <span>
+              {club.member_count}{' '}
+              {club.member_count === 1
+                ? 'membro'
+                : 'membros'}
+            </span>
+          )}
+
+          {club.is_member && (
+            <span className="rounded-full border border-[#61d6a4]/20 bg-[#61d6a4]/5 px-2.5 py-1 font-bold text-[#8fe3ba]">
+              Você participa
+            </span>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function PublicProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -1190,11 +1672,23 @@ export default function PublicProfilePage() {
   const [posts, setPosts] =
     useState<NookPost[]>([]);
 
+  const [readingLists, setReadingLists] =
+    useState<ReadingList[]>([]);
+
+  const [ficClubs, setFicClubs] =
+    useState<FicClub[]>([]);
+
   const [activeTab, setActiveTab] =
     useState<Tab>('stories');
 
   const [loading, setLoading] =
     useState(true);
+
+  const [listsLoading, setListsLoading] =
+    useState(false);
+
+  const [clubsLoading, setClubsLoading] =
+    useState(false);
 
   const [error, setError] =
     useState('');
@@ -1211,6 +1705,16 @@ export default function PublicProfilePage() {
   const [followLoading, setFollowLoading] =
     useState(false);
 
+  const touchStartX =
+    useRef<number | null>(null);
+
+  const touchStartY =
+    useRef<number | null>(null);
+
+  const tabIndex = TABS.indexOf(
+    activeTab
+  );
+
   useEffect(() => {
     if (
       typeof username !== 'string' ||
@@ -1221,11 +1725,6 @@ export default function PublicProfilePage() {
       return;
     }
 
-    /*
-     * Guardamos o valor validado em uma constante.
-     * Isso impede o TypeScript de tratá-lo novamente
-     * como string | undefined dentro da função async.
-     */
     const safeUsername = username;
 
     async function loadProfile() {
@@ -1308,6 +1807,11 @@ export default function PublicProfilePage() {
             followError
           );
         }
+
+        await Promise.all([
+          loadReadingLists(data.user.id),
+          loadFicClubs(data.user.id),
+        ]);
       } catch (err) {
         console.error(
           'Erro ao carregar perfil público:',
@@ -1319,6 +1823,89 @@ export default function PublicProfilePage() {
         );
       } finally {
         setLoading(false);
+      }
+    }
+
+    async function loadReadingLists(
+      userId: string
+    ) {
+      setListsLoading(true);
+
+      try {
+        const response = await fetch(
+          `/api/reading-lists?user_id=${encodeURIComponent(
+            userId
+          )}&public_only=true`,
+          {
+            cache: 'no-store',
+          }
+        );
+
+        if (!response.ok) {
+          setReadingLists([]);
+          return;
+        }
+
+        const data: ReadingListsResponse =
+          await response.json();
+
+        setReadingLists(
+          Array.isArray(data.lists)
+            ? data.lists.filter(
+                (list) =>
+                  list.is_public === true
+              )
+            : []
+        );
+      } catch (listError) {
+        console.error(
+          'Erro ao carregar listas de leitura:',
+          listError
+        );
+
+        setReadingLists([]);
+      } finally {
+        setListsLoading(false);
+      }
+    }
+
+    async function loadFicClubs(
+      userId: string
+    ) {
+      setClubsLoading(true);
+
+      try {
+        const response = await fetch(
+          `/api/fic-clubs?user_id=${encodeURIComponent(
+            userId
+          )}`,
+          {
+            cache: 'no-store',
+          }
+        );
+
+        if (!response.ok) {
+          setFicClubs([]);
+          return;
+        }
+
+        const data: FicClubsResponse =
+          await response.json();
+
+        setFicClubs(
+          Array.isArray(data.clubs)
+            ? data.clubs
+            : []
+        );
+      } catch (clubError) {
+        console.error(
+          'Erro ao carregar clubes das fic:',
+          clubError
+        );
+
+        setFicClubs([]);
+      } finally {
+        setClubsLoading(false);
       }
     }
 
@@ -1432,6 +2019,77 @@ export default function PublicProfilePage() {
     );
   }
 
+  function goToTab(index: number) {
+    const safeIndex = Math.max(
+      0,
+      Math.min(TABS.length - 1, index)
+    );
+
+    setActiveTab(TABS[safeIndex]);
+  }
+
+  function handleTouchStart(
+    event: TouchEvent<HTMLDivElement>
+  ) {
+    const touch = event.touches[0];
+
+    touchStartX.current = touch.clientX;
+    touchStartY.current = touch.clientY;
+  }
+
+  function handleTouchEnd(
+    event: TouchEvent<HTMLDivElement>
+  ) {
+    if (
+      touchStartX.current === null ||
+      touchStartY.current === null
+    ) {
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+
+    const deltaX =
+      touch.clientX -
+      touchStartX.current;
+
+    const deltaY =
+      touch.clientY -
+      touchStartY.current;
+
+    touchStartX.current = null;
+    touchStartY.current = null;
+
+    /*
+     * Só tratamos como swipe quando o movimento
+     * é claramente horizontal.
+     *
+     * Isso evita trocar de aba enquanto o usuário
+     * simplesmente está rolando a página para cima
+     * ou para baixo.
+     */
+    if (
+      Math.abs(deltaX) < 55 ||
+      Math.abs(deltaX) <= Math.abs(deltaY)
+    ) {
+      return;
+    }
+
+    if (deltaX < 0) {
+      goToTab(tabIndex + 1);
+    } else {
+      goToTab(tabIndex - 1);
+    }
+  }
+
+  function openStory(storyId: string) {
+    router.push(
+      `/historia/${encodeURIComponent(
+        storyId
+      )}`
+    );
+  }
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#0d0a0d] text-white">
@@ -1502,9 +2160,12 @@ export default function PublicProfilePage() {
           <div
             className="relative h-44 overflow-hidden sm:h-60"
             style={{
-              backgroundColor:
-                user.theme_color ||
-                '#241924',
+              /*
+               * O theme_color NÃO é usado aqui.
+               * A cor de perfil deve permanecer privada
+               * e individual para o próprio usuário.
+               */
+              backgroundColor: '#241924',
             }}
           >
             {user.cover_url ? (
@@ -1606,152 +2267,120 @@ export default function PublicProfilePage() {
           </div>
         </section>
 
-        <div className="mt-5 rounded-2xl border border-white/10 bg-[#151015] p-1.5">
-          <div className="grid grid-cols-2 gap-1">
-            <button
-              type="button"
-              onClick={() =>
-                setActiveTab('stories')
-              }
-              className={`rounded-xl px-4 py-3 text-sm font-black transition ${
-                activeTab === 'stories'
-                  ? 'bg-white text-black'
-                  : 'text-white/45 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              Histórias
-            </button>
+        {/* =========================================================
+            NAVEGAÇÃO DAS 4 ABAS
+           ========================================================= */}
 
-            <button
-              type="button"
-              onClick={() =>
-                setActiveTab('nook')
-              }
-              className={`rounded-xl px-4 py-3 text-sm font-black transition ${
-                activeTab === 'nook'
-                  ? 'bg-white text-black'
-                  : 'text-white/45 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              Mural
-            </button>
+        <div className="mt-5 rounded-2xl border border-white/10 bg-[#151015] p-1.5">
+          <div className="grid grid-cols-4 gap-1">
+            {TABS.map((tab) => {
+              const active =
+                activeTab === tab;
+
+              const label =
+                tab === 'stories'
+                  ? 'Histórias'
+                  : tab === 'nook'
+                    ? 'Mural'
+                    : tab === 'lists'
+                      ? 'Listas'
+                      : 'Clubes';
+
+              return (
+                <button
+                  type="button"
+                  key={tab}
+                  onClick={() =>
+                    setActiveTab(tab)
+                  }
+                  className={`min-w-0 rounded-xl px-1.5 py-3 text-[10px] font-black uppercase tracking-wide transition sm:px-3 sm:text-xs ${
+                    active
+                      ? 'bg-white text-black'
+                      : 'text-white/40 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <span className="hidden sm:inline">
+                    {label}
+                  </span>
+
+                  <span className="sm:hidden">
+                    {tab === 'stories'
+                      ? 'Fic'
+                      : tab === 'nook'
+                        ? 'Mural'
+                        : tab === 'lists'
+                          ? 'Listas'
+                          : 'Clubes'}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <section className="mt-5">
-          {activeTab === 'stories' && (
-            <>
+        {/* =========================================================
+            ÁREA DESLIZÁVEL
+           ========================================================= */}
+
+        <div
+          className="mt-5 overflow-hidden"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div
+            className="flex w-[400%] transition-transform duration-300 ease-out"
+            style={{
+              transform: `translateX(-${
+                tabIndex * 25
+              }%)`,
+            }}
+          >
+            {/* =====================================================
+                HISTÓRIAS
+               ===================================================== */}
+
+            <section className="w-1/4 shrink-0 px-0">
               {stories.length === 0 ? (
-                <div className="rounded-3xl border border-white/10 bg-[#151015] px-6 py-14 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
-                    <span className="text-lg font-black text-white/40">
+                <EmptyState
+                  icon={
+                    <span className="text-lg font-black">
                       +
                     </span>
-                  </div>
-
-                  <h2 className="mt-4 text-lg font-black">
-                    Nenhuma história ainda
-                  </h2>
-
-                  <p className="mt-2 text-sm text-white/40">
-                    {getDisplayName(user)} ainda não publicou nenhuma história.
-                  </p>
-                </div>
+                  }
+                  title="Nenhuma história ainda"
+                  description={`${getDisplayName(user)} ainda não publicou nenhuma história.`}
+                />
               ) : (
                 <div className="w-full max-w-3xl space-y-3">
                   {stories.map((story) => (
-                    <button
-                      type="button"
+                    <StoryCard
                       key={story.id}
-                      onClick={() =>
-                        router.push(
-                          `/historia/${story.id}`
-                        )
+                      story={story}
+                      onOpen={() =>
+                        openStory(story.id)
                       }
-                      className="group flex w-full overflow-hidden rounded-2xl border border-white/10 bg-[#151015] text-left transition hover:border-white/20 hover:bg-[#191419]"
-                    >
-                      <div className="relative h-32 w-24 shrink-0 overflow-hidden bg-[#211a21] sm:h-36 sm:w-28">
-                        {story.cover_url ? (
-                          <img
-                            src={story.cover_url}
-                            alt=""
-                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-2xl font-black text-white/20">
-                            +
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1 p-4 sm:p-5">
-                        <div className="flex items-start justify-between gap-3">
-                          <h3 className="line-clamp-2 text-base font-black text-white sm:text-lg">
-                            {story.title}
-                          </h3>
-
-                          {story.status && (
-                            <span
-                              className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${
-                                story.status
-                                  .toUpperCase()
-                                  .includes(
-                                    'ANDAMENTO'
-                                  )
-                                  ? 'bg-[#ff78b9] text-[#180d15]'
-                                  : 'border border-white/10 bg-white/5 text-white/45'
-                              }`}
-                            >
-                              {story.status}
-                            </span>
-                          )}
-                        </div>
-
-                        {story.description && (
-                          <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/45">
-                            {story.description}
-                          </p>
-                        )}
-
-                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-white/30">
-                          <span>
-                            {story.rating
-                              ? `Classificação ${story.rating}`
-                              : 'História'}
-                          </span>
-
-                          <span>
-                            {formatDate(
-                              story.updated_at ||
-                                story.created_at
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
+                    />
                   ))}
                 </div>
               )}
-            </>
-          )}
+            </section>
 
-          {activeTab === 'nook' && (
-            <>
+            {/* =====================================================
+                MURAL
+               ===================================================== */}
+
+            <section className="w-1/4 shrink-0 px-0">
               {posts.length === 0 ? (
-                <div className="mx-auto max-w-2xl rounded-3xl border border-white/10 bg-[#151015] px-6 py-14 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
-                    <span className="text-lg font-black text-white/40">
-                      +
-                    </span>
-                  </div>
-
-                  <h2 className="mt-4 text-lg font-black">
-                    Nenhuma publicação ainda
-                  </h2>
-
-                  <p className="mt-2 text-sm text-white/40">
-                    {getDisplayName(user)} ainda não publicou nada no Mural.
-                  </p>
+                <div className="mx-auto max-w-2xl">
+                  <EmptyState
+                    icon={
+                      <span className="text-lg font-black">
+                        +
+                      </span>
+                    }
+                    title="Nenhuma publicação ainda"
+                    description={`${getDisplayName(user)} ainda não publicou nada no Mural.`}
+                  />
                 </div>
               ) : (
                 <div className="mx-auto w-full max-w-2xl space-y-4">
@@ -1765,9 +2394,139 @@ export default function PublicProfilePage() {
                   ))}
                 </div>
               )}
-            </>
-          )}
-        </section>
+            </section>
+
+            {/* =====================================================
+                LISTAS DE LEITURAS
+               ===================================================== */}
+
+            <section className="w-1/4 shrink-0 px-0">
+              {listsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2].map((item) => (
+                    <div
+                      key={item}
+                      className="h-40 animate-pulse rounded-3xl border border-white/10 bg-[#151015]"
+                    />
+                  ))}
+                </div>
+              ) : readingLists.length === 0 ? (
+                <EmptyState
+                  icon={<ListIcon />}
+                  title="Nenhuma lista pública"
+                  description={`${getDisplayName(user)} ainda não possui listas de leitura públicas.`}
+                />
+              ) : (
+                <div className="mx-auto w-full max-w-3xl space-y-4">
+                  {readingLists.map(
+                    (list) => (
+                      <ReadingListCard
+                        key={list.id}
+                        list={list}
+                        onStoryOpen={
+                          openStory
+                        }
+                      />
+                    )
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* =====================================================
+                CLUBES DAS FIC
+               ===================================================== */}
+
+            <section className="w-1/4 shrink-0 px-0">
+              {clubsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2].map((item) => (
+                    <div
+                      key={item}
+                      className="h-44 animate-pulse rounded-3xl border border-white/10 bg-[#151015]"
+                    />
+                  ))}
+                </div>
+              ) : ficClubs.length === 0 ? (
+                <EmptyState
+                  icon={<ClubIcon />}
+                  title="Nenhum clube ainda"
+                  description={`${getDisplayName(user)} ainda não participa de nenhum Clube da Fic.`}
+                />
+              ) : (
+                <div className="mx-auto w-full max-w-3xl space-y-4">
+                  {ficClubs.map(
+                    (club) => (
+                      <FicClubCard
+                        key={club.id}
+                        club={club}
+                        onStoryOpen={
+                          openStory
+                        }
+                      />
+                    )
+                  )}
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+
+        {/* =========================================================
+            INDICADOR DE SWIPE
+           ========================================================= */}
+
+        <div className="mt-5 flex items-center justify-center gap-2">
+          {TABS.map((tab, index) => (
+            <button
+              key={tab}
+              type="button"
+              aria-label={`Ir para aba ${
+                index + 1
+              }`}
+              onClick={() =>
+                goToTab(index)
+              }
+              className={`h-1.5 rounded-full transition-all ${
+                index === tabIndex
+                  ? 'w-7 bg-[#ff78b9]'
+                  : 'w-1.5 bg-white/20'
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* =========================================================
+            SETAS NO DESKTOP
+           ========================================================= */}
+
+        <div className="mt-4 hidden items-center justify-center gap-2 sm:flex">
+          <button
+            type="button"
+            onClick={() =>
+              goToTab(tabIndex - 1)
+            }
+            disabled={tabIndex === 0}
+            className="flex items-center gap-1 rounded-xl border border-white/10 bg-[#151015] px-3 py-2 text-xs font-bold text-white/40 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-20"
+          >
+            <ChevronIcon direction="left" />
+            Anterior
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              goToTab(tabIndex + 1)
+            }
+            disabled={
+              tabIndex === TABS.length - 1
+            }
+            className="flex items-center gap-1 rounded-xl border border-white/10 bg-[#151015] px-3 py-2 text-xs font-bold text-white/40 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-20"
+          >
+            Próxima
+            <ChevronIcon />
+          </button>
+        </div>
       </div>
     </main>
   );
