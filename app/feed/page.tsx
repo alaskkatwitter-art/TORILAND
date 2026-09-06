@@ -3247,12 +3247,14 @@ export default function FeedPage() {
           STORY VIEWER
       ================================================= */}
 
-      <StoryViewer
-        story={activeStory}
-        onClose={() =>
-          setActiveStory(null)
-        }
-      />
+     <StoryViewer
+  story={activeStory}
+  stories={stories}
+  onSelect={setActiveStory}
+  onClose={() =>
+    setActiveStory(null)
+  }
+/>
 
       <div
         className={`relative min-h-screen w-full px-4 pb-20 pt-4 transition-all duration-300 sm:px-6 lg:px-8 lg:pt-6 ${
