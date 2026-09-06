@@ -8,6 +8,7 @@ import {
 } from 'react';
 import Link from 'next/link';
 import NookPostComposer from '@/components/NookPostComposer';
+import StoryComposer from '@/components/StoryComposer';
 
 /* =========================================================
    TIPOS
@@ -249,7 +250,7 @@ function ChevronRightIcon() {
       className="h-4 w-4"
       aria-hidden="true"
     >
-      <path d="m9 18 6-6-6-6" />
+      <path d="m9 18 6-6 6" />
     </svg>
   );
 }
@@ -453,7 +454,6 @@ function UsersIcon() {
       stroke="currentColor"
       strokeWidth="1.7"
       strokeLinecap="round"
-      strokeLinejoin="round"
       className="h-5 w-5"
       aria-hidden="true"
     >
@@ -580,9 +580,11 @@ function Avatar({
 function StoriesRow({
   stories,
   onOpen,
+  onCreateStory,
 }: {
   stories: UserStory[];
   onOpen: (story: UserStory) => void;
+  onCreateStory: () => void;
 }) {
   const groupedStories = useMemo(() => {
     const map = new Map<string, UserStory>();
@@ -618,32 +620,50 @@ function StoriesRow({
       </div>
 
       <div className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {groupedStories.length === 0 ? (
-          <div className="flex min-h-[92px] items-center text-xs text-white/30">
-            Ainda não há stories de quem você segue.
+        <button
+          type="button"
+          onClick={onCreateStory}
+          className="group flex w-[72px] shrink-0 flex-col items-center"
+        >
+          <div className="rounded-full border-2 border-dashed border-[#ff78b9]/35 p-[3px] transition group-hover:border-[#ff78b9]/70">
+            <div className="flex h-[60px] w-[60px] items-center justify-center rounded-full bg-[#ff78b9]/[0.07] transition group-hover:bg-[#ff78b9]/[0.12]">
+              <span className="text-3xl font-light leading-none text-[#ff78b9]">
+                +
+              </span>
+            </div>
           </div>
-        ) : (
-          groupedStories.map((story) => (
-            <button
-              key={story.user_id}
-              type="button"
-              onClick={() => onOpen(story)}
-              className="group flex w-[72px] shrink-0 flex-col items-center"
-            >
-              <div className="rounded-full bg-gradient-to-br from-[#ff4d9d] via-[#ff78b9] to-[#c63dff] p-[2px] shadow-[0_0_18px_rgba(255,120,185,0.18)]">
-                <div className="rounded-full bg-[#100c11] p-[2px]">
-                  <Avatar
-                    profile={story.user}
-                    size="large"
-                  />
-                </div>
-              </div>
 
-              <p className="mt-2 w-full truncate text-center text-[10px] font-semibold text-white/55 transition group-hover:text-white">
-                @{story.user.username}
-              </p>
-            </button>
-          ))
+          <p className="mt-2 w-full truncate text-center text-[10px] font-bold text-white/45 transition group-hover:text-[#ff78b9]">
+            Seu Story
+          </p>
+        </button>
+
+        {groupedStories.map((story) => (
+          <button
+            key={story.user_id}
+            type="button"
+            onClick={() => onOpen(story)}
+            className="group flex w-[72px] shrink-0 flex-col items-center"
+          >
+            <div className="rounded-full bg-gradient-to-br from-[#ff4d9d] via-[#ff78b9] to-[#c63dff] p-[2px] shadow-[0_0_18px_rgba(255,120,185,0.18)]">
+              <div className="rounded-full bg-[#100c11] p-[2px]">
+                <Avatar
+                  profile={story.user}
+                  size="large"
+                />
+              </div>
+            </div>
+
+            <p className="mt-2 w-full truncate text-center text-[10px] font-semibold text-white/55 transition group-hover:text-white">
+              @{story.user.username}
+            </p>
+          </button>
+        ))}
+
+        {groupedStories.length === 0 && (
+          <div className="flex min-h-[92px] items-center px-2 text-xs text-white/30">
+            Seja a primeira pessoa a publicar um Story.
+          </div>
         )}
       </div>
     </section>
@@ -2625,6 +2645,11 @@ export default function FeedPage() {
   ] = useState(false);
 
   const [
+    storyComposerOpen,
+    setStoryComposerOpen,
+  ] = useState(false);
+
+  const [
     upcomingUpdates,
     setUpcomingUpdates,
   ] = useState<
@@ -2737,10 +2762,6 @@ export default function FeedPage() {
 
   /* =======================================================
      STORIES
-     
-     O endpoint é opcional por enquanto.
-     Se ele ainda não existir, a Home continua funcionando
-     normalmente e simplesmente não mostra stories.
   ======================================================= */
 
   const loadStories =
@@ -3105,6 +3126,9 @@ export default function FeedPage() {
           <StoriesRow
             stories={stories}
             onOpen={setActiveStory}
+            onCreateStory={() =>
+              setStoryComposerOpen(true)
+            }
           />
 
           {/* =================================================
@@ -3391,6 +3415,21 @@ export default function FeedPage() {
           loadFeed(true);
           loadStories();
           loadUpcomingUpdates();
+        }}
+      />
+
+      {/* =====================================================
+          NOVO STORY
+      ===================================================== */}
+
+      <StoryComposer
+        open={storyComposerOpen}
+        onClose={() =>
+          setStoryComposerOpen(false)
+        }
+        onPublished={() => {
+          setStoryComposerOpen(false);
+          loadStories();
         }}
       />
     </main>
