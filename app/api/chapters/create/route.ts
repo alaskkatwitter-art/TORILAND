@@ -57,7 +57,10 @@ export async function POST(request: Request) {
       );
     }
 
-    if (new Date(session.expires_at) < new Date()) {
+    if (
+      session.expires_at &&
+      new Date(session.expires_at) < new Date()
+    ) {
       return NextResponse.json(
         { error: 'Sessão inválida ou expirada.' },
         { status: 401 }
@@ -66,9 +69,20 @@ export async function POST(request: Request) {
 
     const data = await request.json();
 
-    const storyId = data.story_id;
-    const title = data.title?.trim();
-    const chapterBody = data.body?.trim();
+    const storyId =
+      typeof data.story_id === 'string'
+        ? data.story_id.trim()
+        : '';
+
+    const title =
+      typeof data.title === 'string'
+        ? data.title.trim()
+        : '';
+
+    const chapterBody =
+      typeof data.body === 'string'
+        ? data.body.trim()
+        : '';
 
     const publishMode =
       data.publish_mode === 'schedule'
@@ -111,23 +125,19 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Se for agendamento, precisamos obrigatoriamente
-     * receber uma data.
-     */
-    if (publishMode === 'schedule' && !scheduledFor) {
-      return NextResponse.json(
-        {
-          error:
-            'Escolha uma data e horário para agendar o capítulo.',
-        },
-        { status: 400 }
-      );
-    }
-
     let scheduledDate: Date | null = null;
 
-    if (publishMode === 'schedule' && scheduledFor) {
+    if (publishMode === 'schedule') {
+      if (!scheduledFor) {
+        return NextResponse.json(
+          {
+            error:
+              'Escolha uma data e horário para agendar o capítulo.',
+          },
+          { status: 400 }
+        );
+      }
+
       scheduledDate = new Date(scheduledFor);
 
       if (Number.isNaN(scheduledDate.getTime())) {
@@ -152,7 +162,8 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Verifica se a história pertence ao usuário.
+     * Verifica se a história existe
+     * e pertence ao usuário logado.
      */
     const { data: story, error: storyError } =
       await supabase
@@ -161,7 +172,22 @@ export async function POST(request: Request) {
         .eq('id', storyId)
         .maybeSingle();
 
-    if (storyError || !story) {
+    if (storyError) {
+      console.error(
+        'Erro ao buscar história:',
+        storyError
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            'Não foi possível verificar a história.',
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!story) {
       return NextResponse.json(
         { error: 'História não encontrada.' },
         { status: 404 }
@@ -208,15 +234,14 @@ export async function POST(request: Request) {
     }
 
     const chapterNumber = lastChapter
-      ? lastChapter.chapter_number + 1
+      ? Number(lastChapter.chapter_number) + 1
       : 1;
 
     /*
-     * Se publicar agora:
-     * published = true
+     * Cria o capítulo.
      *
-     * Se agendar:
-     * published = false
+     * IMPORTANTE:
+     * O campo correto é "title", e não "tittle".
      */
     const { data: chapter, error: chapterError } =
       await supabase
@@ -224,7 +249,7 @@ export async function POST(request: Request) {
         .insert({
           story_id: storyId,
           chapter_number: chapterNumber,
-          tittle: title,
+          title,
           body: chapterBody,
           published: publishMode === 'now',
         })
@@ -248,7 +273,7 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Se foi agendado, cria o registro
+     * Se for agendamento, cria o registro
      * na tabela scheduled_chapters.
      */
     if (
@@ -271,8 +296,9 @@ export async function POST(request: Request) {
         );
 
         /*
-         * Se o agendamento falhar, apagamos o capítulo
-         * para não deixar um capítulo "perdido".
+         * Se o agendamento falhar, remove
+         * o capítulo para não deixar registro
+         * incompleto no banco.
          */
         await supabase
           .from('chapters')
