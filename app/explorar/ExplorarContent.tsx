@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const fandoms = [
   'House of the Dragon',
@@ -23,17 +24,124 @@ const genres = [
   'Ficção',
 ];
 
+type ExploreUser = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+};
+
+type ExploreStory = {
+  id: string;
+  title: string;
+  description: string | null;
+  cover_url: string | null;
+  status: string | null;
+  rating: string | null;
+  author: ExploreUser | null;
+};
+
+type ExploreResults = {
+  users: ExploreUser[];
+  stories: ExploreStory[];
+};
+
 export default function ExplorarContent() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
 
-  const query = searchParams.get('q') || '';
+  const urlQuery = searchParams.get('q') || '';
   const selectedFandom = searchParams.get('fandom') || '';
   const selectedGenre = searchParams.get('genre') || '';
 
+  const [searchValue, setSearchValue] = useState(urlQuery);
+  const [results, setResults] = useState<ExploreResults>({
+    users: [],
+    stories: [],
+  });
+  const [loadingResults, setLoadingResults] = useState(false);
+  const [searchError, setSearchError] = useState('');
+
+  useEffect(() => {
+    setSearchValue(urlQuery);
+  }, [urlQuery]);
+
+  useEffect(() => {
+    const value = urlQuery.trim();
+
+    if (!value) {
+      setResults({
+        users: [],
+        stories: [],
+      });
+      setLoadingResults(false);
+      setSearchError('');
+      return;
+    }
+
+    let cancelled = false;
+
+    async function search() {
+      try {
+        setLoadingResults(true);
+        setSearchError('');
+
+        const response = await fetch(
+          `/api/explore?q=${encodeURIComponent(value)}`,
+          {
+            cache: 'no-store',
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || 'Não foi possível realizar a busca.');
+        }
+
+        if (!cancelled) {
+          setResults({
+            users: Array.isArray(data?.users) ? data.users : [],
+            stories: Array.isArray(data?.stories) ? data.stories : [],
+          });
+        }
+      } catch (error) {
+        console.error('ERRO NA BUSCA DO EXPLORAR:', error);
+
+        if (!cancelled) {
+          setResults({
+            users: [],
+            stories: [],
+          });
+
+          setSearchError(
+            error instanceof Error
+              ? error.message
+              : 'Não foi possível realizar a busca.'
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingResults(false);
+        }
+      }
+    }
+
+    search();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [urlQuery]);
+
   function updateSearch(value: string) {
+    setSearchValue(value);
+
     const params = new URLSearchParams(searchParams.toString());
+
+    params.delete('fandom');
+    params.delete('genre');
 
     if (value.trim()) {
       params.set('q', value);
@@ -41,7 +149,9 @@ export default function ExplorarContent() {
       params.delete('q');
     }
 
-    router.replace(`${pathname}?${params.toString()}`);
+    const queryString = params.toString();
+
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
   }
 
   function selectFandom(fandom: string) {
@@ -78,7 +188,12 @@ export default function ExplorarContent() {
     router.push(queryString ? `${pathname}?${queryString}` : pathname);
   }
 
-  const hasFilters = Boolean(query || selectedFandom || selectedGenre);
+  const hasFilters = Boolean(
+    urlQuery || selectedFandom || selectedGenre
+  );
+
+  const hasSearchResults =
+    results.users.length > 0 || results.stories.length > 0;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#100b12] text-white">
@@ -141,21 +256,184 @@ export default function ExplorarContent() {
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-7 text-white/50 md:text-lg">
-            Explore histórias por fandom, gênero ou palavra-chave e descubra
-            novos universos para acompanhar.
+            Explore histórias, autores e novos universos para acompanhar.
           </p>
 
           <div className="mt-9 flex items-center rounded-2xl border border-white/10 bg-[#191219] px-5 py-4 transition focus-within:border-[#ff78b9]/30 focus-within:bg-[#1d141c]">
             <SearchIcon />
 
             <input
-              value={query}
+              value={searchValue}
               onChange={(event) => updateSearch(event.target.value)}
-              placeholder="Pesquisar histórias, autores, fandoms ou gêneros..."
+              placeholder="Pesquisar histórias ou autores..."
               className="ml-3 w-full bg-transparent text-sm outline-none placeholder:text-white/30"
             />
+
+            {loadingResults && (
+              <div className="ml-3 h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/10 border-t-[#ff78b9]" />
+            )}
           </div>
         </section>
+
+        {urlQuery && (
+          <section className="relative pb-14">
+            <div className="mb-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
+                Resultados
+              </p>
+
+              <h2 className="mt-2 text-3xl font-black">
+                Busca por “{urlQuery}”
+              </h2>
+            </div>
+
+            {searchError ? (
+              <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-6 text-sm text-red-200">
+                {searchError}
+              </div>
+            ) : loadingResults ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="h-28 animate-pulse rounded-2xl border border-white/5 bg-white/[0.025]" />
+                <div className="h-28 animate-pulse rounded-2xl border border-white/5 bg-white/[0.025]" />
+              </div>
+            ) : !hasSearchResults ? (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-8 text-center">
+                <p className="text-lg font-bold">
+                  Nenhum resultado encontrado.
+                </p>
+
+                <p className="mt-2 text-sm text-white/40">
+                  Tente pesquisar outro username ou título de história.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-10">
+                {results.users.length > 0 && (
+                  <div>
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-xl font-bold">Usuários</h3>
+
+                      <span className="text-xs text-white/30">
+                        {results.users.length}{' '}
+                        {results.users.length === 1
+                          ? 'resultado'
+                          : 'resultados'}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {results.users.map((user) => (
+                        <Link
+                          key={user.id}
+                          href={`/perfil/${encodeURIComponent(
+                            user.username
+                          )}`}
+                          className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.025] p-4 transition hover:-translate-y-0.5 hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/5"
+                        >
+                          <Avatar
+                            src={user.avatar_url}
+                            name={user.display_name || user.username}
+                          />
+
+                          <div className="min-w-0">
+                            <p className="truncate font-bold transition group-hover:text-[#ff9bca]">
+                              {user.display_name || user.username}
+                            </p>
+
+                            <p className="truncate text-sm text-white/35">
+                              @{user.username}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {results.stories.length > 0 && (
+                  <div>
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-xl font-bold">Histórias</h3>
+
+                      <span className="text-xs text-white/30">
+                        {results.stories.length}{' '}
+                        {results.stories.length === 1
+                          ? 'resultado'
+                          : 'resultados'}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {results.stories.map((story) => (
+                        <Link
+                          key={story.id}
+                          href={`/historia/${story.id}`}
+                          className="group overflow-hidden rounded-2xl border border-white/10 bg-[#171018] transition hover:-translate-y-0.5 hover:border-[#ff78b9]/30"
+                        >
+                          <div className="flex min-h-36">
+                            <div className="w-28 shrink-0 overflow-hidden bg-[#21151e]">
+                              {story.cover_url ? (
+                                <img
+                                  src={story.cover_url}
+                                  alt=""
+                                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                                />
+                              ) : (
+                                <div className="flex h-full min-h-36 items-center justify-center bg-gradient-to-br from-[#4d203c] to-[#1a1016]">
+                                  <CloudLogo small />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="min-w-0 flex-1 p-5">
+                              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#ff78b9]">
+                                História
+                              </p>
+
+                              <h4 className="mt-2 line-clamp-2 text-lg font-black transition group-hover:text-[#ff9bca]">
+                                {story.title}
+                              </h4>
+
+                              {story.author && (
+                                <p className="mt-2 text-sm text-white/40">
+                                  por{' '}
+                                  <span className="text-white/60">
+                                    {story.author.display_name ||
+                                      story.author.username}
+                                  </span>
+                                </p>
+                              )}
+
+                              {story.description && (
+                                <p className="mt-3 line-clamp-2 text-sm leading-6 text-white/35">
+                                  {story.description}
+                                </p>
+                              )}
+
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                {story.rating && (
+                                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/40">
+                                    {story.rating}
+                                  </span>
+                                )}
+
+                                {story.status && (
+                                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/40">
+                                    {story.status}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="relative pb-14">
           <div className="mb-6 flex flex-col gap-2">
@@ -279,6 +557,30 @@ export default function ExplorarContent() {
   );
 }
 
+function Avatar({
+  src,
+  name,
+}: {
+  src: string | null;
+  name: string;
+}) {
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt=""
+        className="h-12 w-12 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ff68ae] to-[#ff91c4] text-sm font-black text-[#180d15]">
+      {name.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
 function NavLink({
   href,
   label,
@@ -378,11 +680,15 @@ function CategoryCard({
   );
 }
 
-function CloudLogo() {
+function CloudLogo({
+  small = false,
+}: {
+  small?: boolean;
+}) {
   return (
     <svg
-      width="48"
-      height="32"
+      width={small ? 34 : 48}
+      height={small ? 24 : 32}
       viewBox="0 0 180 105"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
