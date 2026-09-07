@@ -396,7 +396,7 @@ export default function HistoriaPage() {
                     if (!story) return;
 
                     router.push(
-                      `/escrever?id=${story.id}`
+                      `/editar-historia/${story.id}`
                     );
                   }}
                   className="rounded-xl border border-pink-400/30 bg-pink-500/10 px-5 py-3 text-sm font-medium text-pink-300 transition hover:border-pink-400/50 hover:bg-pink-500/20"
