@@ -82,7 +82,9 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/");
+      // Login realizado com sucesso:
+      // envia o usuário diretamente para o Feed.
+      router.push("/feed");
       router.refresh();
     } catch {
       setError("Não foi possível conectar ao Nooklie.");
