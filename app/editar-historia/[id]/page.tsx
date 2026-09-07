@@ -20,12 +20,6 @@ type Tag = {
   name: string;
 };
 
-type PublicationStatus =
-  | 'draft'
-  | 'scheduled'
-  | 'published'
-  | 'unpublished';
-
 type StoryChapter = {
   id: string;
   chapter_number: number;
@@ -33,7 +27,11 @@ type StoryChapter = {
   published: boolean;
   scheduled_for: string | null;
   is_scheduled: boolean;
-  publication_status?: PublicationStatus;
+  publication_status?:
+    | 'draft'
+    | 'scheduled'
+    | 'published'
+    | 'unpublished';
 };
 
 type Story = {
@@ -52,7 +50,6 @@ type ChapterMedia = {
   id: string;
   media_url: string;
   media_type: 'image' | 'gif';
-  position?: number;
   created_at?: string;
 };
 
@@ -65,7 +62,11 @@ type Chapter = {
   published: boolean;
   created_at: string;
   updated_at?: string | null;
-  publication_status: PublicationStatus;
+  publication_status:
+    | 'draft'
+    | 'scheduled'
+    | 'published'
+    | 'unpublished';
   original_published_at: string | null;
   republished_at: string | null;
   author_notes: string;
@@ -160,7 +161,7 @@ function getLocalDateTimeInputMin() {
 }
 
 function getStatusLabel(
-  status: PublicationStatus,
+  status: Chapter['publication_status'],
   published?: boolean
 ) {
   if (status === 'scheduled') {
@@ -179,7 +180,7 @@ function getStatusLabel(
 }
 
 function getStatusClass(
-  status: PublicationStatus,
+  status: Chapter['publication_status'],
   published?: boolean
 ) {
   if (status === 'scheduled') {
@@ -222,11 +223,8 @@ function sanitizeHtml(html: string) {
     .forEach((element) => {
       Array.from(element.attributes).forEach(
         (attribute) => {
-          const name =
-            attribute.name.toLowerCase();
-
-          const value =
-            attribute.value.trim();
+          const name = attribute.name.toLowerCase();
+          const value = attribute.value.trim();
 
           if (name.startsWith('on')) {
             element.removeAttribute(attribute.name);
@@ -250,11 +248,7 @@ function sanitizeHtml(html: string) {
   documentNode
     .querySelectorAll('a')
     .forEach((anchor) => {
-      anchor.setAttribute(
-        'target',
-        '_blank'
-      );
-
+      anchor.setAttribute('target', '_blank');
       anchor.setAttribute(
         'rel',
         'noopener noreferrer nofollow'
@@ -334,7 +328,9 @@ export default function EditarHistoriaPage() {
     useState('');
 
   const [chapterStatus, setChapterStatus] =
-    useState<PublicationStatus>('draft');
+    useState<Chapter['publication_status']>(
+      'draft'
+    );
 
   const [scheduledFor, setScheduledFor] =
     useState('');
@@ -375,18 +371,13 @@ export default function EditarHistoriaPage() {
   function saveSelection() {
     if (!editorRef.current) return;
 
-    const selection =
-      window.getSelection();
+    const selection = window.getSelection();
 
-    if (
-      !selection ||
-      selection.rangeCount === 0
-    ) {
+    if (!selection || selection.rangeCount === 0) {
       return;
     }
 
-    const range =
-      selection.getRangeAt(0);
+    const range = selection.getRangeAt(0);
 
     if (
       editorRef.current.contains(
@@ -399,17 +390,13 @@ export default function EditarHistoriaPage() {
   }
 
   function restoreSelection() {
-    if (!savedSelectionRef.current) {
-      return;
-    }
+    if (!savedSelectionRef.current) return;
 
-    const selection =
-      window.getSelection();
+    const selection = window.getSelection();
 
     if (!selection) return;
 
     selection.removeAllRanges();
-
     selection.addRange(
       savedSelectionRef.current
     );
@@ -436,16 +423,14 @@ export default function EditarHistoriaPage() {
       setError('');
 
       try {
-        const response =
-          await fetch(
-            `/api/stories/${id}`,
-            {
-              cache: 'no-store',
-            }
-          );
+        const response = await fetch(
+          `/api/stories/${id}`,
+          {
+            cache: 'no-store',
+          }
+        );
 
-        const data =
-          await response.json();
+        const data = await response.json();
 
         if (!response.ok) {
           throw new Error(
@@ -470,13 +455,10 @@ export default function EditarHistoriaPage() {
             loadedStory.chapters
           )
             ? loadedStory.chapters.map(
-                (
-                  item: StoryChapter
-                ) => ({
+                (item: StoryChapter) => ({
                   ...item,
                   scheduled_for:
-                    item.scheduled_for ||
-                    null,
+                    item.scheduled_for || null,
                   is_scheduled:
                     item.is_scheduled ||
                     item.publication_status ===
@@ -485,49 +467,40 @@ export default function EditarHistoriaPage() {
               )
             : [];
 
-        const normalizedStory: Story =
-          {
-            ...loadedStory,
-            chapters:
-              normalizedChapters,
-            tags:
-              Array.isArray(
-                loadedStory.tags
-              )
-                ? loadedStory.tags
-                : [],
-          };
+        const normalizedStory: Story = {
+          ...loadedStory,
+          chapters:
+            normalizedChapters,
+          tags: Array.isArray(
+            loadedStory.tags
+          )
+            ? loadedStory.tags
+            : [],
+        };
 
         storyRef.current =
           normalizedStory;
 
-        setStory(
-          normalizedStory
-        );
+        setStory(normalizedStory);
 
         setTitle(
-          normalizedStory.title ||
-            ''
+          normalizedStory.title || ''
         );
 
         setDescription(
-          normalizedStory.description ||
-            ''
+          normalizedStory.description || ''
         );
 
         setStatus(
-          normalizedStory.status ||
-            ''
+          normalizedStory.status || ''
         );
 
         setRating(
-          normalizedStory.rating ||
-            ''
+          normalizedStory.rating || ''
         );
 
         setGenre(
-          normalizedStory.genre ||
-            ''
+          normalizedStory.genre || ''
         );
 
         setTags(
@@ -540,14 +513,11 @@ export default function EditarHistoriaPage() {
         );
 
         setCoverPreview(
-          normalizedStory.cover_url ||
-            null
+          normalizedStory.cover_url || null
         );
 
         const requestedChapter =
-          searchParams.get(
-            'chapter'
-          );
+          searchParams.get('chapter');
 
         if (
           requestedChapter &&
@@ -563,9 +533,7 @@ export default function EditarHistoriaPage() {
         } else if (
           requestedChapter
         ) {
-          setSelectedChapterId(
-            null
-          );
+          setSelectedChapterId(null);
         }
       } catch (caughtError) {
         if (cancelled) return;
@@ -604,13 +572,12 @@ export default function EditarHistoriaPage() {
       setSuccess('');
 
       try {
-        const response =
-          await fetch(
-            `/api/chapters/${selectedChapterId}`,
-            {
-              cache: 'no-store',
-            }
-          );
+        const response = await fetch(
+          `/api/chapters/${selectedChapterId}`,
+          {
+            cache: 'no-store',
+          }
+        );
 
         const data: ChapterResponse =
           await response.json();
@@ -664,13 +631,11 @@ export default function EditarHistoriaPage() {
         );
 
         setChapterTitle(
-          normalizedChapter.title ||
-            ''
+          normalizedChapter.title || ''
         );
 
         setChapterBody(
-          normalizedChapter.body ||
-            ''
+          normalizedChapter.body || ''
         );
 
         setAuthorNotes(
@@ -680,11 +645,9 @@ export default function EditarHistoriaPage() {
 
         setChapterStatus(
           normalizedChapter.publication_status ||
-            (
-              normalizedChapter.published
-                ? 'published'
-                : 'draft'
-            )
+            (normalizedChapter.published
+              ? 'published'
+              : 'draft')
         );
 
         setScheduledFor(
@@ -784,10 +747,7 @@ export default function EditarHistoriaPage() {
   function selectChapter(
     chapterId: string
   ) {
-    setSelectedChapterId(
-      chapterId
-    );
-
+    setSelectedChapterId(chapterId);
     setPreviewMode(false);
     setShowLinkBox(false);
     setLinkValue('');
@@ -795,9 +755,7 @@ export default function EditarHistoriaPage() {
     setSuccess('');
 
     const currentUrl =
-      new URL(
-        window.location.href
-      );
+      new URL(window.location.href);
 
     currentUrl.searchParams.set(
       'chapter',
@@ -878,9 +836,7 @@ export default function EditarHistoriaPage() {
         null;
 
       if (newCover) {
-        setCoverPreview(
-          newCover
-        );
+        setCoverPreview(newCover);
 
         setStory(
           (current) =>
@@ -937,9 +893,7 @@ export default function EditarHistoriaPage() {
         ...current,
       ];
 
-      for (
-        const tag of newTags
-      ) {
+      for (const tag of newTags) {
         if (
           result.length >=
           30
@@ -1173,15 +1127,10 @@ export default function EditarHistoriaPage() {
   ) {
     restoreSelection();
 
-    const command =
-      'justify' +
-      alignment
-        .charAt(0)
-        .toUpperCase() +
-      alignment.slice(1);
-
     document.execCommand(
-      command,
+      'justify' +
+        alignment.charAt(0).toUpperCase() +
+        alignment.slice(1),
       false
     );
 
@@ -1203,8 +1152,7 @@ export default function EditarHistoriaPage() {
       )
     ) {
       url =
-        'https://' +
-        url;
+        'https://' + url;
     }
 
     restoreSelection();
@@ -1288,9 +1236,7 @@ export default function EditarHistoriaPage() {
       remaining <= 0
     ) {
       setError(
-        'Este capítulo já possui o limite de ' +
-          MAX_MEDIA +
-          ' mídias.'
+        `Este capítulo já possui o limite de ${MAX_MEDIA} mídias.`
       );
       return;
     }
@@ -1422,26 +1368,21 @@ export default function EditarHistoriaPage() {
       (current) =>
         current.filter(
           (item) =>
-            item.id !==
-            mediaId
+            item.id !== mediaId
         )
     );
 
     if (editorRef.current) {
       const element =
         editorRef.current.querySelector(
-          '[data-media-id="' +
-            mediaId +
-            '"]'
+          `[data-media-id="${mediaId}"]`
         );
 
       element?.remove();
 
       const pendingElement =
         editorRef.current.querySelector(
-          '[data-pending-media-id="' +
-            mediaId +
-            '"]'
+          `[data-pending-media-id="${mediaId}"]`
         );
 
       pendingElement?.remove();
@@ -1451,10 +1392,16 @@ export default function EditarHistoriaPage() {
   }
 
   async function saveChapter(
-    targetStatus?: PublicationStatus
+    targetStatus?: Chapter['publication_status']
   ) {
     if (!chapter) return;
 
+    /*
+     * IMPORTANTE:
+     *
+     * Se nenhum status foi explicitamente passado,
+     * preservamos o status atual do capítulo.
+     */
     const finalStatus =
       targetStatus ||
       chapterStatus;
@@ -1581,13 +1528,13 @@ export default function EditarHistoriaPage() {
       /*
        * PRIMEIRO PASSO:
        *
-       * Enviamos as novas mídias.
+       * Envia as novas mídias.
        *
-       * IMPORTANTE:
-       * O status NÃO é mais forçado para draft.
+       * NÃO usamos "draft" aqui.
        *
-       * Preservamos o status que o usuário está
-       * realmente salvando.
+       * O status atual é preservado para que um
+       * capítulo publicado não desapareça durante
+       * o upload da imagem/GIF.
        */
       if (
         pending.length > 0
@@ -1740,8 +1687,8 @@ export default function EditarHistoriaPage() {
       /*
        * SEGUNDO PASSO:
        *
-       * Salva definitivamente título,
-       * conteúdo, mídias, notas e status.
+       * Salva o capítulo definitivamente
+       * com o status escolhido.
        */
       const formData =
         new FormData();
@@ -1849,6 +1796,11 @@ export default function EditarHistoriaPage() {
           workingBody
       );
 
+      setAuthorNotes(
+        savedChapter.author_notes ||
+          ''
+      );
+
       setScheduledFor(
         resolvedScheduledFor
           ? formatDateForInput(
@@ -1910,52 +1862,50 @@ export default function EditarHistoriaPage() {
         );
       }
 
-      setStory(
-        (currentStory) => {
-          if (!currentStory) {
-            return currentStory;
-          }
-
-          const updatedChapters =
-            currentStory.chapters.map(
-              (item) => {
-                if (
-                  item.id !==
-                  savedChapter.id
-                ) {
-                  return item;
-                }
-
-                return {
-                  ...item,
-                  title:
-                    savedChapter.title,
-                  published:
-                    savedChapter.published,
-                  publication_status:
-                    savedChapter.publication_status,
-                  scheduled_for:
-                    resolvedScheduledFor,
-                  is_scheduled:
-                    savedChapter.publication_status ===
-                    'scheduled',
-                };
-              }
-            );
-
-          const updatedStory =
-            {
-              ...currentStory,
-              chapters:
-                updatedChapters,
-            };
-
-          storyRef.current =
-            updatedStory;
-
-          return updatedStory;
+      setStory((currentStory) => {
+        if (!currentStory) {
+          return currentStory;
         }
-      );
+
+        const updatedChapters =
+          currentStory.chapters.map(
+            (item) => {
+              if (
+                item.id !==
+                savedChapter.id
+              ) {
+                return item;
+              }
+
+              return {
+                ...item,
+                title:
+                  savedChapter.title,
+                published:
+                  savedChapter.published,
+                publication_status:
+                  savedChapter.publication_status,
+                scheduled_for:
+                  resolvedScheduledFor,
+                is_scheduled:
+                  savedChapter.publication_status ===
+                  'scheduled',
+              };
+            }
+          );
+
+        const updatedStory =
+          {
+            ...currentStory,
+            chapters:
+              updatedChapters,
+          };
+
+        storyRef.current =
+          updatedStory;
+
+        return updatedStory;
+      });
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -2012,13 +1962,13 @@ export default function EditarHistoriaPage() {
       /*
        * CORREÇÃO:
        *
-       * Ctrl+S preserva o status atual.
+       * Ctrl+S agora preserva o status atual.
        *
        * Antes:
        * saveChapter('draft')
        *
-       * Isso fazia um capítulo PUBLICADO
-       * virar RASCUNHO ao apertar Ctrl+S.
+       * Isso fazia um capítulo publicado virar
+       * rascunho simplesmente ao apertar Ctrl+S.
        */
       void saveChapter(
         chapterStatus
@@ -2076,9 +2026,7 @@ export default function EditarHistoriaPage() {
       MAX_MEDIA
     ) {
       setError(
-        'Este capítulo já possui o limite de ' +
-          MAX_MEDIA +
-          ' mídias.'
+        `Este capítulo já possui o limite de ${MAX_MEDIA} mídias.`
       );
       return;
     }
@@ -2381,10 +2329,7 @@ export default function EditarHistoriaPage() {
                   {coverPreview ? (
                     <img
                       src={coverPreview}
-                      alt={
-                        'Capa de ' +
-                        story.title
-                      }
+                      alt={`Capa de ${story.title}`}
                       className="h-full w-full object-cover"
                     />
                   ) : (
@@ -2398,9 +2343,7 @@ export default function EditarHistoriaPage() {
                   ALTERAR A CAPA
 
                   <input
-                    ref={
-                      coverInputRef
-                    }
+                    ref={coverInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={
@@ -2450,20 +2393,13 @@ export default function EditarHistoriaPage() {
                     </label>
 
                     <input
-                      value={
-                        title
-                      }
-                      onChange={(
-                        event
-                      ) =>
+                      value={title}
+                      onChange={(event) =>
                         setTitle(
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
-                      maxLength={
-                        150
-                      }
+                      maxLength={150}
                       required
                       className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
                     />
@@ -2478,26 +2414,18 @@ export default function EditarHistoriaPage() {
                       value={
                         description
                       }
-                      onChange={(
-                        event
-                      ) =>
+                      onChange={(event) =>
                         setDescription(
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
-                      maxLength={
-                        5000
-                      }
+                      maxLength={5000}
                       rows={8}
                       className="w-full resize-y rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
                     />
 
                     <div className="mt-1 text-right text-xs text-gray-600">
-                      {
-                        description.length
-                      }
-                      /5000
+                      {description.length}/5000
                     </div>
                   </div>
 
@@ -2507,15 +2435,10 @@ export default function EditarHistoriaPage() {
                     </label>
 
                     <select
-                      value={
-                        status
-                      }
-                      onChange={(
-                        event
-                      ) =>
+                      value={status}
+                      onChange={(event) =>
                         setStatus(
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
                       className="w-full rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
@@ -2544,15 +2467,10 @@ export default function EditarHistoriaPage() {
                     </label>
 
                     <select
-                      value={
-                        rating
-                      }
-                      onChange={(
-                        event
-                      ) =>
+                      value={rating}
+                      onChange={(event) =>
                         setRating(
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
                       className="w-full rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
@@ -2593,20 +2511,13 @@ export default function EditarHistoriaPage() {
                     </label>
 
                     <input
-                      value={
-                        genre
-                      }
-                      onChange={(
-                        event
-                      ) =>
+                      value={genre}
+                      onChange={(event) =>
                         setGenre(
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
-                      maxLength={
-                        50
-                      }
+                      maxLength={50}
                       className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
                       placeholder="Romance, Fantasia, Drama..."
                     />
@@ -2624,16 +2535,9 @@ export default function EditarHistoriaPage() {
 
                   <div className="mt-5 flex min-h-[48px] flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 focus-within:border-pink-400/40">
                     {tags.map(
-                      (
-                        tag,
-                        index
-                      ) => (
+                      (tag, index) => (
                         <span
-                          key={
-                            tag +
-                            '-' +
-                            index
-                          }
+                          key={`${tag}-${index}`}
                           className="inline-flex items-center gap-2 rounded-lg border border-pink-400/20 bg-pink-500/10 px-3 py-1.5 text-sm text-pink-200"
                         >
                           {tag}
@@ -2657,12 +2561,9 @@ export default function EditarHistoriaPage() {
                       value={
                         tagInput
                       }
-                      onChange={(
-                        event
-                      ) =>
+                      onChange={(event) =>
                         setTagInput(
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
                       onKeyDown={
@@ -2710,10 +2611,7 @@ export default function EditarHistoriaPage() {
                     </h2>
 
                     <p className="mt-1 text-xs text-gray-600">
-                      {
-                        story.chapters
-                          .length
-                      }{' '}
+                      {story.chapters.length}{' '}
                       {story.chapters
                         .length === 1
                         ? 'capítulo'
@@ -2730,9 +2628,7 @@ export default function EditarHistoriaPage() {
                     </div>
                   ) : (
                     story.chapters.map(
-                      (
-                        item
-                      ) => (
+                      (item) => (
                         <div
                           key={
                             item.id
@@ -2755,20 +2651,15 @@ export default function EditarHistoriaPage() {
                             </div>
 
                             <span
-                              className={
-                                'shrink-0 rounded-full border px-2 py-1 text-[9px] font-medium tracking-wide ' +
-                                getStatusClass(
-                                  item.is_scheduled
-                                    ? 'scheduled'
-                                    : item.publication_status ||
-                                      (
-                                        item.published
-                                          ? 'published'
-                                          : 'draft'
-                                      ),
-                                  item.published
-                                )
-                              }
+                              className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-medium tracking-wide ${getStatusClass(
+                                item.is_scheduled
+                                  ? 'scheduled'
+                                  : item.publication_status ||
+                                    (item.published
+                                      ? 'published'
+                                      : 'draft'),
+                                item.published
+                              )}`}
                             >
                               {item.is_scheduled
                                 ? 'AGENDADO'
@@ -2816,10 +2707,7 @@ export default function EditarHistoriaPage() {
                   {coverPreview ? (
                     <img
                       src={coverPreview}
-                      alt={
-                        'Capa de ' +
-                        story.title
-                      }
+                      alt={`Capa de ${story.title}`}
                       className="h-full w-full object-cover"
                     />
                   ) : (
@@ -2833,9 +2721,7 @@ export default function EditarHistoriaPage() {
                   ALTERAR A CAPA
 
                   <input
-                    ref={
-                      coverInputRef
-                    }
+                    ref={coverInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={
@@ -2863,18 +2749,13 @@ export default function EditarHistoriaPage() {
                   </h2>
 
                   <span className="text-xs text-gray-600">
-                    {
-                      story.chapters
-                        .length
-                    }
+                    {story.chapters.length}
                   </span>
                 </div>
 
                 <div className="mt-3 max-h-[500px] overflow-y-auto space-y-2 pr-1">
                   {story.chapters.map(
-                    (
-                      item
-                    ) => (
+                    (item) => (
                       <button
                         key={
                           item.id
@@ -2885,15 +2766,12 @@ export default function EditarHistoriaPage() {
                             item.id
                           )
                         }
-                        className={
-                          'w-full rounded-xl border p-3 text-left transition ' +
-                          (
-                            item.id ===
-                            selectedChapterId
-                              ? 'border-pink-400/40 bg-pink-500/[0.08]'
-                              : 'border-white/10 bg-black/20 hover:bg-white/[0.04]'
-                          )
-                        }
+                        className={`w-full rounded-xl border p-3 text-left transition ${
+                          item.id ===
+                          selectedChapterId
+                            ? 'border-pink-400/40 bg-pink-500/[0.08]'
+                            : 'border-white/10 bg-black/20 hover:bg-white/[0.04]'
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
@@ -2911,20 +2789,15 @@ export default function EditarHistoriaPage() {
                           </div>
 
                           <span
-                            className={
-                              'shrink-0 rounded-full border px-2 py-1 text-[8px] ' +
-                              getStatusClass(
-                                item.is_scheduled
-                                  ? 'scheduled'
-                                  : item.publication_status ||
-                                    (
-                                      item.published
-                                        ? 'published'
-                                        : 'draft'
-                                    ),
-                                item.published
-                              )
-                            }
+                            className={`shrink-0 rounded-full border px-2 py-1 text-[8px] ${getStatusClass(
+                              item.is_scheduled
+                                ? 'scheduled'
+                                : item.publication_status ||
+                                  (item.published
+                                    ? 'published'
+                                    : 'draft'),
+                              item.published
+                            )}`}
                           >
                             {item.is_scheduled
                               ? 'AGENDADO'
@@ -2976,13 +2849,10 @@ export default function EditarHistoriaPage() {
 
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <span
-                          className={
-                            'rounded-full border px-3 py-1 text-[10px] tracking-wide ' +
-                            getStatusClass(
-                              chapterStatus,
-                              chapter.published
-                            )
-                          }
+                          className={`rounded-full border px-3 py-1 text-[10px] tracking-wide ${getStatusClass(
+                            chapterStatus,
+                            chapter.published
+                          )}`}
                         >
                           {getStatusLabel(
                             chapterStatus,
@@ -3046,17 +2916,12 @@ export default function EditarHistoriaPage() {
                         value={
                           chapterTitle
                         }
-                        onChange={(
-                          event
-                        ) =>
+                        onChange={(event) =>
                           setChapterTitle(
-                            event.target
-                              .value
+                            event.target.value
                           )
                         }
-                        maxLength={
-                          150
-                        }
+                        maxLength={150}
                         className="w-full border-none bg-transparent px-2 py-3 text-2xl sm:text-3xl font-semibold text-white outline-none placeholder:text-gray-700"
                         placeholder="Título do capítulo"
                       />
@@ -3347,8 +3212,7 @@ export default function EditarHistoriaPage() {
                                     event
                                   ) =>
                                     setLinkValue(
-                                      event.target
-                                        .value
+                                      event.target.value
                                     )
                                   }
                                   onKeyDown={(
@@ -3367,11 +3231,9 @@ export default function EditarHistoriaPage() {
                                       'Escape'
                                     ) {
                                       event.preventDefault();
-
                                       setShowLinkBox(
                                         false
                                       );
-
                                       setLinkValue(
                                         ''
                                       );
@@ -3456,9 +3318,7 @@ export default function EditarHistoriaPage() {
 
                       <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                         {chapterMedia.map(
-                          (
-                            media
-                          ) => (
+                          (media) => (
                             <div
                               key={
                                 media.id
@@ -3530,17 +3390,12 @@ export default function EditarHistoriaPage() {
                       value={
                         authorNotes
                       }
-                      onChange={(
-                        event
-                      ) =>
+                      onChange={(event) =>
                         setAuthorNotes(
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
-                      maxLength={
-                        5000
-                      }
+                      maxLength={5000}
                       rows={6}
                       placeholder="Escreva uma mensagem para seus leitores..."
                       className="mt-4 w-full resize-y rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-700 focus:border-pink-400/40"
@@ -3563,12 +3418,10 @@ export default function EditarHistoriaPage() {
                         value={
                           chapterStatus
                         }
-                        onChange={(
-                          event
-                        ) => {
+                        onChange={(event) => {
                           const nextStatus =
                             event.target
-                              .value as PublicationStatus;
+                              .value as Chapter['publication_status'];
 
                           setChapterStatus(
                             nextStatus
