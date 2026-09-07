@@ -525,11 +525,16 @@ export default function EditarHistoriaPage() {
         const requestedChapter =
           searchParams.get('chapter');
 
-        // Quando abrimos um capítulo novo, ele ainda é um rascunho.
-        // A API pública da obra pode não incluí-lo em story.chapters.
-        // Mesmo assim, o editor precisa carregá-lo diretamente pelo ID.
-        if (requestedChapter) {
-          setSelectedChapterId(requestedChapter);
+        if (
+          requestedChapter
+        ) {
+          // Quando o capítulo foi criado como rascunho, ele pode ainda
+          // não aparecer na lista de capítulos retornada pela obra.
+          // Se a URL trouxe um ID explícito, carregamos esse capítulo
+          // diretamente pela API em vez de descartá-lo.
+          setSelectedChapterId(
+            requestedChapter
+          );
         }
       } catch (caughtError) {
         if (cancelled) return;
@@ -1491,3 +1496,2061 @@ export default function EditarHistoriaPage() {
     }
 
     if (
+      authorNotes.length > 5000
+    ) {
+      setError(
+        'As notas do autor podem ter no máximo 5000 caracteres.'
+      );
+      return;
+    }
+
+    const pending =
+      chapterMedia.filter(
+        (media) =>
+          !media.existing &&
+          media.file
+      );
+
+    let existing =
+      chapterMedia.filter(
+        (media) =>
+          media.existing
+      );
+
+    try {
+      setSavingChapter(true);
+      setError('');
+      setSuccess('');
+
+      let workingBody =
+        sanitizedBody;
+
+      let finalMediaIds =
+        existing.map(
+          (media) =>
+            media.id
+        );
+
+      if (
+        pending.length > 0
+      ) {
+        setMediaUploading(true);
+
+        const uploadData =
+          new FormData();
+
+        uploadData.append(
+          'title',
+          chapterTitle.trim()
+        );
+
+        uploadData.append(
+          'body',
+          workingBody
+        );
+
+        uploadData.append(
+          'author_notes',
+          authorNotes
+        );
+
+        uploadData.append(
+          'publication_status',
+          finalStatus
+        );
+
+        existing.forEach(
+          (media) => {
+            uploadData.append(
+              'existing_media_ids',
+              media.id
+            );
+          }
+        );
+
+        pending.forEach(
+          (media) => {
+            if (media.file) {
+              uploadData.append(
+                'media',
+                media.file
+              );
+            }
+          }
+        );
+
+        if (
+          finalStatus ===
+            'scheduled' &&
+          scheduledFor
+        ) {
+          uploadData.append(
+            'scheduled_for',
+            new Date(
+              scheduledFor
+            ).toISOString()
+          );
+        }
+
+        const uploadResponse =
+          await fetch(
+            `/api/chapters/${chapter.id}`,
+            {
+              method: 'PUT',
+              body: uploadData,
+            }
+          );
+
+        const uploadResult:
+          ChapterResponse =
+          await uploadResponse.json();
+
+        if (
+          !uploadResponse.ok
+        ) {
+          throw new Error(
+            uploadResult.error ||
+              'Não foi possível enviar as mídias.'
+          );
+        }
+
+        const returnedMedia =
+          uploadResult.media ||
+          [];
+
+        const newMedia =
+          returnedMedia.filter(
+            (media) =>
+              !existing.some(
+                (item) =>
+                  item.id ===
+                  media.id
+              )
+          );
+
+        if (
+          newMedia.length !==
+          pending.length
+        ) {
+          throw new Error(
+            'Algumas mídias não foram salvas corretamente.'
+          );
+        }
+
+        workingBody =
+          replacePendingMediaWithRealUrls(
+            workingBody,
+            pending,
+            newMedia
+          );
+
+        finalMediaIds =
+          returnedMedia.map(
+            (media) =>
+              media.id
+          );
+
+        existing =
+          returnedMedia.map(
+            (media) => ({
+              id: media.id,
+              url: media.media_url,
+              type:
+                media.media_type ===
+                'gif'
+                  ? 'gif'
+                  : 'image',
+              existing: true,
+            })
+          );
+
+        setChapterMedia(
+          existing
+        );
+
+        pending.forEach(
+          (media) => {
+            URL.revokeObjectURL(
+              media.url
+            );
+          }
+        );
+
+        setMediaUploading(false);
+      }
+
+      const formData =
+        new FormData();
+
+      formData.append(
+        'title',
+        chapterTitle.trim()
+      );
+
+      formData.append(
+        'body',
+        workingBody
+      );
+
+      formData.append(
+        'author_notes',
+        authorNotes
+      );
+
+      formData.append(
+        'publication_status',
+        finalStatus
+      );
+
+      finalMediaIds.forEach(
+        (mediaId) => {
+          formData.append(
+            'existing_media_ids',
+            mediaId
+          );
+        }
+      );
+
+      if (
+        finalStatus ===
+        'scheduled'
+      ) {
+        formData.append(
+          'scheduled_for',
+          new Date(
+            scheduledFor
+          ).toISOString()
+        );
+      }
+
+      const response =
+        await fetch(
+          `/api/chapters/${chapter.id}`,
+          {
+            method: 'PUT',
+            body: formData,
+          }
+        );
+
+      const data:
+        ChapterResponse =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Não foi possível salvar o capítulo.'
+        );
+      }
+
+      if (!data.chapter) {
+        throw new Error(
+          'O servidor não retornou o capítulo salvo.'
+        );
+      }
+
+      const savedChapter =
+        data.chapter;
+
+      const resolvedScheduledFor =
+        finalStatus ===
+        'scheduled'
+          ? data.scheduled_for ??
+            savedChapter.scheduled_for ??
+            new Date(
+              scheduledFor
+            ).toISOString()
+          : null;
+
+      const normalizedSavedChapter:
+        Chapter = {
+          ...savedChapter,
+          scheduled_for:
+            resolvedScheduledFor,
+          author_notes:
+            savedChapter.author_notes ||
+            '',
+        };
+
+      setChapter(
+        normalizedSavedChapter
+      );
+
+      setChapterStatus(
+        savedChapter.publication_status
+      );
+
+      setChapterBody(
+        savedChapter.body ||
+          workingBody
+      );
+
+      setAuthorNotes(
+        savedChapter.author_notes ||
+          ''
+      );
+
+      setScheduledFor(
+        resolvedScheduledFor
+          ? formatDateForInput(
+              resolvedScheduledFor
+            )
+          : ''
+      );
+
+      if (data.media) {
+        setChapterMedia(
+          data.media.map(
+            (media) => ({
+              id: media.id,
+              url: media.media_url,
+              type:
+                media.media_type ===
+                'gif'
+                  ? 'gif'
+                  : 'image',
+              existing: true,
+            })
+          )
+        );
+      }
+
+      if (editorRef.current) {
+        editorRef.current.innerHTML =
+          savedChapter.body ||
+          workingBody;
+      }
+
+      savedSelectionRef.current =
+        null;
+
+      if (
+        finalStatus ===
+        'published'
+      ) {
+        setSuccess(
+          'Capítulo publicado com sucesso.'
+        );
+      } else if (
+        finalStatus ===
+        'scheduled'
+      ) {
+        setSuccess(
+          'Capítulo agendado com sucesso.'
+        );
+      } else if (
+        finalStatus ===
+        'unpublished'
+      ) {
+        setSuccess(
+          'Capítulo retirado do ar.'
+        );
+      } else {
+        setSuccess(
+          'Rascunho salvo com sucesso.'
+        );
+      }
+
+      setStory((currentStory) => {
+        if (!currentStory) {
+          return currentStory;
+        }
+
+        const updatedChapters =
+          currentStory.chapters.map(
+            (item) => {
+              if (
+                item.id !==
+                savedChapter.id
+              ) {
+                return item;
+              }
+
+              return {
+                ...item,
+                title:
+                  savedChapter.title,
+                published:
+                  savedChapter.published,
+                publication_status:
+                  savedChapter.publication_status,
+                scheduled_for:
+                  resolvedScheduledFor,
+                is_scheduled:
+                  savedChapter.publication_status ===
+                  'scheduled',
+              };
+            }
+          );
+
+        const updatedStory =
+          {
+            ...currentStory,
+            chapters:
+              updatedChapters,
+          };
+
+        storyRef.current =
+          updatedStory;
+
+        return updatedStory;
+      });
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Erro ao salvar o capítulo.'
+      );
+    } finally {
+      setSavingChapter(false);
+      setMediaUploading(false);
+    }
+  }
+
+  function handleEditorInput() {
+    if (!editorRef.current) return;
+
+    setChapterBody(
+      editorRef.current.innerHTML
+    );
+
+    saveSelection();
+  }
+
+  function handleEditorPaste(
+    event: React.ClipboardEvent<HTMLDivElement>
+  ) {
+    event.preventDefault();
+
+    const text =
+      event.clipboardData.getData(
+        'text/plain'
+      );
+
+    document.execCommand(
+      'insertText',
+      false,
+      text
+    );
+
+    saveSelection();
+    syncEditorBody();
+  }
+
+  function handleEditorKeyDown(
+    event: KeyboardEvent<HTMLDivElement>
+  ) {
+    if (
+      (event.ctrlKey ||
+        event.metaKey) &&
+      event.key.toLowerCase() ===
+        's'
+    ) {
+      event.preventDefault();
+
+      void saveChapter(
+        chapterStatus
+      );
+
+      return;
+    }
+
+    saveSelection();
+  }
+
+  function handleChapterFormSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    void saveChapter(
+      chapterStatus
+    );
+  }
+
+  function addHorizontalRule() {
+    restoreSelection();
+
+    document.execCommand(
+      'insertHorizontalRule',
+      false
+    );
+
+    saveSelection();
+    syncEditorBody();
+  }
+
+  function handleScheduleChange(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    setScheduledFor(
+      event.target.value
+    );
+
+    setChapterStatus(
+      'scheduled'
+    );
+  }
+
+  function handleMediaButtonClick(
+    event?: MouseEvent<HTMLButtonElement>
+  ) {
+    event?.preventDefault();
+
+    saveSelection();
+
+    if (
+      chapterMedia.length >=
+      MAX_MEDIA
+    ) {
+      setError(
+        `Este capítulo já possui o limite de ${MAX_MEDIA} mídias.`
+      );
+      return;
+    }
+
+    mediaInputRef.current?.click();
+  }
+
+  function clearChapterSelection() {
+    chapterMedia.forEach(
+      (media) => {
+        if (!media.existing) {
+          URL.revokeObjectURL(
+            media.url
+          );
+        }
+      }
+    );
+
+    setSelectedChapterId(
+      null
+    );
+
+    setChapter(null);
+    setChapterTitle('');
+    setChapterBody('');
+    setAuthorNotes('');
+    setChapterStatus('draft');
+    setScheduledFor('');
+    setChapterMedia([]);
+    setPreviewMode(false);
+    setShowLinkBox(false);
+    setLinkValue('');
+    setError('');
+    setSuccess('');
+
+    savedSelectionRef.current =
+      null;
+
+    const currentUrl =
+      new URL(
+        window.location.href
+      );
+
+    currentUrl.searchParams.delete(
+      'chapter'
+    );
+
+    router.replace(
+      currentUrl.pathname
+    );
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#0b090c] text-white">
+        <div className="min-h-screen flex items-center justify-center">
+          <p className="text-sm text-gray-500">
+            Carregando obra...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!story) {
+    return (
+      <main className="min-h-screen bg-[#0b090c] text-white">
+        <div className="mx-auto max-w-2xl px-6 py-20 text-center">
+          <p className="text-red-300">
+            {error ||
+              'Obra não encontrada.'}
+          </p>
+
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                `/historia/${id}`
+              )
+            }
+            className="mt-6 rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium hover:bg-pink-400 transition"
+          >
+            Voltar para a obra
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-[#0b090c] text-white">
+      <style jsx global>{`
+        .chapter-editor {
+          min-height: 900px;
+          outline: none;
+          white-space: pre-wrap;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+          font: inherit;
+        }
+
+        .chapter-editor:empty:before {
+          content: 'Comece a escrever seu capítulo...';
+          color: rgba(156, 163, 175, 0.35);
+          pointer-events: none;
+        }
+
+        .chapter-editor p {
+          margin: 0 0 1.25rem;
+        }
+
+        .chapter-editor h2 {
+          font-size: 1.75rem;
+          line-height: 1.3;
+          font-weight: 600;
+          margin: 1.5rem 0 1rem;
+        }
+
+        .chapter-editor h3 {
+          font-size: 1.35rem;
+          line-height: 1.35;
+          font-weight: 600;
+          margin: 1.5rem 0 1rem;
+        }
+
+        .chapter-editor blockquote {
+          border-left: 3px solid rgba(236, 72, 153, 0.6);
+          padding-left: 1rem;
+          margin: 1.5rem 0;
+          color: rgba(209, 213, 219, 0.8);
+          font-style: italic;
+        }
+
+        .chapter-editor a {
+          color: rgb(244, 114, 182);
+          text-decoration: underline;
+        }
+
+        .chapter-editor img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          margin: 1.5rem auto;
+          border-radius: 0.75rem;
+        }
+
+        .chapter-editor hr {
+          border: 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.12);
+          margin: 2rem 0;
+        }
+
+        .chapter-media-placeholder {
+          margin: 1.5rem 0;
+          padding: 2rem;
+          border: 1px dashed rgba(236, 72, 153, 0.35);
+          border-radius: 0.75rem;
+          color: rgba(244, 114, 182, 0.7);
+          background: rgba(236, 72, 153, 0.04);
+          text-align: center;
+        }
+
+        .chapter-preview p {
+          margin-bottom: 1.25rem;
+        }
+
+        .chapter-preview h2 {
+          font-size: 1.75rem;
+          line-height: 1.3;
+          font-weight: 600;
+          margin: 1.5rem 0 1rem;
+        }
+
+        .chapter-preview h3 {
+          font-size: 1.35rem;
+          line-height: 1.35;
+          font-weight: 600;
+          margin: 1.5rem 0 1rem;
+        }
+
+        .chapter-preview blockquote {
+          border-left: 3px solid rgba(236, 72, 153, 0.6);
+          padding-left: 1rem;
+          margin: 1.5rem 0;
+          color: rgba(209, 213, 219, 0.8);
+          font-style: italic;
+        }
+
+        .chapter-preview a {
+          color: rgb(244, 114, 182);
+          text-decoration: underline;
+        }
+
+        .chapter-preview img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          margin: 1.5rem auto;
+          border-radius: 0.75rem;
+        }
+
+        .chapter-preview hr {
+          border: 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.12);
+          margin: 2rem 0;
+        }
+
+        .editor-toolbar-button {
+          min-width: 34px;
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 9px;
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(255, 255, 255, 0.025);
+          color: rgba(209, 213, 219, 0.85);
+          transition: all 0.15s ease;
+        }
+
+        .editor-toolbar-button:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: white;
+        }
+
+        .editor-toolbar-divider {
+          width: 1px;
+          height: 24px;
+          margin: 0 3px;
+          background: rgba(255, 255, 255, 0.1);
+        }
+      `}</style>
+
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0b090c]/95 backdrop-blur">
+        <div className="mx-auto max-w-[1550px] px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                `/historia/${id}`
+              )
+            }
+            className="text-xl font-semibold tracking-tight hover:text-pink-300 transition"
+          >
+            Nooklie
+          </button>
+
+          <div className="flex items-center gap-2">
+            {chapter && (
+              <button
+                type="button"
+                onClick={() =>
+                  setPreviewMode(
+                    (current) =>
+                      !current
+                  )
+                }
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
+              >
+                {previewMode
+                  ? 'Voltar ao editor'
+                  : 'Pré-visualizar'}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  `/historia/${id}`
+                )
+              }
+              className="text-sm text-gray-400 hover:text-white transition"
+            >
+              Sair
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-[1550px] px-4 sm:px-6 py-6">
+        {error && (
+          <div className="mb-5 rounded-xl border border-red-400/20 bg-red-500/[0.07] px-4 py-3 text-sm text-red-200">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-500/[0.07] px-4 py-3 text-sm text-emerald-200">
+            {success}
+          </div>
+        )}
+
+        {!chapter ? (
+          <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)_350px]">
+            <aside className="lg:sticky lg:top-24 lg:self-start">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                  {coverPreview ? (
+                    <img
+                      src={coverPreview}
+                      alt={`Capa de ${story.title}`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-sm text-gray-600">
+                      Sem capa
+                    </div>
+                  )}
+                </div>
+
+                <label className="mt-4 block cursor-pointer rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition">
+                  ALTERAR A CAPA
+
+                  <input
+                    ref={coverInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={
+                      handleCoverChange
+                    }
+                    className="hidden"
+                  />
+                </label>
+
+                <p className="mt-2 text-center text-xs text-gray-600">
+                  JPG, PNG, WEBP ou GIF
+                  <br />
+                  até 10 MB
+                </p>
+              </div>
+            </aside>
+
+            <section>
+              <div className="mb-7">
+                <p className="text-xs uppercase tracking-[0.18em] text-pink-300/70">
+                  Editar obra
+                </p>
+
+                <h1 className="mt-2 text-3xl font-semibold">
+                  {story.title}
+                </h1>
+
+                <p className="mt-2 text-sm text-gray-500">
+                  Edite as informações da obra ou escolha um capítulo para editar.
+                </p>
+              </div>
+
+              <form
+                onSubmit={
+                  handleSaveStory
+                }
+                className="space-y-6"
+              >
+                <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                  <h2 className="text-base font-medium">
+                    Informações da obra
+                  </h2>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm text-gray-300">
+                      Título
+                    </label>
+
+                    <input
+                      value={title}
+                      onChange={(event) =>
+                        setTitle(
+                          event.target.value
+                        )
+                      }
+                      maxLength={150}
+                      required
+                      className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
+                    />
+                  </div>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm text-gray-300">
+                      Sinopse
+                    </label>
+
+                    <textarea
+                      value={
+                        description
+                      }
+                      onChange={(event) =>
+                        setDescription(
+                          event.target.value
+                        )
+                      }
+                      maxLength={5000}
+                      rows={8}
+                      className="w-full resize-y rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
+                    />
+
+                    <div className="mt-1 text-right text-xs text-gray-600">
+                      {description.length}/5000
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm text-gray-300">
+                      Status da obra
+                    </label>
+
+                    <select
+                      value={status}
+                      onChange={(event) =>
+                        setStatus(
+                          event.target.value
+                        )
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
+                    >
+                      <option value="">
+                        Selecione
+                      </option>
+
+                      <option value="EM ANDAMENTO">
+                        EM ANDAMENTO
+                      </option>
+
+                      <option value="CONCLUÍDA">
+                        CONCLUÍDA
+                      </option>
+
+                      <option value="HIATUS">
+                        HIATUS
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm text-gray-300">
+                      Classificação
+                    </label>
+
+                    <select
+                      value={rating}
+                      onChange={(event) =>
+                        setRating(
+                          event.target.value
+                        )
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
+                    >
+                      <option value="">
+                        Selecione
+                      </option>
+
+                      <option value="Livre">
+                        Livre
+                      </option>
+
+                      <option value="10">
+                        10 anos
+                      </option>
+
+                      <option value="12">
+                        12 anos
+                      </option>
+
+                      <option value="14">
+                        14 anos
+                      </option>
+
+                      <option value="16">
+                        16 anos
+                      </option>
+
+                      <option value="18">
+                        18 anos
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm text-gray-300">
+                      Gênero
+                    </label>
+
+                    <input
+                      value={genre}
+                      onChange={(event) =>
+                        setGenre(
+                          event.target.value
+                        )
+                      }
+                      maxLength={50}
+                      className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
+                      placeholder="Romance, Fantasia, Drama..."
+                    />
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                  <h2 className="text-base font-medium">
+                    Tags
+                  </h2>
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    Pressione Enter ou vírgula para adicionar.
+                  </p>
+
+                  <div className="mt-5 flex min-h-[48px] flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 focus-within:border-pink-400/40">
+                    {tags.map(
+                      (tag, index) => (
+                        <span
+                          key={`${tag}-${index}`}
+                          className="inline-flex items-center gap-2 rounded-lg border border-pink-400/20 bg-pink-500/10 px-3 py-1.5 text-sm text-pink-200"
+                        >
+                          {tag}
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeTag(
+                                index
+                              )
+                            }
+                            className="text-pink-300/60 hover:text-pink-200 transition"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )
+                    )}
+
+                    <input
+                      value={
+                        tagInput
+                      }
+                      onChange={(event) =>
+                        setTagInput(
+                          event.target.value
+                        )
+                      }
+                      onKeyDown={
+                        handleTagKeyDown
+                      }
+                      className="min-w-[150px] flex-1 bg-transparent px-1 py-2 text-sm text-white outline-none placeholder:text-gray-600"
+                      placeholder={
+                        tags.length >=
+                        30
+                          ? 'Limite atingido'
+                          : 'Adicionar tag...'
+                      }
+                      disabled={
+                        tags.length >=
+                        30
+                      }
+                    />
+                  </div>
+
+                  <div className="mt-2 text-right text-xs text-gray-600">
+                    {tags.length}/30
+                  </div>
+                </section>
+
+                <button
+                  type="submit"
+                  disabled={
+                    savingStory
+                  }
+                  className="w-full rounded-xl bg-pink-500 px-6 py-3 text-sm font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
+                >
+                  {savingStory
+                    ? 'Salvando...'
+                    : 'Salvar informações da obra'}
+                </button>
+              </form>
+            </section>
+
+            <aside className="lg:sticky lg:top-24 lg:self-start">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-medium">
+                      Capítulos
+                    </h2>
+
+                    <p className="mt-1 text-xs text-gray-600">
+                      {story.chapters.length}{' '}
+                      {story.chapters
+                        .length === 1
+                        ? 'capítulo'
+                        : 'capítulos'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {story.chapters
+                    .length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-gray-600">
+                      Sua obra ainda não possui capítulos.
+                    </div>
+                  ) : (
+                    story.chapters.map(
+                      (item) => (
+                        <div
+                          key={
+                            item.id
+                          }
+                          className="rounded-xl border border-white/10 bg-black/20 p-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs text-gray-600">
+                                Capítulo{' '}
+                                {
+                                  item.chapter_number
+                                }
+                              </p>
+
+                              <p className="mt-1 truncate text-sm text-gray-200">
+                                {item.title ||
+                                  'Sem título'}
+                              </p>
+                            </div>
+
+                            <span
+                              className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-medium tracking-wide ${getStatusClass(
+                                item.is_scheduled
+                                  ? 'scheduled'
+                                  : item.publication_status ||
+                                    (item.published
+                                      ? 'published'
+                                      : 'draft'),
+                                item.published
+                              )}`}
+                            >
+                              {item.is_scheduled
+                                ? 'AGENDADO'
+                                : item.publication_status ===
+                                  'unpublished'
+                                  ? 'FORA DO AR'
+                                  : item.published
+                                    ? 'PUBLICADO'
+                                    : 'RASCUNHO'}
+                            </span>
+                          </div>
+
+                          {item.scheduled_for && (
+                            <p className="mt-2 text-[11px] text-violet-300/70">
+                              {formatDate(
+                                item.scheduled_for
+                              )}
+                            </p>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              selectChapter(
+                                item.id
+                              )
+                            }
+                            className="mt-3 w-full rounded-lg bg-pink-500/10 px-3 py-2 text-xs font-medium text-pink-200 hover:bg-pink-500/20 transition"
+                          >
+                            EDITAR CAPÍTULO
+                          </button>
+                        </div>
+                      )
+                    )
+                  )}
+                </div>
+              </div>
+            </aside>
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+            <aside className="lg:sticky lg:top-24 lg:self-start space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                  {coverPreview ? (
+                    <img
+                      src={coverPreview}
+                      alt={`Capa de ${story.title}`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-sm text-gray-600">
+                      Sem capa
+                    </div>
+                  )}
+                </div>
+
+                <label className="mt-4 block cursor-pointer rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition">
+                  ALTERAR A CAPA
+
+                  <input
+                    ref={coverInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={
+                      handleCoverChange
+                    }
+                    className="hidden"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={
+                    clearChapterSelection
+                  }
+                  className="mt-2 w-full rounded-xl border border-white/10 px-4 py-3 text-sm text-gray-400 hover:bg-white/[0.05] hover:text-white transition"
+                >
+                  Voltar para a obra
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-medium">
+                    Capítulos
+                  </h2>
+
+                  <span className="text-xs text-gray-600">
+                    {story.chapters.length}
+                  </span>
+                </div>
+
+                <div className="mt-3 max-h-[500px] overflow-y-auto space-y-2 pr-1">
+                  {story.chapters.map(
+                    (item) => (
+                      <button
+                        key={
+                          item.id
+                        }
+                        type="button"
+                        onClick={() =>
+                          selectChapter(
+                            item.id
+                          )
+                        }
+                        className={`w-full rounded-xl border p-3 text-left transition ${
+                          item.id ===
+                          selectedChapterId
+                            ? 'border-pink-400/40 bg-pink-500/[0.08]'
+                            : 'border-white/10 bg-black/20 hover:bg-white/[0.04]'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                              Capítulo{' '}
+                              {
+                                item.chapter_number
+                              }
+                            </p>
+
+                            <p className="mt-1 truncate text-sm text-gray-200">
+                              {item.title ||
+                                'Sem título'}
+                            </p>
+                          </div>
+
+                          <span
+                            className={`shrink-0 rounded-full border px-2 py-1 text-[8px] ${getStatusClass(
+                              item.is_scheduled
+                                ? 'scheduled'
+                                : item.publication_status ||
+                                  (item.published
+                                    ? 'published'
+                                    : 'draft'),
+                              item.published
+                            )}`}
+                          >
+                            {item.is_scheduled
+                              ? 'AGENDADO'
+                              : item.publication_status ===
+                                'unpublished'
+                                ? 'FORA DO AR'
+                                : item.published
+                                  ? 'PUBLICADO'
+                                  : 'RASCUNHO'}
+                          </span>
+                        </div>
+
+                        {item.scheduled_for && (
+                          <p className="mt-2 text-[10px] text-violet-300/60">
+                            {formatDate(
+                              item.scheduled_for
+                            )}
+                          </p>
+                        )}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            </aside>
+
+            <section className="min-w-0">
+              {loadingChapter ? (
+                <div className="min-h-[700px] flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.02]">
+                  <p className="text-sm text-gray-500">
+                    Carregando capítulo...
+                  </p>
+                </div>
+              ) : (
+                <form
+                  onSubmit={
+                    handleChapterFormSubmit
+                  }
+                  className="space-y-4"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-[0.18em] text-pink-300/70">
+                        Editando capítulo{' '}
+                        {
+                          chapter.chapter_number
+                        }
+                      </p>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-[10px] tracking-wide ${getStatusClass(
+                            chapterStatus,
+                            chapter.published
+                          )}`}
+                        >
+                          {getStatusLabel(
+                            chapterStatus,
+                            chapter.published
+                          )}
+                        </span>
+
+                        {chapter.original_published_at && (
+                          <span className="text-xs text-gray-600">
+                            Original:{' '}
+                            {formatDate(
+                              chapter.original_published_at
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void saveChapter(
+                            'draft'
+                          )
+                        }
+                        disabled={
+                          savingChapter ||
+                          mediaUploading
+                        }
+                        className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white disabled:opacity-50 transition"
+                      >
+                        {savingChapter
+                          ? 'Salvando...'
+                          : 'Salvar rascunho'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void saveChapter(
+                            'published'
+                          )
+                        }
+                        disabled={
+                          savingChapter ||
+                          mediaUploading
+                        }
+                        className="rounded-xl bg-pink-500 px-4 py-2.5 text-sm font-medium hover:bg-pink-400 disabled:opacity-50 transition"
+                      >
+                        {savingChapter
+                          ? 'Salvando...'
+                          : 'Publicar'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden">
+                    <div className="border-b border-white/10 bg-black/20 px-3 sm:px-6 py-3">
+                      <input
+                        value={
+                          chapterTitle
+                        }
+                        onChange={(event) =>
+                          setChapterTitle(
+                            event.target.value
+                          )
+                        }
+                        maxLength={150}
+                        className="w-full border-none bg-transparent px-2 py-3 text-2xl sm:text-3xl font-semibold text-white outline-none placeholder:text-gray-700"
+                        placeholder="Título do capítulo"
+                      />
+                    </div>
+
+                    {previewMode ? (
+                      <article className="chapter-preview min-h-[900px] px-4 sm:px-12 lg:px-20 py-10 text-[17px] leading-8 text-gray-200">
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html:
+                              sanitizeHtml(
+                                chapterBody
+                              ) ||
+                              '<p>O capítulo está vazio.</p>',
+                          }}
+                        />
+
+                        {authorNotes.trim() && (
+                          <div className="mt-12 border-t border-white/10 pt-8">
+                            <p className="text-xs uppercase tracking-[0.2em] text-pink-300/70">
+                              NOTAS DO AUTOR
+                            </p>
+
+                            <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-gray-400">
+                              {
+                                authorNotes
+                              }
+                            </p>
+                          </div>
+                        )}
+                      </article>
+                    ) : (
+                      <>
+                        <div className="sticky top-[61px] z-30 border-b border-white/10 bg-[#0d0a0e]/98 backdrop-blur">
+                          <div className="flex flex-wrap items-center gap-1 p-2">
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                executeCommand(
+                                  'bold'
+                                )
+                              }
+                              className="editor-toolbar-button font-bold"
+                              title="Negrito"
+                            >
+                              B
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                executeCommand(
+                                  'italic'
+                                )
+                              }
+                              className="editor-toolbar-button italic"
+                              title="Itálico"
+                            >
+                              I
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                executeCommand(
+                                  'underline'
+                                )
+                              }
+                              className="editor-toolbar-button underline"
+                              title="Sublinhado"
+                            >
+                              U
+                            </button>
+
+                            <span className="editor-toolbar-divider" />
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setAlignment(
+                                  'left'
+                                )
+                              }
+                              className="editor-toolbar-button"
+                              title="Alinhar à esquerda"
+                            >
+                              <span className="text-lg">
+                                ≡
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setAlignment(
+                                  'center'
+                                )
+                              }
+                              className="editor-toolbar-button"
+                              title="Centralizar"
+                            >
+                              <span className="text-lg">
+                                ≡
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setAlignment(
+                                  'right'
+                                )
+                              }
+                              className="editor-toolbar-button"
+                              title="Alinhar à direita"
+                            >
+                              <span className="text-lg">
+                                ≡
+                              </span>
+                            </button>
+
+                            <span className="editor-toolbar-divider" />
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                executeCommand(
+                                  'formatBlock',
+                                  'h2'
+                                )
+                              }
+                              className="editor-toolbar-button text-xs font-semibold"
+                              title="Título"
+                            >
+                              Título
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                executeCommand(
+                                  'formatBlock',
+                                  'blockquote'
+                                )
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Citação"
+                            >
+                              Citação
+                            </button>
+
+                            <span className="editor-toolbar-divider" />
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={
+                                handleMediaButtonClick
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar imagem ou GIF"
+                            >
+                              Imagem / GIF
+                            </button>
+
+                            <input
+                              ref={
+                                mediaInputRef
+                              }
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              multiple
+                              onChange={
+                                handleMediaSelect
+                              }
+                              className="hidden"
+                            />
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setShowLinkBox(
+                                  (current) =>
+                                    !current
+                                )
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar link"
+                            >
+                              Link
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={
+                                addHorizontalRule
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar separador"
+                            >
+                              Separador
+                            </button>
+
+                            <span className="ml-auto px-2 text-[11px] text-gray-600">
+                              {
+                                chapterMedia.length
+                              }
+                              /{MAX_MEDIA}
+                            </span>
+                          </div>
+
+                          {showLinkBox && (
+                            <div className="border-t border-white/10 p-3">
+                              <div className="flex flex-col gap-2 sm:flex-row">
+                                <input
+                                  ref={
+                                    linkInputRef
+                                  }
+                                  value={
+                                    linkValue
+                                  }
+                                  onChange={(
+                                    event
+                                  ) =>
+                                    setLinkValue(
+                                      event.target.value
+                                    )
+                                  }
+                                  onKeyDown={(
+                                    event
+                                  ) => {
+                                    if (
+                                      event.key ===
+                                      'Enter'
+                                    ) {
+                                      event.preventDefault();
+                                      addLink();
+                                    }
+
+                                    if (
+                                      event.key ===
+                                      'Escape'
+                                    ) {
+                                      event.preventDefault();
+                                      setShowLinkBox(
+                                        false
+                                      );
+                                      setLinkValue(
+                                        ''
+                                      );
+                                    }
+                                  }}
+                                  placeholder="https://exemplo.com"
+                                  className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-pink-400/40"
+                                />
+
+                                <button
+                                  type="button"
+                                  onMouseDown={(
+                                    event
+                                  ) => {
+                                    event.preventDefault();
+                                    saveSelection();
+                                  }}
+                                  onClick={
+                                    addLink
+                                  }
+                                  className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-medium hover:bg-pink-400 transition"
+                                >
+                                  Inserir link
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div
+                          ref={
+                            editorRef
+                          }
+                          contentEditable
+                          suppressContentEditableWarning
+                          onInput={
+                            handleEditorInput
+                          }
+                          onPaste={
+                            handleEditorPaste
+                          }
+                          onKeyDown={
+                            handleEditorKeyDown
+                          }
+                          onMouseUp={
+                            saveSelection
+                          }
+                          onKeyUp={
+                            saveSelection
+                          }
+                          onFocus={
+                            saveSelection
+                          }
+                          className="chapter-editor px-5 sm:px-12 lg:px-20 py-12 text-[17px] leading-8 text-gray-200"
+                          spellCheck
+                        />
+                      </>
+                    )}
+                  </div>
+
+                  {chapterMedia.length >
+                    0 && (
+                    <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-sm font-medium">
+                            Mídias do capítulo
+                          </h2>
+
+                          <p className="mt-1 text-xs text-gray-600">
+                            Máximo de 25 arquivos. Cada arquivo pode ter até 5 MB.
+                          </p>
+                        </div>
+
+                        <span className="text-xs text-gray-500">
+                          {
+                            chapterMedia.length
+                          }
+                          /{MAX_MEDIA}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {chapterMedia.map(
+                          (media) => (
+                            <div
+                              key={
+                                media.id
+                              }
+                              className="relative overflow-hidden rounded-xl border border-white/10 bg-black/20"
+                            >
+                              <div className="aspect-video">
+                                <img
+                                  src={
+                                    media.url
+                                  }
+                                  alt="Mídia do capítulo"
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  removeMedia(
+                                    media.id
+                                  )
+                                }
+                                disabled={
+                                  savingChapter
+                                }
+                                className="absolute right-2 top-2 rounded-lg border border-white/10 bg-black/70 px-2 py-1 text-xs text-gray-300 hover:bg-red-500/80 hover:text-white disabled:opacity-50 transition"
+                              >
+                                Remover
+                              </button>
+
+                              <div className="border-t border-white/10 px-3 py-2 text-[10px] uppercase tracking-wide text-gray-600">
+                                {media.type ===
+                                'gif'
+                                  ? 'GIF'
+                                  : 'IMAGEM'}
+
+                                {!media.existing &&
+                                  ' · NÃO SALVA'}
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </section>
+                  )}
+
+                  <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-base font-medium">
+                          NOTAS DO AUTOR
+                        </h2>
+
+                        <p className="mt-1 text-xs text-gray-600">
+                          Uma mensagem opcional para seus leitores no final do capítulo.
+                        </p>
+                      </div>
+
+                      <span className="text-xs text-gray-600">
+                        {
+                          authorNotes.length
+                        }
+                        /5000
+                      </span>
+                    </div>
+
+                    <textarea
+                      value={
+                        authorNotes
+                      }
+                      onChange={(event) =>
+                        setAuthorNotes(
+                          event.target.value
+                        )
+                      }
+                      maxLength={5000}
+                      rows={6}
+                      placeholder="Escreva uma mensagem para seus leitores..."
+                      className="mt-4 w-full resize-y rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-700 focus:border-pink-400/40"
+                    />
+                  </section>
+
+                  <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <h2 className="text-base font-medium">
+                          Publicação
+                        </h2>
+
+                        <p className="mt-1 text-xs text-gray-600">
+                          Salve como rascunho, publique agora ou escolha uma data para liberar o capítulo.
+                        </p>
+                      </div>
+
+                      <select
+                        value={
+                          chapterStatus
+                        }
+                        onChange={(event) => {
+                          const nextStatus =
+                            event.target
+                              .value as Chapter['publication_status'];
+
+                          setChapterStatus(
+                            nextStatus
+                          );
+
+                          if (
+                            nextStatus !==
+                            'scheduled'
+                          ) {
+                            setScheduledFor(
+                              ''
+                            );
+                          }
+                        }}
+                        className="rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
+                      >
+                        <option value="draft">
+                          Rascunho privado
+                        </option>
+
+                        <option value="published">
+                          Publicar agora
+                        </option>
+
+                        <option value="scheduled">
+                          Agendar publicação
+                        </option>
+
+                        <option value="unpublished">
+                          Retirar do ar
+                        </option>
+                      </select>
+                    </div>
+
+                    {chapterStatus ===
+                      'scheduled' && (
+                      <div className="mt-5 rounded-xl border border-violet-400/20 bg-violet-500/[0.05] p-4">
+                        <label className="mb-2 block text-sm text-violet-200">
+                          Data e horário da publicação
+                        </label>
+
+                        <input
+                          type="datetime-local"
+                          value={
+                            scheduledFor
+                          }
+                          onChange={
+                            handleScheduleChange
+                          }
+                          min={getLocalDateTimeInputMin()}
+                          className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-violet-400/40"
+                        />
+
+                        <p className="mt-2 text-xs text-violet-200/50">
+                          O capítulo ficará privado até a data escolhida.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void saveChapter(
+                            'draft'
+                          )
+                        }
+                        disabled={
+                          savingChapter ||
+                          mediaUploading
+                        }
+                        className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white disabled:opacity-50 transition"
+                      >
+                        {savingChapter
+                          ? 'Salvando...'
+                          : 'Salvar rascunho'}
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={
+                          savingChapter ||
+                          mediaUploading
+                        }
+                        className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
+                      >
+                        {savingChapter
+                          ? 'Salvando...'
+                          : chapterStatus ===
+                              'scheduled'
+                            ? 'Agendar capítulo'
+                            : chapterStatus ===
+                                'published'
+                              ? 'Publicar capítulo'
+                              : chapterStatus ===
+                                  'unpublished'
+                                ? 'Retirar do ar'
+                                : 'Salvar capítulo'}
+                      </button>
+                    </div>
+                  </section>
+
+                  <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                    <h2 className="text-base font-medium">
+                      Histórico de publicação
+                    </h2>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                          Criado em
+                        </p>
+
+                        <p className="mt-2 text-sm text-gray-300">
+                          {formatDate(
+                            chapter.created_at
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                          Publicação original
+                        </p>
+
+                        <p className="mt-2 text-sm text-gray-300">
+                          {formatDate(
+                            chapter.original_published_at
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                          Republicação
+                        </p>
+
+                        <p className="mt-2 text-sm text-gray-300">
+                          {formatDate(
+                            chapter.republished_at
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+                </form>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
