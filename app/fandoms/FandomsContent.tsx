@@ -1,42 +1,48 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 const fandoms = [
   {
     name: 'House of the Dragon',
-    description: 'Dragões, Targaryen e as disputas pelo Trono de Ferro.',
+    description:
+      'Dragões, Targaryen e as disputas pelo Trono de Ferro.',
     slug: 'house-of-the-dragon',
     gradient: 'from-[#5a2345] to-[#21121d]',
   },
   {
     name: 'Game of Thrones',
-    description: 'Westeros, grandes casas, guerras e intrigas.',
+    description:
+      'Westeros, grandes casas, guerras e intrigas.',
     slug: 'game-of-thrones',
     gradient: 'from-[#46284f] to-[#171018]',
   },
   {
     name: 'Harry Potter',
-    description: 'Magia, Hogwarts e o mundo bruxo.',
+    description:
+      'Magia, Hogwarts e o mundo bruxo.',
     slug: 'harry-potter',
     gradient: 'from-[#303e59] to-[#13131b]',
   },
   {
     name: 'Marvel',
-    description: 'Heróis, vilões e universos extraordinários.',
+    description:
+      'Heróis, vilões e universos extraordinários.',
     slug: 'marvel',
     gradient: 'from-[#58332f] to-[#1a1015]',
   },
   {
     name: 'DC',
-    description: 'Gotham, Metropolis e os maiores heróis da DC.',
+    description:
+      'Gotham, Metropolis e os maiores heróis da DC.',
     slug: 'dc',
     gradient: 'from-[#3d4b42] to-[#121714]',
   },
   {
     name: 'K-pop',
-    description: 'Ídolos, grupos, música e histórias inspiradas no K-pop.',
+    description:
+      'Ídolos, grupos, música e histórias inspiradas no K-pop.',
     slug: 'k-pop',
     gradient: 'from-[#523f62] to-[#17121c]',
   },
@@ -44,6 +50,9 @@ const fandoms = [
 
 export default function FandomsContent() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+
   const selected = searchParams.get('fandom') || '';
 
   const filteredFandoms = selected
@@ -52,8 +61,22 @@ export default function FandomsContent() {
       )
     : fandoms;
 
+  function updateSearch(value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (value.trim()) {
+      params.set('fandom', value);
+    } else {
+      params.delete('fandom');
+    }
+
+    const queryString = params.toString();
+
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+  }
+
   return (
-    <main className="min-h-screen bg-[#100b12] text-white">
+    <main className="min-h-screen overflow-x-hidden bg-[#100b12] text-white">
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#100b12]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center gap-6 px-5 py-4">
           <Link
@@ -95,62 +118,48 @@ export default function FandomsContent() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-5">
-        <section className="relative overflow-hidden py-16 md:py-20">
-          <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-[#ff4fa3]/10 blur-3xl" />
+      <div className="relative mx-auto max-w-7xl px-5">
+        <div className="pointer-events-none absolute -left-40 top-0 h-[34rem] w-[34rem] rounded-full bg-[#ff4fa3]/10 blur-3xl" />
 
-          <div className="pointer-events-none absolute right-0 top-0 h-96 w-96 rounded-full bg-[#ff78b9]/5 blur-3xl" />
+        <div className="pointer-events-none absolute -right-40 top-20 h-[32rem] w-[32rem] rounded-full bg-[#ff78b9]/10 blur-3xl" />
 
-          <div className="relative">
-            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#ff78b9]">
-              Comunidades
-            </p>
+        <section className="relative py-16 md:py-20">
+          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#ff78b9]">
+            Comunidades
+          </p>
 
-            <h1 className="mt-4 text-4xl font-black md:text-6xl">
-              Explore os{' '}
-              <span className="bg-gradient-to-r from-[#ff68ae] to-[#ff9acb] bg-clip-text text-transparent">
-                fandoms
-              </span>
-            </h1>
+          <h1 className="mt-4 max-w-4xl text-4xl font-black leading-[1.05] md:text-6xl">
+            Explore os{' '}
+            <span className="bg-gradient-to-r from-[#ff68ae] to-[#ff9acb] bg-clip-text text-transparent">
+              fandoms
+            </span>
+          </h1>
 
-            <p className="mt-5 max-w-2xl text-base leading-7 text-white/50 md:text-lg">
-              Encontre histórias, autores e leitores apaixonados pelos mesmos
-              universos que você.
-            </p>
-          </div>
-        </section>
+          <p className="mt-5 max-w-2xl text-base leading-7 text-white/50 md:text-lg">
+            Encontre histórias, autores e leitores apaixonados pelos mesmos
+            universos que você.
+          </p>
 
-        <section className="pb-8">
-          <div className="flex items-center rounded-2xl border border-white/10 bg-[#191219] px-5 py-4 transition focus-within:border-[#ff78b9]/30 focus-within:bg-[#1d141c]">
+          <div className="mt-9 flex items-center rounded-2xl border border-white/10 bg-[#191219] px-5 py-4 transition focus-within:border-[#ff78b9]/30 focus-within:bg-[#1d141c]">
             <SearchIcon />
 
             <input
-              defaultValue={selected}
+              value={selected}
+              onChange={(event) => updateSearch(event.target.value)}
               placeholder="Pesquisar fandom..."
-              onChange={(event) => {
-                const value = event.target.value.trim();
-
-                const url = value
-                  ? `/fandoms?fandom=${encodeURIComponent(value)}`
-                  : '/fandoms';
-
-                window.history.replaceState(null, '', url);
-
-                window.dispatchEvent(new PopStateEvent('popstate'));
-              }}
               className="ml-3 w-full bg-transparent text-sm outline-none placeholder:text-white/30"
             />
           </div>
         </section>
 
-        <section className="pb-20">
+        <section className="relative pb-20">
           {filteredFandoms.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filteredFandoms.map((fandom) => (
                 <Link
                   key={fandom.slug}
                   href={`/explorar?fandom=${encodeURIComponent(fandom.name)}`}
-                  className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br ${fandom.gradient} p-6 transition duration-300 hover:-translate-y-1 hover:border-[#ff78b9]/30`}
+                  className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${fandom.gradient} p-6 transition duration-300 hover:-translate-y-1 hover:border-[#ff78b9]/30`}
                 >
                   <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full border border-white/5 bg-white/5 transition duration-500 group-hover:scale-125" />
 
@@ -194,19 +203,21 @@ export default function FandomsContent() {
           )}
         </section>
 
-        <section className="mb-20 overflow-hidden rounded-[2rem] border border-[#ff78b9]/15 bg-gradient-to-r from-[#291522] via-[#21131e] to-[#171018]">
-          <div className="p-8 md:p-12">
+        <section className="relative mb-20 overflow-hidden rounded-[2rem] border border-[#ff78b9]/15 bg-gradient-to-r from-[#291522] via-[#21131e] to-[#171018]">
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#ff78b9]/10 blur-3xl" />
+
+          <div className="relative p-8 md:p-12">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
-              Não encontrou o que procura?
+              Nooklie
             </p>
 
             <h2 className="mt-3 text-3xl font-black md:text-4xl">
-              Explore todas as histórias.
+              Não encontrou o que procura?
             </h2>
 
             <p className="mt-4 max-w-2xl leading-7 text-white/50">
-              Use a busca e os filtros do Nooklie para encontrar histórias por
-              fandom, gênero, autor ou título.
+              Explore todas as histórias do Nooklie e use os filtros para
+              encontrar exatamente o que você quer ler.
             </p>
 
             <Link
