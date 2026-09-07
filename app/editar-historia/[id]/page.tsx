@@ -235,9 +235,7 @@ function sanitizeHtml(html: string) {
             ['href', 'src', 'action', 'formaction'].includes(
               name
             ) &&
-            value
-              .toLowerCase()
-              .startsWith('javascript:')
+            value.toLowerCase().startsWith('javascript:')
           ) {
             element.removeAttribute(attribute.name);
           }
@@ -328,9 +326,7 @@ export default function EditarHistoriaPage() {
     useState('');
 
   const [chapterStatus, setChapterStatus] =
-    useState<Chapter['publication_status']>(
-      'draft'
-    );
+    useState<Chapter['publication_status']>('draft');
 
   const [scheduledFor, setScheduledFor] =
     useState('');
@@ -616,15 +612,14 @@ export default function EditarHistoriaPage() {
           storyChapter?.scheduled_for ??
           null;
 
-        const normalizedChapter: Chapter =
-          {
-            ...loadedChapter,
-            scheduled_for:
-              resolvedScheduledFor,
-            author_notes:
-              loadedChapter.author_notes ||
-              '',
-          };
+        const normalizedChapter: Chapter = {
+          ...loadedChapter,
+          scheduled_for:
+            resolvedScheduledFor,
+          author_notes:
+            loadedChapter.author_notes ||
+            '',
+        };
 
         setChapter(
           normalizedChapter
@@ -1392,18 +1387,20 @@ export default function EditarHistoriaPage() {
   }
 
   async function saveChapter(
-    targetStatus?: Chapter['publication_status'],
-    redirectAfterPublish = false
+    targetStatus?: Chapter['publication_status']
   ) {
     if (!chapter) return;
 
+    /*
+     * Se nenhum status foi explicitamente passado,
+     * preservamos o status atual.
+     */
     const finalStatus =
       targetStatus ||
       chapterStatus;
 
     if (
-      finalStatus ===
-        'scheduled' &&
+      finalStatus === 'scheduled' &&
       !scheduledFor
     ) {
       setError(
@@ -1413,8 +1410,7 @@ export default function EditarHistoriaPage() {
     }
 
     if (
-      finalStatus ===
-      'scheduled'
+      finalStatus === 'scheduled'
     ) {
       const selectedDate =
         new Date(
@@ -1455,8 +1451,7 @@ export default function EditarHistoriaPage() {
 
     if (
       !sanitizedBody ||
-      sanitizedBody ===
-        '<br>' ||
+      sanitizedBody === '<br>' ||
       plainText === ''
     ) {
       setError(
@@ -1475,8 +1470,8 @@ export default function EditarHistoriaPage() {
     }
 
     if (
-      chapterTitle.trim()
-        .length > 150
+      chapterTitle.trim().length >
+      150
     ) {
       setError(
         'O título do capítulo pode ter no máximo 150 caracteres.'
@@ -1520,6 +1515,13 @@ export default function EditarHistoriaPage() {
             media.id
         );
 
+      /*
+       * PRIMEIRO PASSO:
+       *
+       * Envia as novas mídias.
+       *
+       * O status atual é preservado durante o upload.
+       */
       if (
         pending.length > 0
       ) {
@@ -1668,6 +1670,12 @@ export default function EditarHistoriaPage() {
         setMediaUploading(false);
       }
 
+      /*
+       * SEGUNDO PASSO:
+       *
+       * Salva o capítulo definitivamente
+       * com o status escolhido.
+       */
       const formData =
         new FormData();
 
@@ -1814,17 +1822,6 @@ export default function EditarHistoriaPage() {
         null;
 
       if (
-        finalStatus === 'published' &&
-        redirectAfterPublish
-      ) {
-        router.push(
-          `/capitulo-publicado/${savedChapter.id}`
-        );
-
-        return;
-      }
-
-      if (
         finalStatus ===
         'published'
       ) {
@@ -1883,12 +1880,11 @@ export default function EditarHistoriaPage() {
             }
           );
 
-        const updatedStory =
-          {
-            ...currentStory,
-            chapters:
-              updatedChapters,
-          };
+        const updatedStory = {
+          ...currentStory,
+          chapters:
+            updatedChapters,
+        };
 
         storyRef.current =
           updatedStory;
@@ -1948,6 +1944,9 @@ export default function EditarHistoriaPage() {
     ) {
       event.preventDefault();
 
+      /*
+       * Ctrl+S preserva o status atual.
+       */
       void saveChapter(
         chapterStatus
       );
@@ -1964,8 +1963,7 @@ export default function EditarHistoriaPage() {
     event.preventDefault();
 
     void saveChapter(
-      chapterStatus,
-      chapterStatus === 'published'
+      chapterStatus
     );
   }
 
@@ -2873,8 +2871,7 @@ export default function EditarHistoriaPage() {
                         type="button"
                         onClick={() =>
                           void saveChapter(
-                            'published',
-                            true
+                            'published'
                           )
                         }
                         disabled={
@@ -3110,4 +3107,161 @@ export default function EditarHistoriaPage() {
                               ) => {
                                 event.preventDefault();
                                 saveSelection();
-                             
+                              }}
+                              onClick={
+                                handleMediaButtonClick
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar imagem ou GIF"
+                            >
+                              Imagem / GIF
+                            </button>
+
+                            <input
+                              ref={
+                                mediaInputRef
+                              }
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              multiple
+                              onChange={
+                                handleMediaSelect
+                              }
+                              className="hidden"
+                            />
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setShowLinkBox(
+                                  (current) =>
+                                    !current
+                                )
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar link"
+                            >
+                              Link
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={
+                                addHorizontalRule
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar separador"
+                            >
+                              Separador
+                            </button>
+
+                            <span className="ml-auto px-2 text-[11px] text-gray-600">
+                              {
+                                chapterMedia.length
+                              }
+                              /{MAX_MEDIA}
+                            </span>
+                          </div>
+
+                          {showLinkBox && (
+                            <div className="border-t border-white/10 p-3">
+                              <div className="flex flex-col gap-2 sm:flex-row">
+                                <input
+                                  ref={
+                                    linkInputRef
+                                  }
+                                  value={
+                                    linkValue
+                                  }
+                                  onChange={(
+                                    event
+                                  ) =>
+                                    setLinkValue(
+                                      event.target.value
+                                    )
+                                  }
+                                  onKeyDown={(
+                                    event
+                                  ) => {
+                                    if (
+                                      event.key ===
+                                      'Enter'
+                                    ) {
+                                      event.preventDefault();
+                                      addLink();
+                                    }
+
+                                    if (
+                                      event.key ===
+                                      'Escape'
+                                    ) {
+                                      event.preventDefault();
+                                      setShowLinkBox(
+                                        false
+                                      );
+                                      setLinkValue(
+                                        ''
+                                      );
+                                    }
+                                  }}
+                                  placeholder="https://exemplo.com"
+                                  className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-pink-400/40"
+                                />
+
+                                <button
+                                  type="button"
+                                  onMouseDown={(
+                                    event
+                                  ) => {
+                                    event.preventDefault();
+                                    saveSelection();
+                                  }}
+                                  onClick={
+                                    addLink
+                                  }
+                                  className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-medium hover:bg-pink-400 transition"
+                                >
+                                  Inserir link
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div
+                          ref={
+                            editorRef
+                          }
+                          contentEditable
+                          suppressContentEditableWarning
+                          onInput={
+                            handleEditorInput
+                          }
+                          onPaste={
+                            handleEditorPaste
+                          }
+                          onKeyDown={
+                            handleEditorKeyDown
+                          }
+                          onMouseUp={
+                            saveSelection
+                          }
+                          onKeyUp={
+                            saveSelection
+                          }
+                          onFocus={
+                            saveSelection
+                          }
+                          className="chapter-editor px-5 sm:px-12 lg
