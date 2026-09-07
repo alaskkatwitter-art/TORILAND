@@ -1,34 +1,61 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!
 );
 
-async function getCurrentUserId(request: Request) {
-  const meResponse = await fetch(
-    new URL('/api/auth/me', request.url),
-    {
-      headers: {
-        cookie: (await cookies()).toString(),
-      },
-      cache: 'no-store',
-    }
-  );
+async function getCurrentUserId() {
+  const cookieStore = await cookies();
 
-  const meData = await meResponse.json();
+  const sessionToken =
+    cookieStore.get('toriland_session')?.value;
 
-  if (
-    !meResponse.ok ||
-    !meData.authenticated ||
-    !meData.user?.id
-  ) {
+  if (!sessionToken) {
     return null;
   }
 
-  return meData.user.id as string;
+  const tokenHash = crypto
+    .createHash('sha256')
+    .update(sessionToken)
+    .digest('hex');
+
+  const { data: session, error } =
+    await supabase
+      .from('auth_sessions')
+      .select('user_id, expires_at')
+      .eq('token_hash', tokenHash)
+      .maybeSingle();
+
+  if (error) {
+    console.error(
+      'ERRO AO VERIFICAR SESSÃO:',
+      error
+    );
+
+    return null;
+  }
+
+  if (!session) {
+    return null;
+  }
+
+  if (
+    new Date(session.expires_at).getTime() <=
+    Date.now()
+  ) {
+    await supabase
+      .from('auth_sessions')
+      .delete()
+      .eq('token_hash', tokenHash);
+
+    return null;
+  }
+
+  return session.user_id as string;
 }
 
 /*
@@ -47,28 +74,31 @@ export async function GET(request: Request) {
     if (!postId) {
       return NextResponse.json(
         {
-          error: 'ID do post não informado.',
+          error:
+            'ID do post não informado.',
         },
         { status: 400 }
       );
     }
 
-    const { data: comments, error } =
-      await supabase
-        .from('nook_comments')
-        .select(`
-          id,
-          post_id,
-          author_id,
-          content,
-          parent_id,
-          created_at,
-          updated_at
-        `)
-        .eq('post_id', postId)
-        .order('created_at', {
-          ascending: true,
-        });
+    const {
+      data: comments,
+      error,
+    } = await supabase
+      .from('nook_comments')
+      .select(`
+        id,
+        post_id,
+        author_id,
+        content,
+        parent_id,
+        created_at,
+        updated_at
+      `)
+      .eq('post_id', postId)
+      .order('created_at', {
+        ascending: true,
+      });
 
     if (error) {
       console.error(
@@ -78,34 +108,40 @@ export async function GET(request: Request) {
 
       return NextResponse.json(
         {
-          error: 'Erro ao buscar comentários.',
+          error:
+            'Erro ao buscar comentários.',
           details: error.message,
         },
         { status: 500 }
       );
     }
 
-    /*
-     * Busca os perfis dos autores.
-     */
     const authorIds = [
       ...new Set(
         (comments || []).map(
-          (comment) => comment.author_id
+          (comment) =>
+            comment.author_id
         )
       ),
     ];
 
-    let profiles: any[] = [];
+    let profiles: Array<{
+      id: string;
+      username: string;
+      display_name: string | null;
+      avatar_url: string | null;
+    }> = [];
 
     if (authorIds.length > 0) {
-      const { data, error: profilesError } =
-        await supabase
-          .from('profiles')
-          .select(
-            'id, username, display_name, avatar_url'
-          )
-          .in('id', authorIds);
+      const {
+        data,
+        error: profilesError,
+      } = await supabase
+        .from('profiles')
+        .select(
+          'id, username, display_name, avatar_url'
+        )
+        .in('id', authorIds);
 
       if (profilesError) {
         console.error(
@@ -126,17 +162,21 @@ export async function GET(request: Request) {
     }
 
     const commentsWithAuthors =
-      (comments || []).map((comment) => ({
-        ...comment,
-        author:
-          profiles.find(
-            (profile) =>
-              profile.id === comment.author_id
-          ) || null,
-      }));
+      (comments || []).map(
+        (comment) => ({
+          ...comment,
+          author:
+            profiles.find(
+              (profile) =>
+                profile.id ===
+                comment.author_id
+            ) || null,
+        })
+      );
 
     return NextResponse.json({
-      comments: commentsWithAuthors,
+      comments:
+        commentsWithAuthors,
     });
   } catch (error) {
     console.error(
@@ -146,7 +186,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       {
-        error: 'Erro interno do servidor.',
+        error:
+          'Erro interno do servidor.',
       },
       { status: 500 }
     );
@@ -162,33 +203,57 @@ export async function GET(request: Request) {
  * null → comentário principal
  * ID   → resposta a outro comentário
  */
-export async function POST(request: Request) {
+export async function POST(
+  request: Request
+) {
   try {
-    const userId = await getCurrentUserId(request);
+    /*
+     * Descobre o usuário diretamente
+     * pela sessão, sem fazer fetch interno
+     * para /api/auth/me.
+     */
+    const userId =
+      await getCurrentUserId();
 
     if (!userId) {
       return NextResponse.json(
         {
-          error: 'Não autenticado.',
+          error:
+            'Não autenticado.',
         },
         { status: 401 }
       );
     }
 
-    const body = await request.json();
+    let body: any;
+
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            'Dados da requisição inválidos.',
+        },
+        { status: 400 }
+      );
+    }
 
     const postId =
-      typeof body.post_id === 'string'
+      typeof body.post_id ===
+      'string'
         ? body.post_id.trim()
         : '';
 
     const content =
-      typeof body.content === 'string'
+      typeof body.content ===
+      'string'
         ? body.content.trim()
         : '';
 
     const parentId =
-      typeof body.parent_id === 'string' &&
+      typeof body.parent_id ===
+        'string' &&
       body.parent_id.trim()
         ? body.parent_id.trim()
         : null;
@@ -196,7 +261,8 @@ export async function POST(request: Request) {
     if (!postId) {
       return NextResponse.json(
         {
-          error: 'ID do post não informado.',
+          error:
+            'ID do post não informado.',
         },
         { status: 400 }
       );
@@ -205,7 +271,8 @@ export async function POST(request: Request) {
     if (!content) {
       return NextResponse.json(
         {
-          error: 'O comentário não pode estar vazio.',
+          error:
+            'O comentário não pode estar vazio.',
         },
         { status: 400 }
       );
@@ -224,12 +291,14 @@ export async function POST(request: Request) {
     /*
      * Confirma que o post existe.
      */
-    const { data: post, error: postError } =
-      await supabase
-        .from('nook_posts')
-        .select('id')
-        .eq('id', postId)
-        .maybeSingle();
+    const {
+      data: post,
+      error: postError,
+    } = await supabase
+      .from('nook_posts')
+      .select('id')
+      .eq('id', postId)
+      .maybeSingle();
 
     if (postError) {
       console.error(
@@ -239,7 +308,10 @@ export async function POST(request: Request) {
 
       return NextResponse.json(
         {
-          error: 'Erro ao validar o post.',
+          error:
+            'Erro ao validar o post.',
+          details:
+            postError.message,
         },
         { status: 500 }
       );
@@ -248,23 +320,30 @@ export async function POST(request: Request) {
     if (!post) {
       return NextResponse.json(
         {
-          error: 'Post não encontrado.',
+          error:
+            'Post não encontrado.',
         },
         { status: 404 }
       );
     }
 
     /*
-     * Se for resposta, confirma que o comentário
-     * pai pertence ao mesmo post.
+     * Se for resposta, confirma que:
+     *
+     * 1. o comentário existe;
+     * 2. pertence ao mesmo post.
      */
     if (parentId) {
-      const { data: parentComment, error: parentError } =
-        await supabase
-          .from('nook_comments')
-          .select('id, post_id')
-          .eq('id', parentId)
-          .maybeSingle();
+      const {
+        data: parentComment,
+        error: parentError,
+      } = await supabase
+        .from('nook_comments')
+        .select(
+          'id, post_id'
+        )
+        .eq('id', parentId)
+        .maybeSingle();
 
       if (parentError) {
         console.error(
@@ -276,14 +355,15 @@ export async function POST(request: Request) {
           {
             error:
               'Erro ao validar o comentário pai.',
+            details:
+              parentError.message,
           },
           { status: 500 }
         );
       }
 
       if (
-        !parentComment ||
-        parentComment.post_id !== postId
+        !parentComment
       ) {
         return NextResponse.json(
           {
@@ -293,27 +373,45 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
+
+      if (
+        parentComment.post_id !==
+        postId
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'O comentário ao qual você está respondendo pertence a outro post.',
+          },
+          { status: 400 }
+        );
+      }
     }
 
-    const { data: comment, error } =
-      await supabase
-        .from('nook_comments')
-        .insert({
-          post_id: postId,
-          author_id: userId,
-          content,
-          parent_id: parentId,
-        })
-        .select(`
-          id,
-          post_id,
-          author_id,
-          content,
-          parent_id,
-          created_at,
-          updated_at
-        `)
-        .single();
+    /*
+     * Cria o comentário.
+     */
+    const {
+      data: comment,
+      error,
+    } = await supabase
+      .from('nook_comments')
+      .insert({
+        post_id: postId,
+        author_id: userId,
+        content,
+        parent_id: parentId,
+      })
+      .select(`
+        id,
+        post_id,
+        author_id,
+        content,
+        parent_id,
+        created_at,
+        updated_at
+      `)
+      .single();
 
     if (error) {
       console.error(
@@ -323,8 +421,12 @@ export async function POST(request: Request) {
 
       return NextResponse.json(
         {
-          error: 'Não foi possível criar o comentário.',
-          details: error.message,
+          error:
+            'Não foi possível criar o comentário.',
+          details:
+            error.message,
+          code:
+            error.code || null,
         },
         { status: 500 }
       );
@@ -333,20 +435,33 @@ export async function POST(request: Request) {
     /*
      * Busca o perfil do autor.
      */
-    const { data: author } =
-      await supabase
-        .from('profiles')
-        .select(
-          'id, username, display_name, avatar_url'
-        )
-        .eq('id', userId)
-        .maybeSingle();
+    const {
+      data: author,
+      error: authorError,
+    } = await supabase
+      .from('profiles')
+      .select(
+        'id, username, display_name, avatar_url'
+      )
+      .eq('id', userId)
+      .maybeSingle();
 
+    if (authorError) {
+      console.error(
+        'ERRO AO BUSCAR AUTOR DO COMENTÁRIO:',
+        authorError
+      );
+    }
+
+    /*
+     * Retorna sempre JSON.
+     */
     return NextResponse.json(
       {
         comment: {
           ...comment,
-          author: author || null,
+          author:
+            author || null,
         },
       },
       { status: 201 }
@@ -359,7 +474,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: 'Erro interno do servidor.',
+        error:
+          'Erro interno do servidor.',
+        details:
+          error instanceof Error
+            ? error.message
+            : String(error),
       },
       { status: 500 }
     );
