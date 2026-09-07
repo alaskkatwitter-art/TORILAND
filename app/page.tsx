@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import AuthStatus from "../components/AuthStatus";
 
 const fandoms = [
@@ -23,25 +23,21 @@ const genres = [
   "Ficção",
 ];
 
+const menu = [
+  { label: "Início", href: "/" },
+  { label: "Explorar", href: "/explorar" },
+  { label: "Escrever", href: "/escrever" },
+  { label: "Fandoms", href: "/fandoms" },
+  { label: "Notícias", href: "/noticias" },
+];
+
 export default function Home() {
-  const [activeTab, setActiveTab] = useState("Início");
-  const [search, setSearch] = useState("");
-
-  const menu = [
-    "Início",
-    "Explorar",
-    "Escrever",
-    "Fandoms",
-    "Notícias",
-  ];
-
   return (
     <main className="min-h-screen bg-[#100b12] text-white">
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#100b12]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center gap-6 px-5 py-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab("Início")}
+          <Link
+            href="/"
             className="group flex shrink-0 items-center gap-2"
           >
             <CloudLogo />
@@ -49,22 +45,21 @@ export default function Home() {
             <span className="text-xl font-black tracking-[0.18em] text-[#ff78b9] transition group-hover:text-[#ff9bca]">
               NOOKLIE
             </span>
-          </button>
+          </Link>
 
           <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">
             {menu.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setActiveTab(item)}
-                className={`relative rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-300 ${
-                  activeTab === item
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-300 ${
+                  item.href === "/"
                     ? "bg-gradient-to-r from-[#ff5fab] to-[#ff8fc5] text-[#180d15] shadow-[0_0_20px_rgba(255,120,185,0.15)]"
-                    : "text-white/60 hover:bg-gradient-to-r hover:from-[#ff5fab]/15 hover:to-[#ff9bca]/15 hover:text-[#ff9bca]"
+                    : "text-white/60 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
                 }`}
               >
-                {item}
-              </button>
+                {item.label}
+              </Link>
             ))}
           </nav>
 
@@ -76,18 +71,17 @@ export default function Home() {
         <div className="overflow-x-auto border-t border-white/5 md:hidden">
           <nav className="mx-auto flex min-w-max items-center justify-center gap-1 px-4 py-2">
             {menu.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setActiveTab(item)}
+              <Link
+                key={item.href}
+                href={item.href}
                 className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
-                  activeTab === item
+                  item.href === "/"
                     ? "bg-gradient-to-r from-[#ff5fab] to-[#ff8fc5] text-[#180d15]"
                     : "text-white/60 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
                 }`}
               >
-                {item}
-              </button>
+                {item.label}
+              </Link>
             ))}
           </nav>
         </div>
@@ -123,21 +117,19 @@ export default function Home() {
               </p>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("Explorar")}
-                  className="rounded-full bg-gradient-to-r from-[#ff68ae] to-[#ff91c4] px-7 py-3.5 font-bold text-[#180d15] shadow-[0_10px_35px_rgba(255,104,174,0.15)] transition duration-300 hover:-translate-y-0.5 hover:brightness-110"
+                <Link
+                  href="/explorar"
+                  className="rounded-full bg-gradient-to-r from-[#ff68ae] to-[#ff91c4] px-7 py-3.5 text-center font-bold text-[#180d15] shadow-[0_10px_35px_rgba(255,104,174,0.15)] transition duration-300 hover:-translate-y-0.5 hover:brightness-110"
                 >
                   Explorar histórias
-                </button>
+                </Link>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("Escrever")}
-                  className="rounded-full border border-white/15 bg-white/5 px-7 py-3.5 font-bold transition duration-300 hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
+                <Link
+                  href="/escrever"
+                  className="rounded-full border border-white/15 bg-white/5 px-7 py-3.5 text-center font-bold transition duration-300 hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
                 >
                   Começar a escrever
-                </button>
+                </Link>
               </div>
             </div>
 
@@ -163,7 +155,7 @@ export default function Home() {
 
                   <FeatureCard
                     title="Calendário"
-                    description="Acompanhe próximas atualizações e capítulos programados."
+                    description="Acompanhe próximas atualizações e capítulos."
                   />
 
                   <FeatureCard
@@ -192,39 +184,41 @@ export default function Home() {
         </section>
 
         <section className="pb-12">
-          <div className="flex items-center rounded-2xl border border-white/10 bg-[#191219] px-5 py-4 transition focus-within:border-[#ff78b9]/30 focus-within:bg-[#1d141c]">
+          <Link
+            href="/explorar"
+            className="group flex items-center rounded-2xl border border-white/10 bg-[#191219] px-5 py-4 transition hover:border-[#ff78b9]/30 hover:bg-[#1d141c]"
+          >
             <SearchIcon />
 
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Pesquisar histórias, autores, fandoms ou gêneros..."
-              className="ml-3 w-full bg-transparent text-sm outline-none placeholder:text-white/30"
-            />
-          </div>
+            <span className="ml-3 text-sm text-white/30 transition group-hover:text-white/50">
+              Pesquisar histórias, autores, fandoms ou gêneros...
+            </span>
 
-          {search && (
-            <p className="mt-3 text-sm text-white/40">
-              Procurando por:{" "}
-              <span className="text-[#ff78b9]">{search}</span>
-            </p>
-          )}
+            <span className="ml-auto text-white/20 transition group-hover:translate-x-1 group-hover:text-[#ff78b9]">
+              →
+            </span>
+          </Link>
         </section>
 
         <section className="pb-16">
           <SectionHeading
             title="Fandoms"
             subtitle="Encontre histórias dentro dos universos que você já conhece."
+            href="/fandoms"
           />
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {fandoms.map((fandom, index) => (
-              <CategoryCard
+              <Link
                 key={fandom}
-                title={fandom}
-                type="Fandom"
-                index={index}
-              />
+                href={`/fandoms?fandom=${encodeURIComponent(fandom)}`}
+              >
+                <CategoryCard
+                  title={fandom}
+                  type="Fandom"
+                  index={index}
+                />
+              </Link>
             ))}
           </div>
         </section>
@@ -233,16 +227,21 @@ export default function Home() {
           <SectionHeading
             title="Gêneros"
             subtitle="Escolha o tipo de história que você quer encontrar."
+            href="/explorar"
           />
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {genres.map((genre, index) => (
-              <CategoryCard
+              <Link
                 key={genre}
-                title={genre}
-                type="Gênero"
-                index={index}
-              />
+                href={`/explorar?genre=${encodeURIComponent(genre)}`}
+              >
+                <CategoryCard
+                  title={genre}
+                  type="Gênero"
+                  index={index}
+                />
+              </Link>
             ))}
           </div>
         </section>
@@ -266,13 +265,12 @@ export default function Home() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab("Escrever")}
+            <Link
+              href="/escrever"
               className="shrink-0 rounded-full bg-gradient-to-r from-[#ff68ae] to-[#ff91c4] px-7 py-3.5 font-bold text-[#180d15] transition duration-300 hover:-translate-y-0.5 hover:brightness-110"
             >
               Começar a escrever
-            </button>
+            </Link>
           </div>
         </section>
       </div>
@@ -280,26 +278,26 @@ export default function Home() {
       <footer className="border-t border-white/10 bg-[#0b080d]">
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-5 py-10 text-sm text-white/35">
           <div className="flex items-center gap-6">
-            <button
-              type="button"
+            <Link
+              href="/"
               className="transition hover:text-[#ff9bca]"
             >
               Sobre
-            </button>
+            </Link>
 
-            <button
-              type="button"
+            <Link
+              href="/"
               className="transition hover:text-[#ff9bca]"
             >
               Termos
-            </button>
+            </Link>
 
-            <button
-              type="button"
+            <Link
+              href="/"
               className="transition hover:text-[#ff9bca]"
             >
               Privacidade
-            </button>
+            </Link>
           </div>
 
           <p className="text-white/25">
@@ -362,23 +360,30 @@ function FeatureCard({
 function SectionHeading({
   title,
   subtitle,
+  href,
 }: {
   title: string;
   subtitle: string;
+  href: string;
 }) {
   return (
     <div className="mb-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
-        Descubra
-      </p>
+      <Link
+        href={href}
+        className="group inline-block"
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
+          Descubra
+        </p>
 
-      <h2 className="mt-2 text-3xl font-black">
-        {title}
-      </h2>
+        <h2 className="mt-2 text-3xl font-black transition group-hover:text-[#ff9bca]">
+          {title}
+        </h2>
 
-      <p className="mt-1 text-sm text-white/40">
-        {subtitle}
-      </p>
+        <p className="mt-1 text-sm text-white/40">
+          {subtitle}
+        </p>
+      </Link>
     </div>
   );
 }
@@ -402,8 +407,7 @@ function CategoryCard({
   ];
 
   return (
-    <button
-      type="button"
+    <div
       className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br ${
         gradients[index % gradients.length]
       } p-5 text-left transition duration-300 hover:-translate-y-0.5 hover:border-[#ff78b9]/30`}
@@ -423,7 +427,7 @@ function CategoryCard({
           Explorar
         </span>
       </div>
-    </button>
+    </div>
   );
 }
 
