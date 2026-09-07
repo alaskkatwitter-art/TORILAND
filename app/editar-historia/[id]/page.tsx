@@ -522,14 +522,32 @@ export default function EditarHistoriaPage() {
           normalizedStory.cover_url || null
         );
 
-     const requestedChapter =
-  searchParams.get('chapter');
+        /*
+         * IMPORTANTE:
+         *
+         * Quando "Novo capítulo" cria um rascunho,
+         * esse capítulo pode ainda não aparecer na
+         * lista de capítulos retornada pela API da obra.
+         *
+         * Antes o código verificava se o ID estava nessa
+         * lista e, caso não estivesse, fazia:
+         *
+         * setSelectedChapterId(null)
+         *
+         * Isso fazia o editor perder o capítulo recém-criado.
+         *
+         * Agora, se a URL trouxe ?chapter=ID, usamos
+         * diretamente esse ID e o próximo useEffect
+         * carrega o capítulo pela API /api/chapters/[id].
+         */
+        const requestedChapter =
+          searchParams.get('chapter');
 
-if (requestedChapter) {
-  setSelectedChapterId(
-    requestedChapter
-  );
-}
+        if (requestedChapter) {
+          setSelectedChapterId(
+            requestedChapter
+          );
+        }
       } catch (caughtError) {
         if (cancelled) return;
 
@@ -1850,32 +1868,80 @@ if (requestedChapter) {
           return currentStory;
         }
 
-        const updatedChapters =
-          currentStory.chapters.map(
-            (item) => {
-              if (
-                item.id !==
-                savedChapter.id
-              ) {
-                return item;
-              }
-
-              return {
-                ...item,
-                title:
-                  savedChapter.title,
-                published:
-                  savedChapter.published,
-                publication_status:
-                  savedChapter.publication_status,
-                scheduled_for:
-                  resolvedScheduledFor,
-                is_scheduled:
-                  savedChapter.publication_status ===
-                  'scheduled',
-              };
-            }
+        const chapterAlreadyExists =
+          currentStory.chapters.some(
+            (item) =>
+              item.id ===
+              savedChapter.id
           );
+
+        let updatedChapters;
+
+        if (
+          chapterAlreadyExists
+        ) {
+          updatedChapters =
+            currentStory.chapters.map(
+              (item) => {
+                if (
+                  item.id !==
+                  savedChapter.id
+                ) {
+                  return item;
+                }
+
+                return {
+                  ...item,
+                  title:
+                    savedChapter.title,
+                  published:
+                    savedChapter.published,
+                  publication_status:
+                    savedChapter.publication_status,
+                  scheduled_for:
+                    resolvedScheduledFor,
+                  is_scheduled:
+                    savedChapter.publication_status ===
+                    'scheduled',
+                };
+              }
+            );
+        } else {
+          /*
+           * O capítulo novo pode ter sido criado como
+           * rascunho e, por isso, ainda não existir na
+           * lista original da obra.
+           *
+           * Depois que ele for salvo, adicionamos o capítulo
+           * à lista local para que ele também apareça na
+           * coluna "Capítulos".
+           */
+          const newStoryChapter: StoryChapter = {
+            id: savedChapter.id,
+            chapter_number:
+              savedChapter.chapter_number,
+            title:
+              savedChapter.title,
+            published:
+              savedChapter.published,
+            scheduled_for:
+              resolvedScheduledFor,
+            is_scheduled:
+              savedChapter.publication_status ===
+              'scheduled',
+            publication_status:
+              savedChapter.publication_status,
+          };
+
+          updatedChapters = [
+            ...currentStory.chapters,
+            newStoryChapter,
+          ].sort(
+            (a, b) =>
+              a.chapter_number -
+              b.chapter_number
+          );
+        }
 
         const updatedStory =
           {
