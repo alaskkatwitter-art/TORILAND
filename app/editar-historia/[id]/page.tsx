@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, {
@@ -16,6 +15,11 @@ import {
   useSearchParams,
 } from 'next/navigation';
 
+type ChapterStatus =
+  | 'draft'
+  | 'published'
+  | 'unpublished';
+
 type Tag = {
   id?: string;
   name: string;
@@ -26,13 +30,7 @@ type StoryChapter = {
   chapter_number: number;
   title: string;
   published: boolean;
-  scheduled_for: string | null;
-  is_scheduled: boolean;
-  publication_status?:
-    | 'draft'
-    | 'scheduled'
-    | 'published'
-    | 'unpublished';
+  publication_status?: ChapterStatus;
 };
 
 type Story = {
@@ -63,24 +61,17 @@ type Chapter = {
   published: boolean;
   created_at: string;
   updated_at?: string | null;
-  publication_status:
-    | 'draft'
-    | 'scheduled'
-    | 'published'
-    | 'unpublished';
+  publication_status: ChapterStatus;
   original_published_at: string | null;
   republished_at: string | null;
   author_notes: string;
-  scheduled_for?: string | null;
   media?: ChapterMedia[];
 };
 
 type ChapterResponse = {
   chapter?: Chapter;
   media?: ChapterMedia[];
-  scheduled?: boolean;
   published?: boolean;
-  scheduled_for?: string | null;
   error?: string;
 };
 
@@ -117,58 +108,10 @@ function formatDate(value: string | null | undefined) {
   });
 }
 
-function formatDateForInput(value: string | null | undefined) {
-  if (!value) return '';
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  const pad = (number: number) =>
-    String(number).padStart(2, '0');
-
-  return (
-    date.getFullYear() +
-    '-' +
-    pad(date.getMonth() + 1) +
-    '-' +
-    pad(date.getDate()) +
-    'T' +
-    pad(date.getHours()) +
-    ':' +
-    pad(date.getMinutes())
-  );
-}
-
-function getLocalDateTimeInputMin() {
-  const date = new Date();
-
-  const pad = (number: number) =>
-    String(number).padStart(2, '0');
-
-  return (
-    date.getFullYear() +
-    '-' +
-    pad(date.getMonth() + 1) +
-    '-' +
-    pad(date.getDate()) +
-    'T' +
-    pad(date.getHours()) +
-    ':' +
-    pad(date.getMinutes())
-  );
-}
-
 function getStatusLabel(
-  status: Chapter['publication_status'],
+  status: ChapterStatus,
   published?: boolean
 ) {
-  if (status === 'scheduled') {
-    return 'AGENDADO';
-  }
-
   if (status === 'published' || published) {
     return 'PUBLICADO';
   }
@@ -181,13 +124,9 @@ function getStatusLabel(
 }
 
 function getStatusClass(
-  status: Chapter['publication_status'],
+  status: ChapterStatus,
   published?: boolean
 ) {
-  if (status === 'scheduled') {
-    return 'border-violet-400/20 bg-violet-500/10 text-violet-200';
-  }
-
   if (status === 'published' || published) {
     return 'border-emerald-400/20 bg-emerald-500/10 text-emerald-200';
   }
@@ -329,12 +268,7 @@ export default function EditarHistoriaPage() {
     useState('');
 
   const [chapterStatus, setChapterStatus] =
-    useState<Chapter['publication_status']>(
-      'draft'
-    );
-
-  const [scheduledFor, setScheduledFor] =
-    useState('');
+    useState<ChapterStatus>('draft');
 
   const [chapterMedia, setChapterMedia] =
     useState<EditorMedia[]>([]);
@@ -461,12 +395,11 @@ export default function EditarHistoriaPage() {
             ? loadedStory.chapters.map(
                 (item: StoryChapter) => ({
                   ...item,
-                  scheduled_for:
-                    item.scheduled_for || null,
-                  is_scheduled:
-                    item.is_scheduled ||
-                    item.publication_status ===
-                      'scheduled',
+                  publication_status:
+                    item.publication_status ||
+                    (item.published
+                      ? 'published'
+                      : 'draft'),
                 })
               )
             : [];
@@ -529,21 +462,17 @@ export default function EditarHistoriaPage() {
         const requestedChapter =
           searchParams.get('chapter');
 
-        if (
-          requestedChapter &&
-          normalizedChapters.some(
-            (item) =>
-              item.id ===
-              requestedChapter
-          )
-        ) {
+        /*
+         * IMPORTANTE:
+         * Não verificamos se o capítulo está na lista
+         * retornada pela obra. Um capítulo recém-criado
+         * pode ainda não estar nessa lista no momento
+         * da navegação.
+         */
+        if (requestedChapter) {
           setSelectedChapterId(
             requestedChapter
           );
-        } else if (
-          requestedChapter
-        ) {
-          setSelectedChapterId(null);
         }
       } catch (caughtError) {
         if (cancelled) return;
@@ -610,27 +539,14 @@ export default function EditarHistoriaPage() {
         const loadedChapter =
           data.chapter;
 
-        const currentStory =
-          storyRef.current;
-
-        const storyChapter =
-          currentStory?.chapters?.find(
-            (item) =>
-              item.id ===
-              loadedChapter.id
-          );
-
-        const resolvedScheduledFor =
-          data.scheduled_for ??
-          loadedChapter.scheduled_for ??
-          storyChapter?.scheduled_for ??
-          null;
-
         const normalizedChapter: Chapter =
           {
             ...loadedChapter,
-            scheduled_for:
-              resolvedScheduledFor,
+            publication_status:
+              loadedChapter.publication_status ||
+              (loadedChapter.published
+                ? 'published'
+                : 'draft'),
             author_notes:
               loadedChapter.author_notes ||
               '',
@@ -654,16 +570,7 @@ export default function EditarHistoriaPage() {
         );
 
         setChapterStatus(
-          normalizedChapter.publication_status ||
-            (normalizedChapter.published
-              ? 'published'
-              : 'draft')
-        );
-
-        setScheduledFor(
-          formatDateForInput(
-            resolvedScheduledFor
-          )
+          normalizedChapter.publication_status
         );
 
         const loadedMedia =
@@ -775,7 +682,6 @@ export default function EditarHistoriaPage() {
             body: '<p><br></p>',
             author_notes: '',
             publication_status: 'draft',
-            scheduled_for: null,
           }),
         }
       );
@@ -798,55 +704,112 @@ export default function EditarHistoriaPage() {
         );
       }
 
-      setSelectedChapterId(newChapter.id);
-      setChapter(newChapter);
-      setChapterTitle(newChapter.title || 'Novo capítulo');
-      setChapterBody(newChapter.body || '<p><br></p>');
-      setAuthorNotes(newChapter.author_notes || '');
-      setChapterStatus(
-        newChapter.publication_status || 'draft'
+      const normalizedNewChapter: Chapter = {
+        ...newChapter,
+        publication_status:
+          newChapter.publication_status ||
+          'draft',
+        author_notes:
+          newChapter.author_notes || '',
+      };
+
+      setSelectedChapterId(
+        normalizedNewChapter.id
       );
-      setScheduledFor('');
+
+      setChapter(
+        normalizedNewChapter
+      );
+
+      setChapterTitle(
+        normalizedNewChapter.title ||
+          'Novo capítulo'
+      );
+
+      setChapterBody(
+        normalizedNewChapter.body ||
+          '<p><br></p>'
+      );
+
+      setAuthorNotes(
+        normalizedNewChapter.author_notes ||
+          ''
+      );
+
+      setChapterStatus(
+        normalizedNewChapter.publication_status
+      );
+
       setChapterMedia([]);
       setPreviewMode(false);
       setShowLinkBox(false);
       setLinkValue('');
-      savedSelectionRef.current = null;
+
+      savedSelectionRef.current =
+        null;
 
       setStory((currentStory) => {
-        if (!currentStory) return currentStory;
+        if (!currentStory) {
+          return currentStory;
+        }
 
-        const exists = currentStory.chapters.some(
-          (item) => item.id === newChapter.id
-        );
+        const exists =
+          currentStory.chapters.some(
+            (item) =>
+              item.id ===
+              normalizedNewChapter.id
+          );
 
-        if (exists) return currentStory;
+        if (exists) {
+          return currentStory;
+        }
 
-        const newStoryChapter: StoryChapter = {
-          id: newChapter.id,
-          chapter_number: newChapter.chapter_number,
-          title: newChapter.title || 'Novo capítulo',
-          published: newChapter.published,
-          scheduled_for: newChapter.scheduled_for || null,
-          is_scheduled: false,
-          publication_status: newChapter.publication_status || 'draft',
-        };
+        const newStoryChapter:
+          StoryChapter = {
+            id: normalizedNewChapter.id,
+            chapter_number:
+              normalizedNewChapter.chapter_number,
+            title:
+              normalizedNewChapter.title ||
+              'Novo capítulo',
+            published:
+              normalizedNewChapter.published,
+            publication_status:
+              normalizedNewChapter.publication_status,
+          };
 
         const updatedStory = {
           ...currentStory,
-          chapters: [...currentStory.chapters, newStoryChapter].sort(
-            (a, b) => a.chapter_number - b.chapter_number
+          chapters: [
+            ...currentStory.chapters,
+            newStoryChapter,
+          ].sort(
+            (a, b) =>
+              a.chapter_number -
+              b.chapter_number
           ),
         };
 
-        storyRef.current = updatedStory;
+        storyRef.current =
+          updatedStory;
+
         return updatedStory;
       });
 
-      const currentUrl = new URL(window.location.href);
-      currentUrl.searchParams.set('chapter', newChapter.id);
+      const currentUrl =
+        new URL(
+          window.location.href
+        );
+
+      currentUrl.searchParams.set(
+        'chapter',
+        normalizedNewChapter.id
+      );
+
       router.replace(
-        currentUrl.pathname + '?' + currentUrl.searchParams.toString()
+        currentUrl.pathname +
+          '?' +
+          currentUrl.searchParams.toString()
       );
     } catch (caughtError) {
       setError(
@@ -1521,45 +1484,13 @@ export default function EditarHistoriaPage() {
   }
 
   async function saveChapter(
-    targetStatus?: Chapter['publication_status']
+    targetStatus?: ChapterStatus
   ) {
     if (!chapter) return;
 
     const finalStatus =
       targetStatus ||
       chapterStatus;
-
-    if (
-      finalStatus === 'scheduled' &&
-      !scheduledFor
-    ) {
-      setError(
-        'Escolha a data e o horário da publicação.'
-      );
-      return;
-    }
-
-    if (
-      finalStatus === 'scheduled'
-    ) {
-      const selectedDate =
-        new Date(
-          scheduledFor
-        );
-
-      if (
-        Number.isNaN(
-          selectedDate.getTime()
-        ) ||
-        selectedDate.getTime() <=
-          Date.now()
-      ) {
-        setError(
-          'A data de publicação precisa estar no futuro.'
-        );
-        return;
-      }
-    }
 
     const body =
       syncEditorBody();
@@ -1693,19 +1624,6 @@ export default function EditarHistoriaPage() {
           }
         );
 
-        if (
-          finalStatus ===
-            'scheduled' &&
-          scheduledFor
-        ) {
-          uploadData.append(
-            'scheduled_for',
-            new Date(
-              scheduledFor
-            ).toISOString()
-          );
-        }
-
         const uploadResponse =
           await fetch(
             `/api/chapters/${chapter.id}`,
@@ -1825,18 +1743,6 @@ export default function EditarHistoriaPage() {
         }
       );
 
-      if (
-        finalStatus ===
-        'scheduled'
-      ) {
-        formData.append(
-          'scheduled_for',
-          new Date(
-            scheduledFor
-          ).toISOString()
-        );
-      }
-
       const response =
         await fetch(
           `/api/chapters/${chapter.id}`,
@@ -1866,21 +1772,12 @@ export default function EditarHistoriaPage() {
       const savedChapter =
         data.chapter;
 
-      const resolvedScheduledFor =
-        finalStatus ===
-        'scheduled'
-          ? data.scheduled_for ??
-            savedChapter.scheduled_for ??
-            new Date(
-              scheduledFor
-            ).toISOString()
-          : null;
-
       const normalizedSavedChapter:
         Chapter = {
           ...savedChapter,
-          scheduled_for:
-            resolvedScheduledFor,
+          publication_status:
+            savedChapter.publication_status ||
+            finalStatus,
           author_notes:
             savedChapter.author_notes ||
             '',
@@ -1891,25 +1788,17 @@ export default function EditarHistoriaPage() {
       );
 
       setChapterStatus(
-        savedChapter.publication_status
+        normalizedSavedChapter.publication_status
       );
 
       setChapterBody(
-        savedChapter.body ||
+        normalizedSavedChapter.body ||
           workingBody
       );
 
       setAuthorNotes(
-        savedChapter.author_notes ||
+        normalizedSavedChapter.author_notes ||
           ''
-      );
-
-      setScheduledFor(
-        resolvedScheduledFor
-          ? formatDateForInput(
-              resolvedScheduledFor
-            )
-          : ''
       );
 
       if (data.media) {
@@ -1931,7 +1820,7 @@ export default function EditarHistoriaPage() {
 
       if (editorRef.current) {
         editorRef.current.innerHTML =
-          savedChapter.body ||
+          normalizedSavedChapter.body ||
           workingBody;
       }
 
@@ -1944,13 +1833,6 @@ export default function EditarHistoriaPage() {
       ) {
         setSuccess(
           'Capítulo publicado com sucesso.'
-        );
-      } else if (
-        finalStatus ===
-        'scheduled'
-      ) {
-        setSuccess(
-          'Capítulo agendado com sucesso.'
         );
       } else if (
         finalStatus ===
@@ -1975,7 +1857,7 @@ export default function EditarHistoriaPage() {
             (item) => {
               if (
                 item.id !==
-                savedChapter.id
+                normalizedSavedChapter.id
               ) {
                 return item;
               }
@@ -1983,16 +1865,11 @@ export default function EditarHistoriaPage() {
               return {
                 ...item,
                 title:
-                  savedChapter.title,
+                  normalizedSavedChapter.title,
                 published:
-                  savedChapter.published,
+                  normalizedSavedChapter.published,
                 publication_status:
-                  savedChapter.publication_status,
-                scheduled_for:
-                  resolvedScheduledFor,
-                is_scheduled:
-                  savedChapter.publication_status ===
-                  'scheduled',
+                  normalizedSavedChapter.publication_status,
               };
             }
           );
@@ -2094,18 +1971,6 @@ export default function EditarHistoriaPage() {
     syncEditorBody();
   }
 
-  function handleScheduleChange(
-    event: ChangeEvent<HTMLInputElement>
-  ) {
-    setScheduledFor(
-      event.target.value
-    );
-
-    setChapterStatus(
-      'scheduled'
-    );
-  }
-
   function handleMediaButtonClick(
     event?: MouseEvent<HTMLButtonElement>
   ) {
@@ -2146,7 +2011,6 @@ export default function EditarHistoriaPage() {
     setChapterBody('');
     setAuthorNotes('');
     setChapterStatus('draft');
-    setScheduledFor('');
     setChapterMedia([]);
     setPreviewMode(false);
     setShowLinkBox(false);
@@ -2713,11 +2577,17 @@ export default function EditarHistoriaPage() {
 
                   <button
                     type="button"
-                    onClick={() => void handleCreateChapter()}
-                    disabled={creatingChapter}
+                    onClick={() =>
+                      void handleCreateChapter()
+                    }
+                    disabled={
+                      creatingChapter
+                    }
                     className="shrink-0 rounded-lg bg-pink-500 px-3 py-2 text-xs font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
                   >
-                    {creatingChapter ? 'CRIANDO...' : '+ NOVO CAPÍTULO'}
+                    {creatingChapter
+                      ? 'CRIANDO...'
+                      : '+ NOVO CAPÍTULO'}
                   </button>
                 </div>
 
@@ -2731,11 +2601,17 @@ export default function EditarHistoriaPage() {
 
                       <button
                         type="button"
-                        onClick={() => void handleCreateChapter()}
-                        disabled={creatingChapter}
+                        onClick={() =>
+                          void handleCreateChapter()
+                        }
+                        disabled={
+                          creatingChapter
+                        }
                         className="mt-4 rounded-lg bg-pink-500 px-4 py-2 text-xs font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
                       >
-                        {creatingChapter ? 'CRIANDO...' : '+ CRIAR PRIMEIRO CAPÍTULO'}
+                        {creatingChapter
+                          ? 'CRIANDO...'
+                          : '+ CRIAR PRIMEIRO CAPÍTULO'}
                       </button>
                     </div>
                   ) : (
@@ -2764,33 +2640,22 @@ export default function EditarHistoriaPage() {
 
                             <span
                               className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-medium tracking-wide ${getStatusClass(
-                                item.is_scheduled
-                                  ? 'scheduled'
-                                  : item.publication_status ||
-                                    (item.published
-                                      ? 'published'
-                                      : 'draft'),
+                                item.publication_status ||
+                                  (item.published
+                                    ? 'published'
+                                    : 'draft'),
                                 item.published
                               )}`}
                             >
-                              {item.is_scheduled
-                                ? 'AGENDADO'
-                                : item.publication_status ===
-                                  'unpublished'
-                                  ? 'FORA DO AR'
-                                  : item.published
-                                    ? 'PUBLICADO'
-                                    : 'RASCUNHO'}
+                              {getStatusLabel(
+                                item.publication_status ||
+                                  (item.published
+                                    ? 'published'
+                                    : 'draft'),
+                                item.published
+                              )}
                             </span>
                           </div>
-
-                          {item.scheduled_for && (
-                            <p className="mt-2 text-[11px] text-violet-300/70">
-                              {formatDate(
-                                item.scheduled_for
-                              )}
-                            </p>
-                          )}
 
                           <button
                             type="button"
@@ -2855,14 +2720,31 @@ export default function EditarHistoriaPage() {
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-medium">
-                    Capítulos
-                  </h2>
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-sm font-medium">
+                      Capítulos
+                    </h2>
 
-                  <span className="text-xs text-gray-600">
-                    {story.chapters.length}
-                  </span>
+                    <span className="text-xs text-gray-600">
+                      {story.chapters.length}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleCreateChapter()
+                    }
+                    disabled={
+                      creatingChapter
+                    }
+                    className="shrink-0 rounded-lg bg-pink-500 px-2.5 py-2 text-[10px] font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
+                  >
+                    {creatingChapter
+                      ? 'CRIANDO...'
+                      : '+ NOVO CAPÍTULO'}
+                  </button>
                 </div>
 
                 <div className="mt-3 max-h-[500px] overflow-y-auto space-y-2 pr-1">
@@ -2902,33 +2784,22 @@ export default function EditarHistoriaPage() {
 
                           <span
                             className={`shrink-0 rounded-full border px-2 py-1 text-[8px] ${getStatusClass(
-                              item.is_scheduled
-                                ? 'scheduled'
-                                : item.publication_status ||
-                                  (item.published
-                                    ? 'published'
-                                    : 'draft'),
+                              item.publication_status ||
+                                (item.published
+                                  ? 'published'
+                                  : 'draft'),
                               item.published
                             )}`}
                           >
-                            {item.is_scheduled
-                              ? 'AGENDADO'
-                              : item.publication_status ===
-                                'unpublished'
-                                ? 'FORA DO AR'
-                                : item.published
-                                  ? 'PUBLICADO'
-                                  : 'RASCUNHO'}
+                            {getStatusLabel(
+                              item.publication_status ||
+                                (item.published
+                                  ? 'published'
+                                  : 'draft'),
+                              item.published
+                            )}
                           </span>
                         </div>
-
-                        {item.scheduled_for && (
-                          <p className="mt-2 text-[10px] text-violet-300/60">
-                            {formatDate(
-                              item.scheduled_for
-                            )}
-                          </p>
-                        )}
                       </button>
                     )
                   )}
@@ -3522,7 +3393,7 @@ export default function EditarHistoriaPage() {
                         </h2>
 
                         <p className="mt-1 text-xs text-gray-600">
-                          Salve como rascunho, publique agora ou escolha uma data para liberar o capítulo.
+                          Salve como rascunho, publique agora ou retire o capítulo do ar.
                         </p>
                       </div>
 
@@ -3533,20 +3404,11 @@ export default function EditarHistoriaPage() {
                         onChange={(event) => {
                           const nextStatus =
                             event.target
-                              .value as Chapter['publication_status'];
+                              .value as ChapterStatus;
 
                           setChapterStatus(
                             nextStatus
                           );
-
-                          if (
-                            nextStatus !==
-                            'scheduled'
-                          ) {
-                            setScheduledFor(
-                              ''
-                            );
-                          }
                         }}
                         className="rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
                       >
@@ -3558,40 +3420,11 @@ export default function EditarHistoriaPage() {
                           Publicar agora
                         </option>
 
-                        <option value="scheduled">
-                          Agendar publicação
-                        </option>
-
                         <option value="unpublished">
                           Retirar do ar
                         </option>
                       </select>
                     </div>
-
-                    {chapterStatus ===
-                      'scheduled' && (
-                      <div className="mt-5 rounded-xl border border-violet-400/20 bg-violet-500/[0.05] p-4">
-                        <label className="mb-2 block text-sm text-violet-200">
-                          Data e horário da publicação
-                        </label>
-
-                        <input
-                          type="datetime-local"
-                          value={
-                            scheduledFor
-                          }
-                          onChange={
-                            handleScheduleChange
-                          }
-                          min={getLocalDateTimeInputMin()}
-                          className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-violet-400/40"
-                        />
-
-                        <p className="mt-2 text-xs text-violet-200/50">
-                          O capítulo ficará privado até a data escolhida.
-                        </p>
-                      </div>
-                    )}
 
                     <div className="mt-5 grid gap-3 sm:grid-cols-2">
                       <button
@@ -3623,15 +3456,12 @@ export default function EditarHistoriaPage() {
                         {savingChapter
                           ? 'Salvando...'
                           : chapterStatus ===
-                              'scheduled'
-                            ? 'Agendar capítulo'
+                              'published'
+                            ? 'Publicar capítulo'
                             : chapterStatus ===
-                                'published'
-                              ? 'Publicar capítulo'
-                              : chapterStatus ===
-                                  'unpublished'
-                                ? 'Retirar do ar'
-                                : 'Salvar capítulo'}
+                                'unpublished'
+                              ? 'Retirar do ar'
+                              : 'Salvar capítulo'}
                       </button>
                     </div>
                   </section>
