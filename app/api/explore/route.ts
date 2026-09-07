@@ -32,8 +32,7 @@ export async function GET(request: Request) {
      */
     const { data: users, error: usersError } = await supabase
       .from('profiles')
-      .select('id, username, display_name, avatar_url')
-      .or(`username.ilike.${search},display_name.ilike.${search}`)
+.select('id, username, display_name, avatar_url, verified')      .or(`username.ilike.${search},display_name.ilike.${search}`)
       .order('username', { ascending: true })
       .limit(20);
 
