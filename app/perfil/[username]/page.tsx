@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
+
 import {
   useParams,
   useRouter,
@@ -17,6 +18,7 @@ type User = {
   bio: string | null;
   avatar_url: string | null;
   cover_url: string | null;
+  verified?: boolean;
 };
 
 type Story = {
@@ -38,7 +40,9 @@ type PostMedia = {
   id: string;
   post_id: string;
   media_url: string;
-  media_type: 'image' | 'gif';
+  media_type:
+    | 'image'
+    | 'gif';
   created_at?: string;
 };
 
@@ -92,6 +96,15 @@ type ProfileResponse = {
   error?: string;
 };
 
+type FollowResponse = {
+  followers_count?: number;
+  following_count?: number;
+  is_following?: boolean;
+  is_self?: boolean;
+  following?: boolean;
+  error?: string;
+};
+
 type Tab =
   | 'stories'
   | 'nook'
@@ -105,28 +118,37 @@ const TAB_ORDER: Tab[] = [
   'clubs',
 ];
 
-function formatDate(value: string) {
+function formatDate(
+  value: string
+) {
   try {
     return new Date(
       value
-    ).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    ).toLocaleDateString(
+      'pt-BR',
+      {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }
+    );
   } catch {
     return '';
   }
 }
 
-function getDisplayName(user: User) {
+function getDisplayName(
+  user: User
+) {
   return (
     user.display_name?.trim() ||
     user.username
   );
 }
 
-function getFandom(story: Story) {
+function getFandom(
+  story: Story
+) {
   return (
     story.main_fandom?.trim() ||
     story.fandom?.trim() ||
@@ -135,7 +157,9 @@ function getFandom(story: Story) {
   );
 }
 
-function isOngoing(status: string | null) {
+function isOngoing(
+  status: string | null
+) {
   if (!status) {
     return false;
   }
@@ -155,6 +179,28 @@ function isOngoing(status: string | null) {
   );
 }
 
+function VerifiedBadge() {
+  return (
+    <span
+      title="Perfil verificado"
+      aria-label="Perfil verificado"
+      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#ff78b9] text-[#190d16]"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M5 12.5 9.2 17 19 7" />
+      </svg>
+    </span>
+  );
+}
+
 function StoryCard({
   story,
   onOpen,
@@ -162,10 +208,13 @@ function StoryCard({
   story: Story;
   onOpen: () => void;
 }) {
-  const fandom = getFandom(story);
-  const ongoing = isOngoing(
-    story.status
-  );
+  const fandom =
+    getFandom(story);
+
+  const ongoing =
+    isOngoing(
+      story.status
+    );
 
   return (
     <button
@@ -177,13 +226,15 @@ function StoryCard({
         <div className="relative h-36 w-24 shrink-0 overflow-hidden rounded-2xl bg-[#211a21] sm:h-44 sm:w-28">
           {story.cover_url ? (
             <img
-              src={story.cover_url}
+              src={
+                story.cover_url
+              }
               alt=""
               className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-3xl text-white/20">
-              📖
+              Livro
             </div>
           )}
         </div>
@@ -195,7 +246,9 @@ function StoryCard({
 
           {story.description && (
             <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/45">
-              {story.description}
+              {
+                story.description
+              }
             </p>
           )}
 
@@ -275,8 +328,11 @@ function EmptyState({
 }
 
 export default function PublicProfilePage() {
-  const params = useParams();
-  const router = useRouter();
+  const params =
+    useParams();
+
+  const router =
+    useRouter();
 
   const usernameParam =
     params?.username;
@@ -286,13 +342,15 @@ export default function PublicProfilePage() {
     'string'
       ? usernameParam
       : Array.isArray(
-          usernameParam
-        )
+            usernameParam
+          )
         ? usernameParam[0]
         : undefined;
 
   const [user, setUser] =
-    useState<User | null>(null);
+    useState<User | null>(
+      null
+    );
 
   const [stories, setStories] =
     useState<Story[]>([]);
@@ -300,14 +358,26 @@ export default function PublicProfilePage() {
   const [posts, setPosts] =
     useState<NookPost[]>([]);
 
-  const [readingLists, setReadingLists] =
-    useState<ReadingList[]>([]);
+  const [
+    readingLists,
+    setReadingLists,
+  ] = useState<ReadingList[]>(
+    []
+  );
 
-  const [ficClubs, setFicClubs] =
-    useState<FicClub[]>([]);
+  const [
+    ficClubs,
+    setFicClubs,
+  ] = useState<FicClub[]>(
+    []
+  );
 
-  const [activeTab, setActiveTab] =
-    useState<Tab>('stories');
+  const [
+    activeTab,
+    setActiveTab,
+  ] = useState<Tab>(
+    'stories'
+  );
 
   const [loading, setLoading] =
     useState(true);
@@ -315,8 +385,33 @@ export default function PublicProfilePage() {
   const [error, setError] =
     useState('');
 
+  const [
+    followersCount,
+    setFollowersCount,
+  ] = useState(0);
+
+  const [
+    followingCount,
+    setFollowingCount,
+  ] = useState(0);
+
+  const [
+    isFollowing,
+    setIsFollowing,
+  ] = useState(false);
+
+  const [isSelf, setIsSelf] =
+    useState(false);
+
+  const [
+    followLoading,
+    setFollowLoading,
+  ] = useState(false);
+
   const touchStartX =
-    useRef<number | null>(null);
+    useRef<number | null>(
+      null
+    );
 
   const activeIndex =
     TAB_ORDER.indexOf(
@@ -404,6 +499,51 @@ export default function PublicProfilePage() {
             ? data.fic_clubs
             : []
         );
+
+        try {
+          const followResponse =
+            await fetch(
+              `/api/follows?user_id=${encodeURIComponent(
+                data.user.id
+              )}`,
+              {
+                cache:
+                  'no-store',
+              }
+            );
+
+          const followData: FollowResponse =
+            await followResponse.json();
+
+          if (
+            followResponse.ok
+          ) {
+            setFollowersCount(
+              followData.followers_count ??
+                0
+            );
+
+            setFollowingCount(
+              followData.following_count ??
+                0
+            );
+
+            setIsFollowing(
+              !!followData.is_following
+            );
+
+            setIsSelf(
+              !!followData.is_self
+            );
+          }
+        } catch (
+          followError
+        ) {
+          console.error(
+            'Erro ao carregar seguidores:',
+            followError
+          );
+        }
       } catch (err) {
         console.error(
           'Erro ao carregar perfil público:',
@@ -420,6 +560,83 @@ export default function PublicProfilePage() {
 
     loadProfile();
   }, [username]);
+
+  async function handleFollow() {
+    if (
+      !user ||
+      isSelf ||
+      followLoading
+    ) {
+      return;
+    }
+
+    setFollowLoading(true);
+
+    try {
+      const method =
+        isFollowing
+          ? 'DELETE'
+          : 'POST';
+
+      const response =
+        await fetch(
+          '/api/follows',
+          {
+            method,
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+            body: JSON.stringify(
+              {
+                following_id:
+                  user.id,
+              }
+            ),
+          }
+        );
+
+      const data: FollowResponse =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Não foi possível atualizar o follow.'
+        );
+      }
+
+      setIsFollowing(
+        data.following ??
+          !isFollowing
+      );
+
+      setFollowersCount(
+        data.followers_count ??
+          followersCount
+      );
+
+      setFollowingCount(
+        data.following_count ??
+          followingCount
+      );
+    } catch (err) {
+      console.error(
+        'Erro ao atualizar follow:',
+        err
+      );
+
+      alert(
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível atualizar o follow.'
+      );
+    } finally {
+      setFollowLoading(
+        false
+      );
+    }
+  }
 
   function goToTab(
     index: number
@@ -461,7 +678,8 @@ export default function PublicProfilePage() {
         ?.clientX;
 
     if (
-      typeof endX !== 'number'
+      typeof endX !==
+      'number'
     ) {
       touchStartX.current =
         null;
@@ -519,7 +737,7 @@ export default function PublicProfilePage() {
       <main className="flex min-h-screen items-center justify-center bg-[#0d0a0d] px-5 text-white">
         <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#151015] p-8 text-center">
           <div className="text-5xl">
-            📖
+            Livro
           </div>
 
           <h1 className="mt-5 text-2xl font-black">
@@ -548,6 +766,7 @@ export default function PublicProfilePage() {
   return (
     <main className="min-h-screen bg-[#0d0a0d] text-white">
       <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-5 sm:py-8">
+
         {/* VOLTAR */}
 
         <button
@@ -570,7 +789,9 @@ export default function PublicProfilePage() {
           <div className="relative h-44 overflow-hidden bg-[#241924] sm:h-60">
             {user.cover_url ? (
               <img
-                src={user.cover_url}
+                src={
+                  user.cover_url
+                }
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover"
               />
@@ -582,11 +803,13 @@ export default function PublicProfilePage() {
           </div>
 
           <div className="relative px-5 pb-7 sm:px-8">
-            <div className="-mt-14 flex items-end justify-between">
+            <div className="-mt-14 flex items-end justify-between gap-4">
               <div>
                 {user.avatar_url ? (
                   <img
-                    src={user.avatar_url}
+                    src={
+                      user.avatar_url
+                    }
                     alt={getDisplayName(
                       user
                     )}
@@ -603,29 +826,82 @@ export default function PublicProfilePage() {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    '/perfil'
-                  )
-                }
-                className="mb-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
-              >
-                Meu perfil
-              </button>
+              {!isSelf && (
+                <button
+                  type="button"
+                  onClick={
+                    handleFollow
+                  }
+                  disabled={
+                    followLoading
+                  }
+                  className={`mb-2 rounded-2xl px-5 py-2.5 text-sm font-black transition disabled:opacity-50 ${
+                    isFollowing
+                      ? 'border border-white/15 bg-white/5 text-white hover:bg-white/10'
+                      : 'bg-[#ff78b9] text-[#190d16] hover:brightness-110'
+                  }`}
+                >
+                  {followLoading
+                    ? '...'
+                    : isFollowing
+                      ? 'Seguindo'
+                      : 'Seguir'}
+                </button>
+              )}
+
+              {isSelf && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      '/perfil'
+                    )
+                  }
+                  className="mb-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
+                >
+                  Editar perfil
+                </button>
+              )}
             </div>
 
             <div className="mt-5">
-              <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
-                {getDisplayName(
-                  user
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+                  {getDisplayName(
+                    user
+                  )}
+                </h1>
+
+                {user.verified && (
+                  <VerifiedBadge />
                 )}
-              </h1>
+              </div>
 
               <p className="mt-1 text-sm font-semibold text-white/40">
                 @{user.username}
               </p>
+
+              <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+                <div>
+                  <span className="text-lg font-black text-white">
+                    {followersCount}
+                  </span>
+
+                  <span className="ml-2 text-xs font-semibold text-white/40">
+                    seguidores
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-lg font-black text-white">
+                    {followingCount}
+                  </span>
+
+                  <span className="ml-2 text-xs font-semibold text-white/40">
+                    seguindo
+                  </span>
+                </div>
+              </div>
 
               {user.bio ? (
                 <p className="mt-5 max-w-2xl whitespace-pre-wrap text-sm leading-7 text-white/70">
@@ -704,9 +980,8 @@ export default function PublicProfilePage() {
               }%)`,
             }}
           >
-            {/* =================================================
-                HISTÓRIAS
-            ================================================= */}
+
+            {/* HISTÓRIAS */}
 
             <section className="w-1/4 shrink-0 px-0.5">
               {stories.length ===
@@ -739,9 +1014,7 @@ export default function PublicProfilePage() {
               )}
             </section>
 
-            {/* =================================================
-                MURAL
-            ================================================= */}
+            {/* MURAL */}
 
             <section className="w-1/4 shrink-0 px-0.5">
               {posts.length ===
@@ -837,8 +1110,7 @@ export default function PublicProfilePage() {
                               0 && (
                               <div
                                 className={`mt-5 grid gap-2 ${
-                                  post
-                                    .media
+                                  post.media
                                     .length ===
                                   1
                                     ? 'grid-cols-1'
@@ -880,9 +1152,7 @@ export default function PublicProfilePage() {
               )}
             </section>
 
-            {/* =================================================
-                LISTAS DE LEITURA
-            ================================================= */}
+            {/* LISTAS */}
 
             <section className="w-1/4 shrink-0 px-0.5">
               {readingLists.length ===
@@ -970,7 +1240,7 @@ export default function PublicProfilePage() {
                                         />
                                       ) : (
                                         <div className="flex h-full items-center justify-center text-xl text-white/20">
-                                          📖
+                                          Livro
                                         </div>
                                       )}
                                     </div>
@@ -1009,9 +1279,7 @@ export default function PublicProfilePage() {
               )}
             </section>
 
-            {/* =================================================
-                CLUBES DAS FIC
-            ================================================= */}
+            {/* CLUBES */}
 
             <section className="w-1/4 shrink-0 px-0.5">
               {ficClubs.length ===
@@ -1092,7 +1360,7 @@ export default function PublicProfilePage() {
                                   />
                                 ) : (
                                   <div className="flex h-full items-center justify-center text-lg text-white/20">
-                                    📖
+                                    Livro
                                   </div>
                                 )}
                               </div>
