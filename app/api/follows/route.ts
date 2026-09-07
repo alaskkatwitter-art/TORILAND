@@ -5,9 +5,14 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SECRET_KEY!;
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(
+  supabaseUrl,
+  supabaseKey
+);
 
-async function getCurrentUserId(request: Request) {
+async function getCurrentUserId(
+  request: Request
+) {
   try {
     const cookieStore = await cookies();
 
@@ -37,57 +42,105 @@ async function getCurrentUserId(request: Request) {
   }
 }
 
-/**
- * GET
- *
- * Verifica se o usuário atual segue determinado perfil
- * e retorna a quantidade de seguidores.
- *
- * Uso:
- * /api/follows?user_id=ID_DO_PERFIL
- */
-export async function GET(request: Request) {
-  try {
-    const currentUserId = await getCurrentUserId(request);
-
-    const url = new URL(request.url);
-    const targetUserId = url.searchParams.get('user_id');
-
-    if (!targetUserId) {
-      return NextResponse.json(
-        { error: 'user_id é obrigatório.' },
-        { status: 400 }
-      );
-    }
-
-    const { count, error: countError } = await supabase
+async function getFollowCounts(
+  userId: string
+) {
+  const [
+    followersResult,
+    followingResult,
+  ] = await Promise.all([
+    supabase
       .from('follows')
       .select('*', {
         count: 'exact',
         head: true,
       })
-      .eq('following_id', targetUserId);
+      .eq('following_id', userId),
 
-    if (countError) {
-      console.error(
-        'Erro ao contar seguidores:',
-        countError
+    supabase
+      .from('follows')
+      .select('*', {
+        count: 'exact',
+        head: true,
+      })
+      .eq('follower_id', userId),
+  ]);
+
+  return {
+    followers_count:
+      followersResult.count ?? 0,
+
+    following_count:
+      followingResult.count ?? 0,
+  };
+}
+
+/**
+ * GET
+ *
+ * Retorna:
+ * - quantidade de seguidores
+ * - quantidade de pessoas seguindo
+ * - se o usuário atual segue este perfil
+ * - se é o próprio perfil
+ *
+ * /api/follows?user_id=ID_DO_PERFIL
+ */
+export async function GET(
+  request: Request
+) {
+  try {
+    const currentUserId =
+      await getCurrentUserId(
+        request
       );
 
+    const url =
+      new URL(request.url);
+
+    const targetUserId =
+      url.searchParams.get(
+        'user_id'
+      );
+
+    if (!targetUserId) {
       return NextResponse.json(
-        { error: 'Não foi possível carregar os seguidores.' },
-        { status: 500 }
+        {
+          error:
+            'user_id é obrigatório.',
+        },
+        {
+          status: 400,
+        }
       );
     }
 
+    const counts =
+      await getFollowCounts(
+        targetUserId
+      );
+
     let isFollowing = false;
 
-    if (currentUserId && currentUserId !== targetUserId) {
-      const { data, error } = await supabase
+    if (
+      currentUserId &&
+      currentUserId !==
+        targetUserId
+    ) {
+      const {
+        data,
+        error,
+      } = await supabase
         .from('follows')
         .select('follower_id')
-        .eq('follower_id', currentUserId)
-        .eq('following_id', targetUserId)
+        .eq(
+          'follower_id',
+          currentUserId
+        )
+        .eq(
+          'following_id',
+          targetUserId
+        )
         .maybeSingle();
 
       if (error) {
@@ -97,25 +150,48 @@ export async function GET(request: Request) {
         );
 
         return NextResponse.json(
-          { error: 'Não foi possível verificar o follow.' },
-          { status: 500 }
+          {
+            error:
+              'Não foi possível verificar o follow.',
+          },
+          {
+            status: 500,
+          }
         );
       }
 
-      isFollowing = !!data;
+      isFollowing =
+        !!data;
     }
 
     return NextResponse.json({
-      followers_count: count ?? 0,
-      is_following: isFollowing,
-      is_self: currentUserId === targetUserId,
+      followers_count:
+        counts.followers_count,
+
+      following_count:
+        counts.following_count,
+
+      is_following:
+        isFollowing,
+
+      is_self:
+        currentUserId ===
+        targetUserId,
     });
   } catch (error) {
-    console.error('GET /api/follows:', error);
+    console.error(
+      'GET /api/follows:',
+      error
+    );
 
     return NextResponse.json(
-      { error: 'Erro interno.' },
-      { status: 500 }
+      {
+        error:
+          'Erro interno.',
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
@@ -124,47 +200,69 @@ export async function GET(request: Request) {
  * POST
  *
  * Segue um usuário.
- *
- * Body:
- * {
- *   following_id: "ID_DO_USUARIO"
- * }
  */
-export async function POST(request: Request) {
+export async function POST(
+  request: Request
+) {
   try {
-    const currentUserId = await getCurrentUserId(request);
+    const currentUserId =
+      await getCurrentUserId(
+        request
+      );
 
     if (!currentUserId) {
       return NextResponse.json(
-        { error: 'Você precisa estar logado.' },
-        { status: 401 }
+        {
+          error:
+            'Você precisa estar logado.',
+        },
+        {
+          status: 401,
+        }
       );
     }
 
-    const body = await request.json();
-    const followingId = body?.following_id;
+    const body =
+      await request.json();
+
+    const followingId =
+      body?.following_id;
 
     if (!followingId) {
       return NextResponse.json(
-        { error: 'following_id é obrigatório.' },
-        { status: 400 }
+        {
+          error:
+            'following_id é obrigatório.',
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    if (currentUserId === followingId) {
+    if (
+      currentUserId ===
+      followingId
+    ) {
       return NextResponse.json(
-        { error: 'Você não pode seguir a si mesmo.' },
-        { status: 400 }
+        {
+          error:
+            'Você não pode seguir a si mesmo.',
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    // Confirma que o perfil existe.
-    const { data: targetUser, error: targetError } =
-      await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', followingId)
-        .maybeSingle();
+    const {
+      data: targetUser,
+      error: targetError,
+    } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', followingId)
+      .maybeSingle();
 
     if (targetError) {
       console.error(
@@ -173,78 +271,119 @@ export async function POST(request: Request) {
       );
 
       return NextResponse.json(
-        { error: 'Não foi possível encontrar o usuário.' },
-        { status: 500 }
+        {
+          error:
+            'Não foi possível encontrar o usuário.',
+        },
+        {
+          status: 500,
+        }
       );
     }
 
     if (!targetUser) {
       return NextResponse.json(
-        { error: 'Usuário não encontrado.' },
-        { status: 404 }
+        {
+          error:
+            'Usuário não encontrado.',
+        },
+        {
+          status: 404,
+        }
       );
     }
 
-    // Verifica se já segue.
-    const { data: existingFollow } = await supabase
+    const {
+      data: existingFollow,
+      error: existingError,
+    } = await supabase
       .from('follows')
       .select('follower_id')
-      .eq('follower_id', currentUserId)
-      .eq('following_id', followingId)
+      .eq(
+        'follower_id',
+        currentUserId
+      )
+      .eq(
+        'following_id',
+        followingId
+      )
       .maybeSingle();
 
-    if (existingFollow) {
-      const { count } = await supabase
-        .from('follows')
-        .select('*', {
-          count: 'exact',
-          head: true,
-        })
-        .eq('following_id', followingId);
-
-      return NextResponse.json({
-        following: true,
-        followers_count: count ?? 0,
-      });
-    }
-
-    const { error: insertError } = await supabase
-      .from('follows')
-      .insert({
-        follower_id: currentUserId,
-        following_id: followingId,
-      });
-
-    if (insertError) {
+    if (existingError) {
       console.error(
-        'Erro ao seguir usuário:',
-        insertError
+        'Erro ao verificar follow existente:',
+        existingError
       );
 
       return NextResponse.json(
-        { error: 'Não foi possível seguir este usuário.' },
-        { status: 500 }
+        {
+          error:
+            'Não foi possível verificar o follow.',
+        },
+        {
+          status: 500,
+        }
       );
     }
 
-    const { count } = await supabase
-      .from('follows')
-      .select('*', {
-        count: 'exact',
-        head: true,
-      })
-      .eq('following_id', followingId);
+    if (!existingFollow) {
+      const {
+        error: insertError,
+      } = await supabase
+        .from('follows')
+        .insert({
+          follower_id:
+            currentUserId,
+          following_id:
+            followingId,
+        });
+
+      if (insertError) {
+        console.error(
+          'Erro ao seguir usuário:',
+          insertError
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              'Não foi possível seguir este usuário.',
+          },
+          {
+            status: 500,
+          }
+        );
+      }
+    }
+
+    const counts =
+      await getFollowCounts(
+        followingId
+      );
 
     return NextResponse.json({
       following: true,
-      followers_count: count ?? 0,
+
+      followers_count:
+        counts.followers_count,
+
+      following_count:
+        counts.following_count,
     });
   } catch (error) {
-    console.error('POST /api/follows:', error);
+    console.error(
+      'POST /api/follows:',
+      error
+    );
 
     return NextResponse.json(
-      { error: 'Erro interno.' },
-      { status: 500 }
+      {
+        error:
+          'Erro interno.',
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
@@ -253,38 +392,59 @@ export async function POST(request: Request) {
  * DELETE
  *
  * Deixa de seguir um usuário.
- *
- * Body:
- * {
- *   following_id: "ID_DO_USUARIO"
- * }
  */
-export async function DELETE(request: Request) {
+export async function DELETE(
+  request: Request
+) {
   try {
-    const currentUserId = await getCurrentUserId(request);
+    const currentUserId =
+      await getCurrentUserId(
+        request
+      );
 
     if (!currentUserId) {
       return NextResponse.json(
-        { error: 'Você precisa estar logado.' },
-        { status: 401 }
+        {
+          error:
+            'Você precisa estar logado.',
+        },
+        {
+          status: 401,
+        }
       );
     }
 
-    const body = await request.json();
-    const followingId = body?.following_id;
+    const body =
+      await request.json();
+
+    const followingId =
+      body?.following_id;
 
     if (!followingId) {
       return NextResponse.json(
-        { error: 'following_id é obrigatório.' },
-        { status: 400 }
+        {
+          error:
+            'following_id é obrigatório.',
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    const { error } = await supabase
+    const {
+      error,
+    } = await supabase
       .from('follows')
       .delete()
-      .eq('follower_id', currentUserId)
-      .eq('following_id', followingId);
+      .eq(
+        'follower_id',
+        currentUserId
+      )
+      .eq(
+        'following_id',
+        followingId
+      );
 
     if (error) {
       console.error(
@@ -293,29 +453,44 @@ export async function DELETE(request: Request) {
       );
 
       return NextResponse.json(
-        { error: 'Não foi possível deixar de seguir.' },
-        { status: 500 }
+        {
+          error:
+            'Não foi possível deixar de seguir.',
+        },
+        {
+          status: 500,
+        }
       );
     }
 
-    const { count } = await supabase
-      .from('follows')
-      .select('*', {
-        count: 'exact',
-        head: true,
-      })
-      .eq('following_id', followingId);
+    const counts =
+      await getFollowCounts(
+        followingId
+      );
 
     return NextResponse.json({
       following: false,
-      followers_count: count ?? 0,
+
+      followers_count:
+        counts.followers_count,
+
+      following_count:
+        counts.following_count,
     });
   } catch (error) {
-    console.error('DELETE /api/follows:', error);
+    console.error(
+      'DELETE /api/follows:',
+      error
+    );
 
     return NextResponse.json(
-      { error: 'Erro interno.' },
-      { status: 500 }
+      {
+        error:
+          'Erro interno.',
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
