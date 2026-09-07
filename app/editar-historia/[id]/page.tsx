@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, {
@@ -76,10 +75,16 @@ type Chapter = {
 };
 
 type ChapterResponse = {
+  success?: boolean;
   chapter?: Chapter;
   media?: ChapterMedia[];
   scheduled?: boolean;
   published?: boolean;
+  publication_status?:
+    | 'draft'
+    | 'scheduled'
+    | 'published'
+    | 'unpublished';
   scheduled_for?: string | null;
   error?: string;
 };
@@ -1830,14 +1835,38 @@ export default function EditarHistoriaPage() {
       savedSelectionRef.current =
         null;
 
+      /*
+       * ========================================================
+       * REDIRECIONAMENTO APÓS PUBLICAÇÃO
+       * ========================================================
+       *
+       * Só redireciona quando o SERVIDOR confirma:
+       *
+       * success === true
+       * publication_status === 'published'
+       * published === true
+       *
+       * Assim, clicar em "Publicar" não basta:
+       * o capítulo precisa ter sido realmente salvo
+       * como publicado no banco.
+       */
       if (
-        finalStatus ===
-        'published'
+        data.success === true &&
+        data.publication_status ===
+          'published' &&
+        data.published === true &&
+        savedChapter.publication_status ===
+          'published' &&
+        savedChapter.published === true
       ) {
-        setSuccess(
-          'Capítulo publicado com sucesso.'
+        router.push(
+          `/capitulo-publicado/${savedChapter.id}`
         );
-      } else if (
+
+        return;
+      }
+
+      if (
         finalStatus ===
         'scheduled'
       ) {
