@@ -1392,16 +1392,11 @@ export default function EditarHistoriaPage() {
   }
 
   async function saveChapter(
-    targetStatus?: Chapter['publication_status']
+    targetStatus?: Chapter['publication_status'],
+    redirectAfterPublish = false
   ) {
     if (!chapter) return;
 
-    /*
-     * IMPORTANTE:
-     *
-     * Se nenhum status foi explicitamente passado,
-     * preservamos o status atual do capítulo.
-     */
     const finalStatus =
       targetStatus ||
       chapterStatus;
@@ -1525,17 +1520,6 @@ export default function EditarHistoriaPage() {
             media.id
         );
 
-      /*
-       * PRIMEIRO PASSO:
-       *
-       * Envia as novas mídias.
-       *
-       * NÃO usamos "draft" aqui.
-       *
-       * O status atual é preservado para que um
-       * capítulo publicado não desapareça durante
-       * o upload da imagem/GIF.
-       */
       if (
         pending.length > 0
       ) {
@@ -1684,12 +1668,6 @@ export default function EditarHistoriaPage() {
         setMediaUploading(false);
       }
 
-      /*
-       * SEGUNDO PASSO:
-       *
-       * Salva o capítulo definitivamente
-       * com o status escolhido.
-       */
       const formData =
         new FormData();
 
@@ -1836,6 +1814,17 @@ export default function EditarHistoriaPage() {
         null;
 
       if (
+        finalStatus === 'published' &&
+        redirectAfterPublish
+      ) {
+        router.push(
+          `/capitulo-publicado/${savedChapter.id}`
+        );
+
+        return;
+      }
+
+      if (
         finalStatus ===
         'published'
       ) {
@@ -1959,17 +1948,6 @@ export default function EditarHistoriaPage() {
     ) {
       event.preventDefault();
 
-      /*
-       * CORREÇÃO:
-       *
-       * Ctrl+S agora preserva o status atual.
-       *
-       * Antes:
-       * saveChapter('draft')
-       *
-       * Isso fazia um capítulo publicado virar
-       * rascunho simplesmente ao apertar Ctrl+S.
-       */
       void saveChapter(
         chapterStatus
       );
@@ -1986,7 +1964,8 @@ export default function EditarHistoriaPage() {
     event.preventDefault();
 
     void saveChapter(
-      chapterStatus
+      chapterStatus,
+      chapterStatus === 'published'
     );
   }
 
@@ -2894,7 +2873,8 @@ export default function EditarHistoriaPage() {
                         type="button"
                         onClick={() =>
                           void saveChapter(
-                            'published'
+                            'published',
+                            true
                           )
                         }
                         disabled={
@@ -3130,449 +3110,4 @@ export default function EditarHistoriaPage() {
                               ) => {
                                 event.preventDefault();
                                 saveSelection();
-                              }}
-                              onClick={
-                                handleMediaButtonClick
-                              }
-                              className="editor-toolbar-button text-xs"
-                              title="Adicionar imagem ou GIF"
-                            >
-                              Imagem / GIF
-                            </button>
-
-                            <input
-                              ref={
-                                mediaInputRef
-                              }
-                              type="file"
-                              accept="image/jpeg,image/png,image/webp,image/gif"
-                              multiple
-                              onChange={
-                                handleMediaSelect
-                              }
-                              className="hidden"
-                            />
-
-                            <button
-                              type="button"
-                              onMouseDown={(
-                                event
-                              ) => {
-                                event.preventDefault();
-                                saveSelection();
-                              }}
-                              onClick={() =>
-                                setShowLinkBox(
-                                  (current) =>
-                                    !current
-                                )
-                              }
-                              className="editor-toolbar-button text-xs"
-                              title="Adicionar link"
-                            >
-                              Link
-                            </button>
-
-                            <button
-                              type="button"
-                              onMouseDown={(
-                                event
-                              ) => {
-                                event.preventDefault();
-                                saveSelection();
-                              }}
-                              onClick={
-                                addHorizontalRule
-                              }
-                              className="editor-toolbar-button text-xs"
-                              title="Adicionar separador"
-                            >
-                              Separador
-                            </button>
-
-                            <span className="ml-auto px-2 text-[11px] text-gray-600">
-                              {
-                                chapterMedia.length
-                              }
-                              /{MAX_MEDIA}
-                            </span>
-                          </div>
-
-                          {showLinkBox && (
-                            <div className="border-t border-white/10 p-3">
-                              <div className="flex flex-col gap-2 sm:flex-row">
-                                <input
-                                  ref={
-                                    linkInputRef
-                                  }
-                                  value={
-                                    linkValue
-                                  }
-                                  onChange={(
-                                    event
-                                  ) =>
-                                    setLinkValue(
-                                      event.target.value
-                                    )
-                                  }
-                                  onKeyDown={(
-                                    event
-                                  ) => {
-                                    if (
-                                      event.key ===
-                                      'Enter'
-                                    ) {
-                                      event.preventDefault();
-                                      addLink();
-                                    }
-
-                                    if (
-                                      event.key ===
-                                      'Escape'
-                                    ) {
-                                      event.preventDefault();
-                                      setShowLinkBox(
-                                        false
-                                      );
-                                      setLinkValue(
-                                        ''
-                                      );
-                                    }
-                                  }}
-                                  placeholder="https://exemplo.com"
-                                  className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-pink-400/40"
-                                />
-
-                                <button
-                                  type="button"
-                                  onMouseDown={(
-                                    event
-                                  ) => {
-                                    event.preventDefault();
-                                    saveSelection();
-                                  }}
-                                  onClick={
-                                    addLink
-                                  }
-                                  className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-medium hover:bg-pink-400 transition"
-                                >
-                                  Inserir link
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <div
-                          ref={
-                            editorRef
-                          }
-                          contentEditable
-                          suppressContentEditableWarning
-                          onInput={
-                            handleEditorInput
-                          }
-                          onPaste={
-                            handleEditorPaste
-                          }
-                          onKeyDown={
-                            handleEditorKeyDown
-                          }
-                          onMouseUp={
-                            saveSelection
-                          }
-                          onKeyUp={
-                            saveSelection
-                          }
-                          onFocus={
-                            saveSelection
-                          }
-                          className="chapter-editor px-5 sm:px-12 lg:px-20 py-12 text-[17px] leading-8 text-gray-200"
-                          spellCheck
-                        />
-                      </>
-                    )}
-                  </div>
-
-                  {chapterMedia.length >
-                    0 && (
-                    <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <h2 className="text-sm font-medium">
-                            Mídias do capítulo
-                          </h2>
-
-                          <p className="mt-1 text-xs text-gray-600">
-                            Máximo de 25 arquivos. Cada arquivo pode ter até 5 MB.
-                          </p>
-                        </div>
-
-                        <span className="text-xs text-gray-500">
-                          {
-                            chapterMedia.length
-                          }
-                          /{MAX_MEDIA}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {chapterMedia.map(
-                          (media) => (
-                            <div
-                              key={
-                                media.id
-                              }
-                              className="relative overflow-hidden rounded-xl border border-white/10 bg-black/20"
-                            >
-                              <div className="aspect-video">
-                                <img
-                                  src={
-                                    media.url
-                                  }
-                                  alt="Mídia do capítulo"
-                                  className="h-full w-full object-cover"
-                                />
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  removeMedia(
-                                    media.id
-                                  )
-                                }
-                                disabled={
-                                  savingChapter
-                                }
-                                className="absolute right-2 top-2 rounded-lg border border-white/10 bg-black/70 px-2 py-1 text-xs text-gray-300 hover:bg-red-500/80 hover:text-white disabled:opacity-50 transition"
-                              >
-                                Remover
-                              </button>
-
-                              <div className="border-t border-white/10 px-3 py-2 text-[10px] uppercase tracking-wide text-gray-600">
-                                {media.type ===
-                                'gif'
-                                  ? 'GIF'
-                                  : 'IMAGEM'}
-
-                                {!media.existing &&
-                                  ' · NÃO SALVA'}
-                              </div>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    </section>
-                  )}
-
-                  <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <h2 className="text-base font-medium">
-                          NOTAS DO AUTOR
-                        </h2>
-
-                        <p className="mt-1 text-xs text-gray-600">
-                          Uma mensagem opcional para seus leitores no final do capítulo.
-                        </p>
-                      </div>
-
-                      <span className="text-xs text-gray-600">
-                        {
-                          authorNotes.length
-                        }
-                        /5000
-                      </span>
-                    </div>
-
-                    <textarea
-                      value={
-                        authorNotes
-                      }
-                      onChange={(event) =>
-                        setAuthorNotes(
-                          event.target.value
-                        )
-                      }
-                      maxLength={5000}
-                      rows={6}
-                      placeholder="Escreva uma mensagem para seus leitores..."
-                      className="mt-4 w-full resize-y rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-700 focus:border-pink-400/40"
-                    />
-                  </section>
-
-                  <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <h2 className="text-base font-medium">
-                          Publicação
-                        </h2>
-
-                        <p className="mt-1 text-xs text-gray-600">
-                          Salve como rascunho, publique agora ou escolha uma data para liberar o capítulo.
-                        </p>
-                      </div>
-
-                      <select
-                        value={
-                          chapterStatus
-                        }
-                        onChange={(event) => {
-                          const nextStatus =
-                            event.target
-                              .value as Chapter['publication_status'];
-
-                          setChapterStatus(
-                            nextStatus
-                          );
-
-                          if (
-                            nextStatus !==
-                            'scheduled'
-                          ) {
-                            setScheduledFor(
-                              ''
-                            );
-                          }
-                        }}
-                        className="rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
-                      >
-                        <option value="draft">
-                          Rascunho privado
-                        </option>
-
-                        <option value="published">
-                          Publicar agora
-                        </option>
-
-                        <option value="scheduled">
-                          Agendar publicação
-                        </option>
-
-                        <option value="unpublished">
-                          Retirar do ar
-                        </option>
-                      </select>
-                    </div>
-
-                    {chapterStatus ===
-                      'scheduled' && (
-                      <div className="mt-5 rounded-xl border border-violet-400/20 bg-violet-500/[0.05] p-4">
-                        <label className="mb-2 block text-sm text-violet-200">
-                          Data e horário da publicação
-                        </label>
-
-                        <input
-                          type="datetime-local"
-                          value={
-                            scheduledFor
-                          }
-                          onChange={
-                            handleScheduleChange
-                          }
-                          min={getLocalDateTimeInputMin()}
-                          className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-violet-400/40"
-                        />
-
-                        <p className="mt-2 text-xs text-violet-200/50">
-                          O capítulo ficará privado até a data escolhida.
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void saveChapter(
-                            'draft'
-                          )
-                        }
-                        disabled={
-                          savingChapter ||
-                          mediaUploading
-                        }
-                        className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white disabled:opacity-50 transition"
-                      >
-                        {savingChapter
-                          ? 'Salvando...'
-                          : 'Salvar rascunho'}
-                      </button>
-
-                      <button
-                        type="submit"
-                        disabled={
-                          savingChapter ||
-                          mediaUploading
-                        }
-                        className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
-                      >
-                        {savingChapter
-                          ? 'Salvando...'
-                          : chapterStatus ===
-                              'scheduled'
-                            ? 'Agendar capítulo'
-                            : chapterStatus ===
-                                'published'
-                              ? 'Publicar capítulo'
-                              : chapterStatus ===
-                                  'unpublished'
-                                ? 'Retirar do ar'
-                                : 'Salvar capítulo'}
-                      </button>
-                    </div>
-                  </section>
-
-                  <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-                    <h2 className="text-base font-medium">
-                      Histórico de publicação
-                    </h2>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
-                          Criado em
-                        </p>
-
-                        <p className="mt-2 text-sm text-gray-300">
-                          {formatDate(
-                            chapter.created_at
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
-                          Publicação original
-                        </p>
-
-                        <p className="mt-2 text-sm text-gray-300">
-                          {formatDate(
-                            chapter.original_published_at
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
-                          Republicação
-                        </p>
-
-                        <p className="mt-2 text-sm text-gray-300">
-                          {formatDate(
-                            chapter.republished_at
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </section>
-                </form>
-              )}
-            </section>
-          </div>
-        )}
-      </div>
-    </main>
-  );
-}
+                             
