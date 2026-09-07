@@ -54,6 +54,8 @@ export default function CapituloPublicadoPage() {
       return;
     }
 
+    let cancelled = false;
+
     async function loadPublishedChapter() {
       try {
         setLoading(true);
@@ -83,18 +85,34 @@ export default function CapituloPublicadoPage() {
         const loadedChapter =
           chapterData.chapter;
 
+        if (cancelled) {
+          return;
+        }
+
         setChapter(
           loadedChapter
         );
 
+        /*
+         * IMPORTANTE:
+         *
+         * Não redirecionamos automaticamente
+         * para a história caso o status ainda
+         * não esteja publicado.
+         *
+         * Isso evita que a página desapareça
+         * durante uma leitura imediatamente
+         * após a publicação.
+         */
         if (
           loadedChapter.publication_status !==
           'published'
         ) {
-          router.replace(
-            `/historia/${loadedChapter.story_id}`
+          setError(
+            'Este capítulo ainda não está publicado.'
           );
 
+          setLoading(false);
           return;
         }
 
@@ -108,6 +126,10 @@ export default function CapituloPublicadoPage() {
 
         const storyData =
           await storyResponse.json();
+
+        if (cancelled) {
+          return;
+        }
 
         if (
           storyResponse.ok &&
@@ -132,6 +154,10 @@ export default function CapituloPublicadoPage() {
           });
         }
       } catch (caughtError) {
+        if (cancelled) {
+          return;
+        }
+
         console.error(
           caughtError
         );
@@ -142,12 +168,18 @@ export default function CapituloPublicadoPage() {
             : 'Não foi possível carregar a publicação.'
         );
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
-    loadPublishedChapter();
-  }, [id, router]);
+    void loadPublishedChapter();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   async function handleCopyLink() {
     if (!chapter) {
@@ -317,4 +349,4 @@ export default function CapituloPublicadoPage() {
       </div>
     </main>
   );
-            }
+}
