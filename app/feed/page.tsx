@@ -19,6 +19,7 @@ type Profile = {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
+  verified?: boolean;
 };
 
 type CurrentUser = {
@@ -29,6 +30,15 @@ type CurrentUser = {
   avatar_url: string | null;
   cover_url: string | null;
   theme_color: string | null;
+  verified?: boolean;
+};
+
+type FeedSearchUser = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  verified?: boolean;
 };
 
 type Media = {
@@ -118,6 +128,25 @@ function CloudIcon({
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M7.5 19h9a4.5 4.5 0 0 0 .8-8.93A6 6 0 0 0 5.6 8.5 4.25 4.25 0 0 0 7.5 19Z"
+      />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="6.5" />
+      <path
+        strokeLinecap="round"
+        d="m16 16 4.5 4.5"
       />
     </svg>
   );
@@ -554,7 +583,7 @@ function formatPostDateTime(date: string) {
 }
 
 function getInitial(
-  profile: Profile | CurrentUser | StoryUser | null
+  profile: Profile | CurrentUser | StoryUser | FeedSearchUser | null
 ) {
   if (!profile) {
     return '?';
@@ -597,7 +626,12 @@ function Avatar({
   profile,
   size = 'normal',
 }: {
-  profile: Profile | CurrentUser | StoryUser | null;
+  profile:
+    | Profile
+    | CurrentUser
+    | StoryUser
+    | FeedSearchUser
+    | null;
   size?: 'small' | 'normal' | 'large';
 }) {
   const sizeClass =
@@ -621,6 +655,22 @@ function Avatar({
         getInitial(profile)
       )}
     </div>
+  );
+}
+
+/* =========================================================
+   SELO DE VERIFICADO
+========================================================= */
+
+function VerifiedBadge() {
+  return (
+    <span
+      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#ff78b9] text-[10px] font-black text-[#190d16]"
+      title="Perfil verificado"
+      aria-label="Perfil verificado"
+    >
+      ✓
+    </span>
   );
 }
 
@@ -837,9 +887,6 @@ function StoryViewer({
       </button>
 
       <div className="relative flex h-[min(820px,92vh)] w-full max-w-[430px] overflow-hidden rounded-[30px] border border-white/10 bg-[#100c11] shadow-[0_30px_120px_rgba(0,0,0,0.65)]">
-
-        {/* BARRAS DE PROGRESSO */}
-
         <div className="absolute left-4 right-4 top-4 z-20 flex gap-1.5">
           {userStories.map(
             (item, index) => (
@@ -858,8 +905,6 @@ function StoryViewer({
             )
           )}
         </div>
-
-        {/* USUÁRIO */}
 
         <div className="absolute left-4 right-14 top-8 z-20 flex items-center gap-3">
           <Avatar
@@ -892,8 +937,6 @@ function StoryViewer({
           </div>
         </div>
 
-        {/* MÍDIA */}
-
         <div className="relative flex h-full w-full items-center justify-center">
           {currentStory.media_type ===
           'video' ? (
@@ -919,8 +962,6 @@ function StoryViewer({
             />
           )}
 
-          {/* ÁREA ESQUERDA */}
-
           <button
             type="button"
             onClick={goPrevious}
@@ -928,16 +969,12 @@ function StoryViewer({
             aria-label="Story anterior"
           />
 
-          {/* ÁREA DIREITA */}
-
           <button
             type="button"
             onClick={goNext}
             className="absolute inset-y-0 right-0 z-10 w-1/3"
             aria-label="Próximo story"
           />
-
-          {/* SETA ESQUERDA */}
 
           {currentIndex > 0 && (
             <button
@@ -949,8 +986,6 @@ function StoryViewer({
               ‹
             </button>
           )}
-
-          {/* SETA DIREITA */}
 
           {currentIndex <
             userStories.length -
@@ -965,8 +1000,6 @@ function StoryViewer({
             </button>
           )}
         </div>
-
-        {/* PENSAMENTO */}
 
         {currentStory.thought && (
           <div className="absolute bottom-6 left-5 right-5 z-30">
@@ -2224,13 +2257,19 @@ function FeedPost({
                         )}`
                       : '#'
                   }
-                  className="block truncate text-sm font-bold text-white transition hover:text-[#ff78b9]"
+                  className="flex items-center gap-1.5 truncate text-sm font-bold text-white transition hover:text-[#ff78b9]"
                 >
-                  {post.author
-                    ?.display_name ||
-                    post.author
-                      ?.username ||
-                    'Usuário'}
+                  <span className="truncate">
+                    {post.author
+                      ?.display_name ||
+                      post.author
+                        ?.username ||
+                      'Usuário'}
+                  </span>
+
+                  {post.author?.verified && (
+                    <VerifiedBadge />
+                  )}
                 </Link>
 
                 <Link
@@ -2868,6 +2907,289 @@ function MobileCalendarModal({
 }
 
 /* =========================================================
+   BUSCA DE USUÁRIOS
+========================================================= */
+
+function FeedSearchModal({
+  open,
+  query,
+  setQuery,
+  users,
+  loading,
+  currentUser,
+  followingUsers,
+  followLoading,
+  onFollow,
+  onClose,
+}: {
+  open: boolean;
+  query: string;
+  setQuery: (value: string) => void;
+  users: FeedSearchUser[];
+  loading: boolean;
+  currentUser: CurrentUser | null;
+  followingUsers: Record<string, boolean>;
+  followLoading: string | null;
+  onFollow: (user: FeedSearchUser) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      'hidden';
+
+    const handleKeyDown = (
+      event: KeyboardEvent
+    ) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener(
+      'keydown',
+      handleKeyDown
+    );
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        'keydown',
+        handleKeyDown
+      );
+    };
+  }, [open, onClose]);
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-start justify-center bg-black/75 p-3 pt-[8vh] backdrop-blur-md sm:p-6 sm:pt-[10vh]">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute inset-0"
+        aria-label="Fechar busca"
+      />
+
+      <div className="relative z-10 flex max-h-[80vh] w-full max-w-[620px] flex-col overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#100c11] shadow-[0_30px_120px_rgba(0,0,0,0.65)]">
+        <div className="border-b border-white/[0.06] p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#ff78b9]">
+                Encontrar pessoas
+              </p>
+
+              <h2 className="mt-1 text-xl font-black text-white">
+                Quem você quer encontrar?
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/35 transition hover:bg-white/[0.05] hover:text-white"
+              aria-label="Fechar busca"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-3 focus-within:border-[#ff78b9]/35">
+            <SearchIcon />
+
+            <input
+              autoFocus
+              value={query}
+              onChange={(event) =>
+                setQuery(
+                  event.target.value
+                )
+              }
+              onKeyDown={(event) => {
+                if (
+                  event.key === 'Escape'
+                ) {
+                  onClose();
+                }
+              }}
+              placeholder="Nome ou @username"
+              className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/25"
+            />
+
+            {query && (
+              <button
+                type="button"
+                onClick={() =>
+                  setQuery('')
+                }
+                className="text-xs font-bold text-white/30 transition hover:text-white"
+              >
+                Limpar
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+          {!query.trim() ? (
+            <div className="flex min-h-[220px] items-center justify-center px-6 text-center">
+              <div>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05] text-[#ff78b9]/60">
+                  <SearchIcon />
+                </div>
+
+                <p className="mt-4 text-sm font-bold text-white/55">
+                  Pesquise por alguém
+                </p>
+
+                <p className="mt-1 text-xs leading-5 text-white/25">
+                  Digite um nome ou
+                  @username para
+                  encontrar escritores.
+                </p>
+              </div>
+            </div>
+          ) : loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(
+                (item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-3 rounded-2xl p-3"
+                  >
+                    <div className="h-11 w-11 animate-pulse rounded-full bg-white/[0.06]" />
+
+                    <div className="min-w-0 flex-1">
+                      <div className="h-3 w-32 animate-pulse rounded bg-white/[0.06]" />
+                      <div className="mt-2 h-2 w-20 animate-pulse rounded bg-white/[0.04]" />
+                    </div>
+
+                    <div className="h-9 w-20 animate-pulse rounded-full bg-white/[0.05]" />
+                  </div>
+                )
+              )}
+            </div>
+          ) : users.length === 0 ? (
+            <div className="flex min-h-[220px] items-center justify-center px-6 text-center">
+              <div>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.025] text-white/25">
+                  <UserIcon />
+                </div>
+
+                <p className="mt-4 text-sm font-bold text-white/55">
+                  Nenhuma pessoa encontrada.
+                </p>
+
+                <p className="mt-1 text-xs leading-5 text-white/25">
+                  Tente outro nome ou
+                  username.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {users.map((user) => {
+                const isCurrentUser =
+                  currentUser?.id ===
+                  user.id;
+
+                const isFollowing =
+                  Boolean(
+                    followingUsers[
+                      user.id
+                    ]
+                  );
+
+                const isLoading =
+                  followLoading ===
+                  user.id;
+
+                return (
+                  <div
+                    key={user.id}
+                    className="flex items-center gap-3 rounded-2xl p-3 transition hover:bg-white/[0.035]"
+                  >
+                    <Link
+                      href={`/perfil/${encodeURIComponent(
+                        user.username
+                      )}`}
+                      onClick={onClose}
+                      className="shrink-0"
+                    >
+                      <Avatar
+                        profile={user}
+                      />
+                    </Link>
+
+                    <Link
+                      href={`/perfil/${encodeURIComponent(
+                        user.username
+                      )}`}
+                      onClick={onClose}
+                      className="min-w-0 flex-1"
+                    >
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <p className="truncate text-sm font-bold text-white transition hover:text-[#ff78b9]">
+                          {user.display_name ||
+                            user.username}
+                        </p>
+
+                        {user.verified && (
+                          <VerifiedBadge />
+                        )}
+                      </div>
+
+                      <p className="mt-0.5 truncate text-xs text-[#ff78b9]/65">
+                        @{user.username}
+                      </p>
+                    </Link>
+
+                    {isCurrentUser ? (
+                      <span className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.035] px-3.5 py-2 text-[10px] font-bold text-white/30">
+                        Você
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onFollow(user)
+                        }
+                        disabled={isLoading}
+                        className={`shrink-0 rounded-full px-4 py-2 text-[10px] font-black transition ${
+                          isFollowing
+                            ? 'border border-white/[0.1] bg-white/[0.045] text-white/55 hover:border-red-400/20 hover:bg-red-400/[0.05] hover:text-red-300'
+                            : 'bg-[#ff78b9] text-[#190d16] hover:brightness-110'
+                        } disabled:cursor-wait disabled:opacity-50`}
+                      >
+                        {isLoading
+                          ? '...'
+                          : isFollowing
+                            ? 'Seguindo'
+                            : 'Seguir'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
    FEED PAGE
 ========================================================= */
 
@@ -2937,6 +3259,42 @@ export default function FeedPage() {
   ] = useState(false);
 
   /* =======================================================
+     BUSCA
+  ======================================================= */
+
+  const [
+    searchOpen,
+    setSearchOpen,
+  ] = useState(false);
+
+  const [
+    searchQuery,
+    setSearchQuery,
+  ] = useState('');
+
+  const [
+    searchUsers,
+    setSearchUsers,
+  ] = useState<FeedSearchUser[]>([]);
+
+  const [
+    searchLoading,
+    setSearchLoading,
+  ] = useState(false);
+
+  const [
+    followLoading,
+    setFollowLoading,
+  ] = useState<string | null>(null);
+
+  const [
+    followingUsers,
+    setFollowingUsers,
+  ] = useState<
+    Record<string, boolean>
+  >({});
+
+  /* =======================================================
      USUÁRIO LOGADO
   ======================================================= */
 
@@ -2974,6 +3332,260 @@ export default function FeedPage() {
         setCurrentUser(null);
       }
     }, []);
+
+  /* =======================================================
+     BUSCAR USUÁRIOS
+  ======================================================= */
+
+  const searchFeedUsers =
+    useCallback(
+      async (value: string) => {
+        const query =
+          value.trim();
+
+        if (!query) {
+          setSearchUsers([]);
+          setSearchLoading(false);
+          return;
+        }
+
+        setSearchLoading(true);
+
+        try {
+          const response =
+            await fetch(
+              `/api/explore?q=${encodeURIComponent(
+                query
+              )}`,
+              {
+                cache: 'no-store',
+              }
+            );
+
+          const data =
+            await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              data.error ||
+                'Não foi possível pesquisar usuários.'
+            );
+          }
+
+          const users =
+            Array.isArray(
+              data.users
+            )
+              ? data.users
+              : [];
+
+          setSearchUsers(
+            users
+          );
+
+          const followingEntries =
+            await Promise.all(
+              users.map(
+                async (
+                  user: FeedSearchUser
+                ) => {
+                  if (
+                    currentUser?.id ===
+                    user.id
+                  ) {
+                    return [
+                      user.id,
+                      false,
+                    ] as const;
+                  }
+
+                  try {
+                    const followResponse =
+                      await fetch(
+                        `/api/follows?user_id=${encodeURIComponent(
+                          user.id
+                        )}`,
+                        {
+                          cache:
+                            'no-store',
+                        }
+                      );
+
+                    if (
+                      !followResponse.ok
+                    ) {
+                      return [
+                        user.id,
+                        false,
+                      ] as const;
+                    }
+
+                    const followData =
+                      await followResponse.json();
+
+                    const following =
+                      Boolean(
+                        followData.following ??
+                          followData.is_following ??
+                          followData.followed
+                      );
+
+                    return [
+                      user.id,
+                      following,
+                    ] as const;
+                  } catch {
+                    return [
+                      user.id,
+                      false,
+                    ] as const;
+                  }
+                }
+              )
+            );
+
+          setFollowingUsers(
+            (current) => ({
+              ...current,
+              ...Object.fromEntries(
+                followingEntries
+              ),
+            })
+          );
+        } catch (error) {
+          console.error(
+            'Erro ao pesquisar usuários:',
+            error
+          );
+
+          setSearchUsers([]);
+        } finally {
+          setSearchLoading(false);
+        }
+      },
+      [currentUser?.id]
+    );
+
+  useEffect(() => {
+    if (!searchOpen) {
+      return;
+    }
+
+    const timeout =
+      window.setTimeout(() => {
+        searchFeedUsers(
+          searchQuery
+        );
+      }, 300);
+
+    return () => {
+      window.clearTimeout(
+        timeout
+      );
+    };
+  }, [
+    searchOpen,
+    searchQuery,
+    searchFeedUsers,
+  ]);
+
+  async function handleFollow(
+    user: FeedSearchUser
+  ) {
+    if (
+      !currentUser ||
+      currentUser.id === user.id ||
+      followLoading === user.id
+    ) {
+      return;
+    }
+
+    const currentlyFollowing =
+      Boolean(
+        followingUsers[user.id]
+      );
+
+    setFollowLoading(
+      user.id
+    );
+
+    setFollowingUsers(
+      (current) => ({
+        ...current,
+        [user.id]:
+          !currentlyFollowing,
+      })
+    );
+
+    try {
+      const response =
+        await fetch(
+          '/api/follows',
+          {
+            method:
+              currentlyFollowing
+                ? 'DELETE'
+                : 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+            body: JSON.stringify({
+              following_id:
+                user.id,
+            }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Não foi possível alterar o seguimento.'
+        );
+      }
+
+      const following =
+        typeof data.following ===
+        'boolean'
+          ? data.following
+          : typeof data.is_following ===
+              'boolean'
+            ? data.is_following
+            : !currentlyFollowing;
+
+      setFollowingUsers(
+        (current) => ({
+          ...current,
+          [user.id]:
+            following,
+        })
+      );
+    } catch (error) {
+      console.error(
+        'Erro ao seguir usuário:',
+        error
+      );
+
+      setFollowingUsers(
+        (current) => ({
+          ...current,
+          [user.id]:
+            currentlyFollowing,
+        })
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível alterar o seguimento.'
+      );
+    } finally {
+      setFollowLoading(null);
+    }
+  }
 
   /* =======================================================
      FEED
@@ -3206,7 +3818,6 @@ export default function FeedPage() {
 
   return (
     <main className="min-h-screen bg-[#080609] text-white">
-
       {/* =================================================
           BACKGROUND
       ================================================= */}
@@ -3275,6 +3886,27 @@ export default function FeedPage() {
       />
 
       {/* =================================================
+          BUSCA
+      ================================================= */}
+
+      <FeedSearchModal
+        open={searchOpen}
+        query={searchQuery}
+        setQuery={setSearchQuery}
+        users={searchUsers}
+        loading={searchLoading}
+        currentUser={currentUser}
+        followingUsers={followingUsers}
+        followLoading={followLoading}
+        onFollow={handleFollow}
+        onClose={() => {
+          setSearchOpen(false);
+          setSearchQuery('');
+          setSearchUsers([]);
+        }}
+      />
+
+      {/* =================================================
           CONTEÚDO
       ================================================= */}
 
@@ -3286,7 +3918,6 @@ export default function FeedPage() {
         }`}
       >
         <div className="mx-auto max-w-[1380px]">
-
           {/* =================================================
               TOP BAR
           ================================================= */}
@@ -3322,6 +3953,19 @@ export default function FeedPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* LUPA */}
+              <button
+                type="button"
+                onClick={() =>
+                  setSearchOpen(true)
+                }
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] text-white/45 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9]"
+                aria-label="Pesquisar pessoas"
+                title="Pesquisar pessoas"
+              >
+                <SearchIcon />
+              </button>
+
               <Link
                 href="/perfil"
                 className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] sm:flex"
@@ -3422,13 +4066,11 @@ export default function FeedPage() {
           ================================================= */}
 
           <div className="flex items-start justify-center gap-7">
-
             {/* =================================================
                 COLUNA CENTRAL
             ================================================= */}
 
             <div className="w-full max-w-[680px]">
-
               {/* CREATE POST */}
 
               <div className="mb-7 w-full">
@@ -3602,7 +4244,6 @@ export default function FeedPage() {
 
             <div className="hidden w-[270px] shrink-0 xl:block">
               <div className="sticky top-6 space-y-5">
-
                 {/* MINI STORIES */}
 
                 <aside className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
