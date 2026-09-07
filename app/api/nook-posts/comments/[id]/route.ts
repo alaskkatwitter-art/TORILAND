@@ -1,34 +1,63 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!
 );
 
-async function getCurrentUserId(request: Request) {
-  const meResponse = await fetch(
-    new URL('/api/auth/me', request.url),
-    {
-      headers: {
-        cookie: (await cookies()).toString(),
-      },
-      cache: 'no-store',
-    }
-  );
+async function getCurrentUserId() {
+  const cookieStore = await cookies();
 
-  const meData = await meResponse.json();
+  const sessionToken =
+    cookieStore.get('toriland_session')?.value;
 
-  if (
-    !meResponse.ok ||
-    !meData.authenticated ||
-    !meData.user?.id
-  ) {
+  if (!sessionToken) {
     return null;
   }
 
-  return meData.user.id as string;
+  const tokenHash = crypto
+    .createHash('sha256')
+    .update(sessionToken)
+    .digest('hex');
+
+  const {
+    data: session,
+    error,
+  } = await supabase
+    .from('auth_sessions')
+    .select('user_id, expires_at')
+    .eq('token_hash', tokenHash)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      'ERRO AO VERIFICAR SESSÃO:',
+      error
+    );
+
+    return null;
+  }
+
+  if (!session) {
+    return null;
+  }
+
+  if (
+    new Date(session.expires_at).getTime() <=
+    Date.now()
+  ) {
+    await supabase
+      .from('auth_sessions')
+      .delete()
+      .eq('token_hash', tokenHash);
+
+    return null;
+  }
+
+  return session.user_id as string;
 }
 
 /*
@@ -45,34 +74,42 @@ export async function PATCH(
   }
 ) {
   try {
-    const userId = await getCurrentUserId(request);
+    const userId =
+      await getCurrentUserId();
 
     if (!userId) {
       return NextResponse.json(
         {
-          error: 'Não autenticado.',
+          error:
+            'Não autenticado.',
         },
         { status: 401 }
       );
     }
 
-    const { id } = await context.params;
+    const { id } =
+      await context.params;
 
     if (!id) {
       return NextResponse.json(
         {
-          error: 'ID do comentário não informado.',
+          error:
+            'ID do comentário não informado.',
         },
         { status: 400 }
       );
     }
 
-    const { data: existingComment, error: findError } =
-      await supabase
-        .from('nook_comments')
-        .select('id, author_id')
-        .eq('id', id)
-        .maybeSingle();
+    const {
+      data: existingComment,
+      error: findError,
+    } = await supabase
+      .from('nook_comments')
+      .select(
+        'id, author_id'
+      )
+      .eq('id', id)
+      .maybeSingle();
 
     if (findError) {
       console.error(
@@ -82,7 +119,10 @@ export async function PATCH(
 
       return NextResponse.json(
         {
-          error: 'Erro ao buscar comentário.',
+          error:
+            'Erro ao buscar comentário.',
+          details:
+            findError.message,
         },
         { status: 500 }
       );
@@ -91,13 +131,17 @@ export async function PATCH(
     if (!existingComment) {
       return NextResponse.json(
         {
-          error: 'Comentário não encontrado.',
+          error:
+            'Comentário não encontrado.',
         },
         { status: 404 }
       );
     }
 
-    if (existingComment.author_id !== userId) {
+    if (
+      existingComment.author_id !==
+      userId
+    ) {
       return NextResponse.json(
         {
           error:
@@ -107,17 +151,31 @@ export async function PATCH(
       );
     }
 
-    const body = await request.json();
+    let body: any;
+
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            'Dados da requisição inválidos.',
+        },
+        { status: 400 }
+      );
+    }
 
     const content =
-      typeof body.content === 'string'
+      typeof body.content ===
+      'string'
         ? body.content.trim()
         : '';
 
     if (!content) {
       return NextResponse.json(
         {
-          error: 'O comentário não pode estar vazio.',
+          error:
+            'O comentário não pode estar vazio.',
         },
         { status: 400 }
       );
@@ -133,24 +191,29 @@ export async function PATCH(
       );
     }
 
-    const { data: comment, error } =
-      await supabase
-        .from('nook_comments')
-        .update({
-          content,
-        })
-        .eq('id', id)
-        .eq('author_id', userId)
-        .select(`
-          id,
-          post_id,
-          author_id,
-          content,
-          parent_id,
-          created_at,
-          updated_at
-        `)
-        .single();
+    const {
+      data: comment,
+      error,
+    } = await supabase
+      .from('nook_comments')
+      .update({
+        content,
+      })
+      .eq('id', id)
+      .eq(
+        'author_id',
+        userId
+      )
+      .select(`
+        id,
+        post_id,
+        author_id,
+        content,
+        parent_id,
+        created_at,
+        updated_at
+      `)
+      .single();
 
     if (error) {
       console.error(
@@ -162,7 +225,10 @@ export async function PATCH(
         {
           error:
             'Não foi possível editar o comentário.',
-          details: error.message,
+          details:
+            error.message,
+          code:
+            error.code || null,
         },
         { status: 500 }
       );
@@ -179,7 +245,12 @@ export async function PATCH(
 
     return NextResponse.json(
       {
-        error: 'Erro interno do servidor.',
+        error:
+          'Erro interno do servidor.',
+        details:
+          error instanceof Error
+            ? error.message
+            : String(error),
       },
       { status: 500 }
     );
@@ -191,9 +262,8 @@ export async function PATCH(
  *
  * Exclui o próprio comentário.
  *
- * Como a tabela usa ON DELETE CASCADE,
- * respostas daquele comentário também serão
- * removidas.
+ * As respostas vinculadas serão removidas
+ * caso a FK esteja configurada com ON DELETE CASCADE.
  */
 export async function DELETE(
   request: Request,
@@ -204,34 +274,42 @@ export async function DELETE(
   }
 ) {
   try {
-    const userId = await getCurrentUserId(request);
+    const userId =
+      await getCurrentUserId();
 
     if (!userId) {
       return NextResponse.json(
         {
-          error: 'Não autenticado.',
+          error:
+            'Não autenticado.',
         },
         { status: 401 }
       );
     }
 
-    const { id } = await context.params;
+    const { id } =
+      await context.params;
 
     if (!id) {
       return NextResponse.json(
         {
-          error: 'ID do comentário não informado.',
+          error:
+            'ID do comentário não informado.',
         },
         { status: 400 }
       );
     }
 
-    const { data: comment, error: findError } =
-      await supabase
-        .from('nook_comments')
-        .select('id, author_id')
-        .eq('id', id)
-        .maybeSingle();
+    const {
+      data: comment,
+      error: findError,
+    } = await supabase
+      .from('nook_comments')
+      .select(
+        'id, author_id'
+      )
+      .eq('id', id)
+      .maybeSingle();
 
     if (findError) {
       console.error(
@@ -241,7 +319,10 @@ export async function DELETE(
 
       return NextResponse.json(
         {
-          error: 'Erro ao buscar comentário.',
+          error:
+            'Erro ao buscar comentário.',
+          details:
+            findError.message,
         },
         { status: 500 }
       );
@@ -250,13 +331,17 @@ export async function DELETE(
     if (!comment) {
       return NextResponse.json(
         {
-          error: 'Comentário não encontrado.',
+          error:
+            'Comentário não encontrado.',
         },
         { status: 404 }
       );
     }
 
-    if (comment.author_id !== userId) {
+    if (
+      comment.author_id !==
+      userId
+    ) {
       return NextResponse.json(
         {
           error:
@@ -266,12 +351,16 @@ export async function DELETE(
       );
     }
 
-    const { error: deleteError } =
-      await supabase
-        .from('nook_comments')
-        .delete()
-        .eq('id', id)
-        .eq('author_id', userId);
+    const {
+      error: deleteError,
+    } = await supabase
+      .from('nook_comments')
+      .delete()
+      .eq('id', id)
+      .eq(
+        'author_id',
+        userId
+      );
 
     if (deleteError) {
       console.error(
@@ -283,7 +372,10 @@ export async function DELETE(
         {
           error:
             'Não foi possível excluir o comentário.',
-          details: deleteError.message,
+          details:
+            deleteError.message,
+          code:
+            deleteError.code || null,
         },
         { status: 500 }
       );
@@ -291,7 +383,8 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: 'Comentário excluído com sucesso.',
+      message:
+        'Comentário excluído com sucesso.',
       commentId: id,
     });
   } catch (error) {
@@ -302,7 +395,12 @@ export async function DELETE(
 
     return NextResponse.json(
       {
-        error: 'Erro interno do servidor.',
+        error:
+          'Erro interno do servidor.',
+        details:
+          error instanceof Error
+            ? error.message
+            : String(error),
       },
       { status: 500 }
     );
