@@ -18,31 +18,34 @@ export default function NovoCapituloPage() {
       try {
         setError('');
 
-        const response = await fetch('/api/chapters/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            story_id: storyId,
-            title: 'Novo capítulo',
-            body: '<p><br></p>',
-            author_notes: '',
-            publication_status: 'draft',
-            scheduled_for: null,
-          }),
-        });
+        const response = await fetch(
+          '/api/chapters/create',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              story_id: storyId,
+              title: 'Novo capítulo',
+              body: '<p><br></p>',
+              author_notes: '',
+              publication_status: 'draft',
+              scheduled_for: null,
+            }),
+          }
+        );
 
         const data = await response.json();
 
         if (!response.ok) {
           throw new Error(
-            data.error ||
+            data?.error ||
               'Não foi possível criar o novo capítulo.'
           );
         }
 
-        const chapterId = data.chapter?.id;
+        const chapterId = data?.chapter?.id;
 
         if (!chapterId) {
           throw new Error(
@@ -50,13 +53,24 @@ export default function NovoCapituloPage() {
           );
         }
 
-        if (!cancelled) {
-          router.replace(
-            `/editar-historia/${storyId}?chapter=${chapterId}`
-          );
+        if (cancelled) {
+          return;
         }
+
+        /*
+         * Abre o MESMO editor moderno usado
+         * para editar a obra.
+         *
+         * O parâmetro ?chapter= informa ao editor
+         * qual capítulo deve ser carregado.
+         */
+        router.replace(
+          `/editar-historia/${storyId}?chapter=${chapterId}`
+        );
       } catch (caughtError) {
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
         setError(
           caughtError instanceof Error
@@ -81,7 +95,7 @@ export default function NovoCapituloPage() {
             Não foi possível criar o capítulo
           </h1>
 
-          <p className="mt-3 text-sm text-gray-400">
+          <p className="mt-3 text-sm leading-6 text-gray-400">
             {error}
           </p>
 
