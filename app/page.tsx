@@ -1,38 +1,38 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import AuthStatus from '../components/AuthStatus';
+import { useState } from "react";
+import AuthStatus from "../components/AuthStatus";
 
 const fandoms = [
-  'House of the Dragon',
-  'Game of Thrones',
-  'Harry Potter',
-  'Marvel',
-  'DC',
-  'K-pop',
+  "House of the Dragon",
+  "Game of Thrones",
+  "Harry Potter",
+  "Marvel",
+  "DC",
+  "K-pop",
 ];
 
 const genres = [
-  'Romance',
-  'Fantasia',
-  'Drama',
-  'Aventura',
-  'Mistério',
-  'Terror',
-  'Comédia',
-  'Ficção',
+  "Romance",
+  "Fantasia",
+  "Drama",
+  "Aventura",
+  "Mistério",
+  "Terror",
+  "Comédia",
+  "Ficção",
 ];
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('Início');
-  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState("Início");
+  const [search, setSearch] = useState("");
 
   const menu = [
-    'Início',
-    'Explorar',
-    'Escrever',
-    'Fandoms',
-    'Notícias',
+    "Início",
+    "Explorar",
+    "Escrever",
+    "Fandoms",
+    "Notícias",
   ];
 
   return (
@@ -41,7 +41,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-7xl items-center gap-6 px-5 py-4">
           <button
             type="button"
-            onClick={() => setActiveTab('Início')}
+            onClick={() => setActiveTab("Início")}
             className="group flex shrink-0 items-center gap-2"
           >
             <CloudLogo />
@@ -59,8 +59,8 @@ export default function Home() {
                 onClick={() => setActiveTab(item)}
                 className={`relative rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-300 ${
                   activeTab === item
-                    ? 'bg-gradient-to-r from-[#ff5fab] to-[#ff8fc5] text-[#180d15] shadow-[0_0_20px_rgba(255,120,185,0.15)]'
-                    : 'text-white/60 hover:bg-gradient-to-r hover:from-[#ff5fab]/15 hover:to-[#ff9bca]/15 hover:text-[#ff9bca]'
+                    ? "bg-gradient-to-r from-[#ff5fab] to-[#ff8fc5] text-[#180d15] shadow-[0_0_20px_rgba(255,120,185,0.15)]"
+                    : "text-white/60 hover:bg-gradient-to-r hover:from-[#ff5fab]/15 hover:to-[#ff9bca]/15 hover:text-[#ff9bca]"
                 }`}
               >
                 {item}
@@ -82,8 +82,8 @@ export default function Home() {
                 onClick={() => setActiveTab(item)}
                 className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
                   activeTab === item
-                    ? 'bg-gradient-to-r from-[#ff5fab] to-[#ff8fc5] text-[#180d15]'
-                    : 'text-white/60 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]'
+                    ? "bg-gradient-to-r from-[#ff5fab] to-[#ff8fc5] text-[#180d15]"
+                    : "text-white/60 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
                 }`}
               >
                 {item}
@@ -94,10 +94,12 @@ export default function Home() {
       </header>
 
       <div className="mx-auto max-w-7xl px-5">
-        <section className="relative overflow-hidden py-16 md:py-24">
-          <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-[#ff4fa3]/10 blur-3xl" />
+        <section className="relative py-16 md:py-24">
+          <div className="pointer-events-none absolute -left-40 top-[-80px] h-[520px] w-[520px] rounded-full bg-[#ff4fa3]/10 blur-[110px]" />
 
-          <div className="pointer-events-none absolute right-0 top-0 h-96 w-96 rounded-full bg-[#ff78b9]/5 blur-3xl" />
+          <div className="pointer-events-none absolute right-[-120px] top-[-120px] h-[520px] w-[520px] rounded-full bg-[#ff78b9]/10 blur-[120px]" />
+
+          <div className="pointer-events-none absolute left-[30%] top-[25%] h-[360px] w-[360px] rounded-full bg-[#ff68ae]/[0.035] blur-[100px]" />
 
           <div className="relative grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
             <div>
@@ -108,6 +110,7 @@ export default function Home() {
               <h1 className="max-w-3xl text-4xl font-black leading-[1.05] md:text-6xl">
                 Encontre uma história.
                 <br />
+
                 <span className="bg-gradient-to-r from-[#ff68ae] to-[#ff9acb] bg-clip-text text-transparent">
                   Ou escreva a sua.
                 </span>
@@ -122,7 +125,7 @@ export default function Home() {
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('Explorar')}
+                  onClick={() => setActiveTab("Explorar")}
                   className="rounded-full bg-gradient-to-r from-[#ff68ae] to-[#ff91c4] px-7 py-3.5 font-bold text-[#180d15] shadow-[0_10px_35px_rgba(255,104,174,0.15)] transition duration-300 hover:-translate-y-0.5 hover:brightness-110"
                 >
                   Explorar histórias
@@ -130,7 +133,7 @@ export default function Home() {
 
                 <button
                   type="button"
-                  onClick={() => setActiveTab('Escrever')}
+                  onClick={() => setActiveTab("Escrever")}
                   className="rounded-full border border-white/15 bg-white/5 px-7 py-3.5 font-bold transition duration-300 hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
                 >
                   Começar a escrever
@@ -139,7 +142,9 @@ export default function Home() {
             </div>
 
             <div className="relative">
-              <div className="rounded-[2rem] border border-[#ff78b9]/15 bg-gradient-to-br from-[#21131e] to-[#171018] p-7 shadow-[0_20px_80px_rgba(0,0,0,0.25)]">
+              <div className="pointer-events-none absolute -inset-10 rounded-[3rem] bg-[#ff78b9]/[0.035] blur-3xl" />
+
+              <div className="relative rounded-[2rem] border border-[#ff78b9]/15 bg-gradient-to-br from-[#21131e] to-[#171018] p-7 shadow-[0_20px_80px_rgba(0,0,0,0.25)]">
                 <div className="mb-6">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
                     O que existe no Nooklie
@@ -200,7 +205,7 @@ export default function Home() {
 
           {search && (
             <p className="mt-3 text-sm text-white/40">
-              Procurando por:{' '}
+              Procurando por:{" "}
               <span className="text-[#ff78b9]">{search}</span>
             </p>
           )}
@@ -242,8 +247,10 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mb-20 overflow-hidden rounded-[2rem] border border-[#ff78b9]/15 bg-gradient-to-r from-[#291522] via-[#21131e] to-[#171018]">
-          <div className="flex flex-col items-start justify-between gap-8 p-8 md:flex-row md:items-center md:p-12">
+        <section className="relative mb-20 overflow-hidden rounded-[2rem] border border-[#ff78b9]/15 bg-gradient-to-r from-[#291522] via-[#21131e] to-[#171018]">
+          <div className="pointer-events-none absolute -right-32 -top-32 h-80 w-80 rounded-full bg-[#ff78b9]/10 blur-[90px]" />
+
+          <div className="relative flex flex-col items-start justify-between gap-8 p-8 md:flex-row md:items-center md:p-12">
             <div className="max-w-2xl">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
                 Para quem escreve
@@ -261,7 +268,7 @@ export default function Home() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('Escrever')}
+              onClick={() => setActiveTab("Escrever")}
               className="shrink-0 rounded-full bg-gradient-to-r from-[#ff68ae] to-[#ff91c4] px-7 py-3.5 font-bold text-[#180d15] transition duration-300 hover:-translate-y-0.5 hover:brightness-110"
             >
               Começar a escrever
@@ -365,9 +372,13 @@ function SectionHeading({
         Descubra
       </p>
 
-      <h2 className="mt-2 text-3xl font-black">{title}</h2>
+      <h2 className="mt-2 text-3xl font-black">
+        {title}
+      </h2>
 
-      <p className="mt-1 text-sm text-white/40">{subtitle}</p>
+      <p className="mt-1 text-sm text-white/40">
+        {subtitle}
+      </p>
     </div>
   );
 }
@@ -378,16 +389,16 @@ function CategoryCard({
   index,
 }: {
   title: string;
-  type: 'Fandom' | 'Gênero';
+  type: "Fandom" | "Gênero";
   index: number;
 }) {
   const gradients = [
-    'from-[#5a2345] to-[#21121d]',
-    'from-[#46284f] to-[#171018]',
-    'from-[#303e59] to-[#13131b]',
-    'from-[#58332f] to-[#1a1015]',
-    'from-[#3d4b42] to-[#121714]',
-    'from-[#523f62] to-[#17121c]',
+    "from-[#5a2345] to-[#21121d]",
+    "from-[#46284f] to-[#171018]",
+    "from-[#303e59] to-[#13131b]",
+    "from-[#58332f] to-[#1a1015]",
+    "from-[#3d4b42] to-[#121714]",
+    "from-[#523f62] to-[#17121c]",
   ];
 
   return (
