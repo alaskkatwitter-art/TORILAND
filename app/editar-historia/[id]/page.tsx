@@ -1,3 +1,4 @@
+```tsx
 'use client';
 
 import React, {
@@ -467,15 +468,24 @@ export default function EditarHistoriaPage() {
               )
             : [];
 
+        const normalizedTags =
+          Array.isArray(
+            loadedStory.tags
+          )
+            ? loadedStory.tags.map(
+                (tag: Tag | string) =>
+                  typeof tag === 'string'
+                    ? { name: tag }
+                    : tag
+              )
+            : [];
+
         const normalizedStory: Story = {
           ...loadedStory,
           chapters:
             normalizedChapters,
-          tags: Array.isArray(
-            loadedStory.tags
-          )
-            ? loadedStory.tags
-            : [],
+          tags:
+            normalizedTags,
         };
 
         storyRef.current =
@@ -504,11 +514,8 @@ export default function EditarHistoriaPage() {
         );
 
         setTags(
-          normalizedStory.tags.map(
-            (tag) =>
-              typeof tag === 'string'
-                ? tag
-                : tag.name
+          normalizedTags.map(
+            (tag) => tag.name
           )
         );
 
@@ -1043,7 +1050,15 @@ export default function EditarHistoriaPage() {
               Array.isArray(
                 updatedStory.tags
               )
-                ? updatedStory.tags
+                ? updatedStory.tags.map(
+                    (tag: Tag | string) =>
+                      typeof tag ===
+                      'string'
+                        ? {
+                            name: tag,
+                          }
+                        : tag
+                  )
                 : tags.map(
                     (name) => ({
                       name,
@@ -1081,6 +1096,12 @@ export default function EditarHistoriaPage() {
         setGenre(
           normalizedStory.genre ||
             genre
+        );
+
+        setTags(
+          normalizedStory.tags.map(
+            (tag) => tag.name
+          )
         );
 
         setCoverPreview(
@@ -3539,3 +3560,4 @@ export default function EditarHistoriaPage() {
     </main>
   );
 }
+```
