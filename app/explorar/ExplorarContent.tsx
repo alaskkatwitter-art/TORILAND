@@ -57,10 +57,12 @@ export default function ExplorarContent() {
   const selectedGenre = searchParams.get('genre') || '';
 
   const [searchValue, setSearchValue] = useState(urlQuery);
+
   const [results, setResults] = useState<ExploreResults>({
     users: [],
     stories: [],
   });
+
   const [loadingResults, setLoadingResults] = useState(false);
   const [searchError, setSearchError] = useState('');
 
@@ -76,8 +78,10 @@ export default function ExplorarContent() {
         users: [],
         stories: [],
       });
+
       setLoadingResults(false);
       setSearchError('');
+
       return;
     }
 
@@ -98,7 +102,9 @@ export default function ExplorarContent() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data?.error || 'Não foi possível realizar a busca.');
+          throw new Error(
+            data?.error || 'Não foi possível realizar a busca.'
+          );
         }
 
         if (!cancelled) {
@@ -152,7 +158,9 @@ export default function ExplorarContent() {
 
     const queryString = params.toString();
 
-    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+    router.replace(
+      queryString ? `${pathname}?${queryString}` : pathname
+    );
   }
 
   function selectFandom(fandom: string) {
@@ -169,7 +177,9 @@ export default function ExplorarContent() {
 
     const queryString = params.toString();
 
-    router.push(queryString ? `${pathname}?${queryString}` : pathname);
+    router.push(
+      queryString ? `${pathname}?${queryString}` : pathname
+    );
   }
 
   function selectGenre(genre: string) {
@@ -186,7 +196,9 @@ export default function ExplorarContent() {
 
     const queryString = params.toString();
 
-    router.push(queryString ? `${pathname}?${queryString}` : pathname);
+    router.push(
+      queryString ? `${pathname}?${queryString}` : pathname
+    );
   }
 
   const hasFilters = Boolean(
@@ -231,7 +243,11 @@ export default function ExplorarContent() {
         <div className="overflow-x-auto border-t border-white/5 md:hidden">
           <nav className="mx-auto flex min-w-max items-center justify-center gap-1 px-4 py-2">
             <MobileNavLink href="/" label="Início" />
-            <MobileNavLink href="/explorar" label="Explorar" active />
+            <MobileNavLink
+              href="/explorar"
+              label="Explorar"
+              active
+            />
             <MobileNavLink href="/escrever" label="Escrever" />
             <MobileNavLink href="/fandoms" label="Fandoms" />
             <MobileNavLink href="/noticias" label="Notícias" />
@@ -265,7 +281,9 @@ export default function ExplorarContent() {
 
             <input
               value={searchValue}
-              onChange={(event) => updateSearch(event.target.value)}
+              onChange={(event) =>
+                updateSearch(event.target.value)
+              }
               placeholder="Pesquisar histórias ou autores..."
               className="ml-3 w-full bg-transparent text-sm outline-none placeholder:text-white/30"
             />
@@ -295,6 +313,7 @@ export default function ExplorarContent() {
             ) : loadingResults ? (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="h-28 animate-pulse rounded-2xl border border-white/5 bg-white/[0.025]" />
+
                 <div className="h-28 animate-pulse rounded-2xl border border-white/5 bg-white/[0.025]" />
               </div>
             ) : !hasSearchResults ? (
@@ -312,7 +331,9 @@ export default function ExplorarContent() {
                 {results.users.length > 0 && (
                   <div>
                     <div className="mb-4 flex items-center justify-between">
-                      <h3 className="text-xl font-bold">Usuários</h3>
+                      <h3 className="text-xl font-bold">
+                        Usuários
+                      </h3>
 
                       <span className="text-xs text-white/30">
                         {results.users.length}{' '}
@@ -333,13 +354,23 @@ export default function ExplorarContent() {
                         >
                           <Avatar
                             src={user.avatar_url}
-                            name={user.display_name || user.username}
+                            name={
+                              user.display_name ||
+                              user.username
+                            }
                           />
 
                           <div className="min-w-0">
-                            <p className="truncate font-bold transition group-hover:text-[#ff9bca]">
-                              {user.display_name || user.username}
-                            </p>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <p className="truncate font-bold transition group-hover:text-[#ff9bca]">
+                                {user.display_name ||
+                                  user.username}
+                              </p>
+
+                              {user.verified && (
+                                <VerifiedBadge size="small" />
+                              )}
+                            </div>
 
                             <p className="truncate text-sm text-white/35">
                               @{user.username}
@@ -354,7 +385,9 @@ export default function ExplorarContent() {
                 {results.stories.length > 0 && (
                   <div>
                     <div className="mb-4 flex items-center justify-between">
-                      <h3 className="text-xl font-bold">Histórias</h3>
+                      <h3 className="text-xl font-bold">
+                        Histórias
+                      </h3>
 
                       <span className="text-xs text-white/30">
                         {results.stories.length}{' '}
@@ -396,13 +429,18 @@ export default function ExplorarContent() {
                               </h4>
 
                               {story.author && (
-                                <p className="mt-2 text-sm text-white/40">
-                                  por{' '}
+                                <div className="mt-2 flex items-center gap-1.5 text-sm text-white/40">
+                                  <span>por</span>
+
                                   <span className="text-white/60">
                                     {story.author.display_name ||
                                       story.author.username}
                                   </span>
-                                </p>
+
+                                  {story.author.verified && (
+                                    <VerifiedBadge size="small" />
+                                  )}
+                                </div>
                               )}
 
                               {story.description && (
@@ -465,7 +503,9 @@ export default function ExplorarContent() {
               Filtre por estilo
             </p>
 
-            <h2 className="mt-2 text-3xl font-black">Gêneros</h2>
+            <h2 className="mt-2 text-3xl font-black">
+              Gêneros
+            </h2>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -496,8 +536,8 @@ export default function ExplorarContent() {
               </h2>
 
               <p className="mt-4 leading-7 text-white/50">
-                Explore diferentes fandoms e gêneros para encontrar histórias
-                que combinam com você.
+                Explore diferentes fandoms e gêneros para encontrar
+                histórias que combinam com você.
               </p>
             </div>
 
@@ -579,6 +619,53 @@ function Avatar({
     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ff68ae] to-[#ff91c4] text-sm font-black text-[#180d15]">
       {name.charAt(0).toUpperCase()}
     </div>
+  );
+}
+
+function VerifiedBadge({
+  size = 'normal',
+}: {
+  size?: 'small' | 'normal' | 'large';
+}) {
+  const sizes = {
+    small: {
+      wrapper: 'h-4 w-4',
+      icon: 10,
+    },
+    normal: {
+      wrapper: 'h-5 w-5',
+      icon: 12,
+    },
+    large: {
+      wrapper: 'h-6 w-6',
+      icon: 14,
+    },
+  };
+
+  const current = sizes[size];
+
+  return (
+    <span
+      className={`inline-flex ${current.wrapper} shrink-0 items-center justify-center rounded-full bg-[#ff78b9] shadow-[0_0_12px_rgba(255,120,185,0.25)]`}
+      title="Conta verificada"
+      aria-label="Conta verificada"
+    >
+      <svg
+        width={current.icon}
+        height={current.icon}
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M5 12.5L9.2 16.5L19 7"
+          stroke="#180d15"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
   );
 }
 
