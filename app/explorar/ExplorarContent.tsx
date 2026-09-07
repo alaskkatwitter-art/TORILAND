@@ -30,6 +30,8 @@ type ExploreUser = {
   display_name: string | null;
   avatar_url: string | null;
   verified: boolean;
+  is_following?: boolean;
+  is_self?: boolean;
 };
 
 type ExploreStory = {
@@ -40,11 +42,21 @@ type ExploreStory = {
   status: string | null;
   rating: string | null;
   author: ExploreUser | null;
+  is_saved?: boolean;
+  is_own_story?: boolean;
 };
 
 type ExploreResults = {
   users: ExploreUser[];
   stories: ExploreStory[];
+};
+
+type CurrentUser = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  verified?: boolean;
 };
 
 export default function ExplorarContent() {
@@ -63,12 +75,89 @@ export default function ExplorarContent() {
     stories: [],
   });
 
-  const [loadingResults, setLoadingResults] = useState(false);
-  const [searchError, setSearchError] = useState('');
+  const [currentUser, setCurrentUser] =
+    useState<CurrentUser | null>(null);
+
+  const [loadingUser, setLoadingUser] =
+    useState(true);
+
+  const [loadingResults, setLoadingResults] =
+    useState(false);
+
+  const [searchError, setSearchError] =
+    useState('');
+
+  const [followLoading, setFollowLoading] =
+    useState<Record<string, boolean>>({});
+
+  const [libraryLoading, setLibraryLoading] =
+    useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setSearchValue(urlQuery);
   }, [urlQuery]);
+
+  /*
+   * =========================================================
+   * USUÁRIO LOGADO
+   * =========================================================
+   */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCurrentUser() {
+      try {
+        setLoadingUser(true);
+
+        const response = await fetch(
+          '/api/auth/me',
+          {
+            cache: 'no-store',
+          }
+        );
+
+        if (!response.ok) {
+          if (!cancelled) {
+            setCurrentUser(null);
+          }
+
+          return;
+        }
+
+        const data = await response.json();
+
+        if (!cancelled) {
+          setCurrentUser(
+            data?.authenticated &&
+              data?.user
+              ? data.user
+              : null
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setCurrentUser(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingUser(false);
+        }
+      }
+    }
+
+    void loadCurrentUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /*
+   * =========================================================
+   * BUSCA
+   * =========================================================
+   */
 
   useEffect(() => {
     const value = urlQuery.trim();
@@ -103,18 +192,26 @@ export default function ExplorarContent() {
 
         if (!response.ok) {
           throw new Error(
-            data?.error || 'Não foi possível realizar a busca.'
+            data?.error ||
+              'Não foi possível realizar a busca.'
           );
         }
 
         if (!cancelled) {
           setResults({
-            users: Array.isArray(data?.users) ? data.users : [],
-            stories: Array.isArray(data?.stories) ? data.stories : [],
+            users: Array.isArray(data?.users)
+              ? data.users
+              : [],
+            stories: Array.isArray(data?.stories)
+              ? data.stories
+              : [],
           });
         }
       } catch (error) {
-        console.error('ERRO NA BUSCA DO EXPLORAR:', error);
+        console.error(
+          'ERRO NA BUSCA DO EXPLORAR:',
+          error
+        );
 
         if (!cancelled) {
           setResults({
@@ -135,7 +232,7 @@ export default function ExplorarContent() {
       }
     }
 
-    search();
+    void search();
 
     return () => {
       cancelled = true;
@@ -145,7 +242,9 @@ export default function ExplorarContent() {
   function updateSearch(value: string) {
     setSearchValue(value);
 
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(
+      searchParams.toString()
+    );
 
     params.delete('fandom');
     params.delete('genre');
@@ -159,12 +258,16 @@ export default function ExplorarContent() {
     const queryString = params.toString();
 
     router.replace(
-      queryString ? `${pathname}?${queryString}` : pathname
+      queryString
+        ? `${pathname}?${queryString}`
+        : pathname
     );
   }
 
   function selectFandom(fandom: string) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(
+      searchParams.toString()
+    );
 
     params.delete('q');
     params.delete('genre');
@@ -178,12 +281,16 @@ export default function ExplorarContent() {
     const queryString = params.toString();
 
     router.push(
-      queryString ? `${pathname}?${queryString}` : pathname
+      queryString
+        ? `${pathname}?${queryString}`
+        : pathname
     );
   }
 
   function selectGenre(genre: string) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(
+      searchParams.toString()
+    );
 
     params.delete('q');
     params.delete('fandom');
@@ -197,16 +304,179 @@ export default function ExplorarContent() {
     const queryString = params.toString();
 
     router.push(
-      queryString ? `${pathname}?${queryString}` : pathname
+      queryString
+        ? `${pathname}?${queryString}`
+        : pathname
     );
   }
 
+  /*
+   * =========================================================
+   * FOLLOW / UNFOLLOW
+   * =========================================================
+   */
+
+  async function toggleFollow(
+    user: ExploreUser
+  ) {
+    if (!currentUser) {
+      router.push('/login');
+      return;
+    }
+
+    if (user.is_self) {
+      return;
+    }
+
+    setFollowLoading((previous) => ({
+      ...previous,
+      [user.id]: true,
+    }));
+
+    try {
+      const response = await fetch(
+        '/api/follows',
+        {
+          method: user.is_following
+            ? 'DELETE'
+            : 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            following_id: user.id,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            'Não foi possível atualizar o follow.'
+        );
+      }
+
+      setResults((previous) => ({
+        ...previous,
+        users: previous.users.map(
+          (item) =>
+            item.id === user.id
+              ? {
+                  ...item,
+                  is_following:
+                    data.following === true,
+                }
+              : item
+        ),
+      }));
+    } catch (error) {
+      console.error(
+        'ERRO AO ALTERAR FOLLOW:',
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível atualizar o follow.'
+      );
+    } finally {
+      setFollowLoading((previous) => ({
+        ...previous,
+        [user.id]: false,
+      }));
+    }
+  }
+
+  /*
+   * =========================================================
+   * BIBLIOTECA
+   * =========================================================
+   */
+
+  async function toggleLibrary(
+    story: ExploreStory
+  ) {
+    if (!currentUser) {
+      router.push('/login');
+      return;
+    }
+
+    setLibraryLoading((previous) => ({
+      ...previous,
+      [story.id]: true,
+    }));
+
+    try {
+      const response = await fetch(
+        '/api/library',
+        {
+          method: story.is_saved
+            ? 'DELETE'
+            : 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            story_id: story.id,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            'Não foi possível atualizar sua biblioteca.'
+        );
+      }
+
+      setResults((previous) => ({
+        ...previous,
+        stories: previous.stories.map(
+          (item) =>
+            item.id === story.id
+              ? {
+                  ...item,
+                  is_saved:
+                    data.saved === true,
+                }
+              : item
+        ),
+      }));
+    } catch (error) {
+      console.error(
+        'ERRO AO ALTERAR BIBLIOTECA:',
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível atualizar sua biblioteca.'
+      );
+    } finally {
+      setLibraryLoading((previous) => ({
+        ...previous,
+        [story.id]: false,
+      }));
+    }
+  }
+
   const hasFilters = Boolean(
-    urlQuery || selectedFandom || selectedGenre
+    urlQuery ||
+      selectedFandom ||
+      selectedGenre
   );
 
   const hasSearchResults =
-    results.users.length > 0 || results.stories.length > 0;
+    results.users.length > 0 ||
+    results.stories.length > 0;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#100b12] text-white">
@@ -225,32 +495,97 @@ export default function ExplorarContent() {
           </Link>
 
           <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">
-            <NavLink href="/" label="Início" />
-            <NavLink href="/explorar" label="Explorar" active />
-            <NavLink href="/escrever" label="Escrever" />
-            <NavLink href="/fandoms" label="Fandoms" />
-            <NavLink href="/noticias" label="Notícias" />
+            <NavLink
+              href="/"
+              label="Início"
+            />
+
+            <NavLink
+              href="/explorar"
+              label="Explorar"
+              active
+            />
+
+            <NavLink
+              href="/escrever"
+              label="Escrever"
+            />
+
+            <NavLink
+              href="/fandoms"
+              label="Fandoms"
+            />
+
+            <NavLink
+              href="/noticias"
+              label="Notícias"
+            />
           </nav>
 
-          <Link
-            href="/login"
-            className="ml-auto shrink-0 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/70 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
-          >
-            Entrar
-          </Link>
+          {loadingUser ? (
+            <div className="ml-auto h-10 w-24 animate-pulse rounded-full bg-white/5" />
+          ) : currentUser ? (
+            <Link
+              href={`/perfil/${encodeURIComponent(
+                currentUser.username
+              )}`}
+              className="ml-auto flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10"
+            >
+              <Avatar
+                src={currentUser.avatar_url}
+                name={
+                  currentUser.display_name ||
+                  currentUser.username
+                }
+                size="small"
+              />
+
+              <span className="hidden max-w-28 truncate text-sm font-semibold text-white/70 sm:block">
+                {currentUser.display_name ||
+                  currentUser.username}
+              </span>
+
+              {currentUser.verified && (
+                <VerifiedBadge size="small" />
+              )}
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="ml-auto shrink-0 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/70 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
+            >
+              Entrar
+            </Link>
+          )}
         </div>
 
         <div className="overflow-x-auto border-t border-white/5 md:hidden">
           <nav className="mx-auto flex min-w-max items-center justify-center gap-1 px-4 py-2">
-            <MobileNavLink href="/" label="Início" />
+            <MobileNavLink
+              href="/"
+              label="Início"
+            />
+
             <MobileNavLink
               href="/explorar"
               label="Explorar"
               active
             />
-            <MobileNavLink href="/escrever" label="Escrever" />
-            <MobileNavLink href="/fandoms" label="Fandoms" />
-            <MobileNavLink href="/noticias" label="Notícias" />
+
+            <MobileNavLink
+              href="/escrever"
+              label="Escrever"
+            />
+
+            <MobileNavLink
+              href="/fandoms"
+              label="Fandoms"
+            />
+
+            <MobileNavLink
+              href="/noticias"
+              label="Notícias"
+            />
           </nav>
         </div>
       </header>
@@ -344,40 +679,86 @@ export default function ExplorarContent() {
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {results.users.map((user) => (
-                        <Link
-                          key={user.id}
-                          href={`/perfil/${encodeURIComponent(
-                            user.username
-                          )}`}
-                          className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.025] p-4 transition hover:-translate-y-0.5 hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/5"
-                        >
-                          <Avatar
-                            src={user.avatar_url}
-                            name={
-                              user.display_name ||
-                              user.username
-                            }
-                          />
+                      {results.users.map(
+                        (user) => (
+                          <div
+                            key={user.id}
+                            className="rounded-2xl border border-white/10 bg-white/[0.025] p-4 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/5"
+                          >
+                            <div className="flex items-center gap-4">
+                              <Link
+                                href={`/perfil/${encodeURIComponent(
+                                  user.username
+                                )}`}
+                                className="shrink-0"
+                              >
+                                <Avatar
+                                  src={user.avatar_url}
+                                  name={
+                                    user.display_name ||
+                                    user.username
+                                  }
+                                />
+                              </Link>
 
-                          <div className="min-w-0">
-                            <div className="flex min-w-0 items-center gap-1.5">
-                              <p className="truncate font-bold transition group-hover:text-[#ff9bca]">
-                                {user.display_name ||
-                                  user.username}
-                              </p>
+                              <Link
+                                href={`/perfil/${encodeURIComponent(
+                                  user.username
+                                )}`}
+                                className="min-w-0 flex-1"
+                              >
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                  <p className="truncate font-bold transition hover:text-[#ff9bca]">
+                                    {user.display_name ||
+                                      user.username}
+                                  </p>
 
-                              {user.verified && (
-                                <VerifiedBadge size="small" />
-                              )}
+                                  {user.verified && (
+                                    <VerifiedBadge size="small" />
+                                  )}
+                                </div>
+
+                                <p className="truncate text-sm text-white/35">
+                                  @{user.username}
+                                </p>
+                              </Link>
                             </div>
 
-                            <p className="truncate text-sm text-white/35">
-                              @{user.username}
-                            </p>
+                            {currentUser &&
+                              !user.is_self && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    toggleFollow(user)
+                                  }
+                                  disabled={
+                                    followLoading[user.id]
+                                  }
+                                  className={`mt-4 w-full rounded-xl px-4 py-2.5 text-xs font-bold transition ${
+                                    user.is_following
+                                      ? 'border border-white/10 bg-white/5 text-white/55 hover:border-red-400/20 hover:bg-red-400/5 hover:text-red-300'
+                                      : 'bg-gradient-to-r from-[#ff68ae] to-[#ff91c4] text-[#180d15] hover:-translate-y-0.5 hover:brightness-110'
+                                  }`}
+                                >
+                                  {followLoading[user.id]
+                                    ? 'Aguarde...'
+                                    : user.is_following
+                                    ? 'Seguindo'
+                                    : 'Seguir'}
+                                </button>
+                              )}
+
+                            {!currentUser && (
+                              <Link
+                                href="/login"
+                                className="mt-4 flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-bold text-white/50 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
+                              >
+                                Entrar para seguir
+                              </Link>
+                            )}
                           </div>
-                        </Link>
-                      ))}
+                        )
+                      )}
                     </div>
                   </div>
                 )}
@@ -398,74 +779,128 @@ export default function ExplorarContent() {
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                      {results.stories.map((story) => (
-                        <Link
-                          key={story.id}
-                          href={`/historia/${story.id}`}
-                          className="group overflow-hidden rounded-2xl border border-white/10 bg-[#171018] transition hover:-translate-y-0.5 hover:border-[#ff78b9]/30"
-                        >
-                          <div className="flex min-h-36">
-                            <div className="w-28 shrink-0 overflow-hidden bg-[#21151e]">
-                              {story.cover_url ? (
-                                <img
-                                  src={story.cover_url}
-                                  alt=""
-                                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                                />
-                              ) : (
-                                <div className="flex h-full min-h-36 items-center justify-center bg-gradient-to-br from-[#4d203c] to-[#1a1016]">
-                                  <CloudLogo small />
-                                </div>
-                              )}
-                            </div>
+                      {results.stories.map(
+                        (story) => (
+                          <article
+                            key={story.id}
+                            className="group overflow-hidden rounded-2xl border border-white/10 bg-[#171018] transition hover:-translate-y-0.5 hover:border-[#ff78b9]/30"
+                          >
+                            <div className="flex min-h-36">
+                              <Link
+                                href={`/historia/${story.id}`}
+                                className="w-28 shrink-0 overflow-hidden bg-[#21151e]"
+                              >
+                                {story.cover_url ? (
+                                  <img
+                                    src={story.cover_url}
+                                    alt=""
+                                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                                  />
+                                ) : (
+                                  <div className="flex h-full min-h-36 items-center justify-center bg-gradient-to-br from-[#4d203c] to-[#1a1016]">
+                                    <CloudLogo small />
+                                  </div>
+                                )}
+                              </Link>
 
-                            <div className="min-w-0 flex-1 p-5">
-                              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#ff78b9]">
-                                História
-                              </p>
+                              <div className="min-w-0 flex-1 p-5">
+                                <Link
+                                  href={`/historia/${story.id}`}
+                                >
+                                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#ff78b9]">
+                                    História
+                                  </p>
 
-                              <h4 className="mt-2 line-clamp-2 text-lg font-black transition group-hover:text-[#ff9bca]">
-                                {story.title}
-                              </h4>
+                                  <h4 className="mt-2 line-clamp-2 text-lg font-black transition group-hover:text-[#ff9bca]">
+                                    {story.title}
+                                  </h4>
+                                </Link>
 
-                              {story.author && (
-                                <div className="mt-2 flex items-center gap-1.5 text-sm text-white/40">
-                                  <span>por</span>
+                                {story.author && (
+                                  <div className="mt-2 flex items-center gap-1.5 text-sm text-white/40">
+                                    <span>
+                                      por
+                                    </span>
 
-                                  <span className="text-white/60">
-                                    {story.author.display_name ||
-                                      story.author.username}
-                                  </span>
+                                    <Link
+                                      href={`/perfil/${encodeURIComponent(
+                                        story.author.username
+                                      )}`}
+                                      className="text-white/60 hover:text-[#ff9bca]"
+                                    >
+                                      {story.author.display_name ||
+                                        story.author.username}
+                                    </Link>
 
-                                  {story.author.verified && (
-                                    <VerifiedBadge size="small" />
+                                    {story.author
+                                      .verified && (
+                                      <VerifiedBadge size="small" />
+                                    )}
+                                  </div>
+                                )}
+
+                                {story.description && (
+                                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-white/35">
+                                    {story.description}
+                                  </p>
+                                )}
+
+                                <div className="mt-4 flex flex-wrap items-center gap-2">
+                                  {story.rating && (
+                                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/40">
+                                      {story.rating}
+                                    </span>
                                   )}
+
+                                  {story.status && (
+                                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/40">
+                                      {story.status}
+                                    </span>
+                                  )}
+
+                                  <div className="ml-auto">
+                                    {currentUser ? (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          toggleLibrary(
+                                            story
+                                          )
+                                        }
+                                        disabled={
+                                          libraryLoading[
+                                            story.id
+                                          ]
+                                        }
+                                        className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+                                          story.is_saved
+                                            ? 'border border-[#ff78b9]/30 bg-[#ff78b9]/10 text-[#ff9bca] hover:bg-red-400/10 hover:text-red-300'
+                                            : 'border border-white/10 bg-white/5 text-white/45 hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]'
+                                        }`}
+                                      >
+                                        {libraryLoading[
+                                          story.id
+                                        ]
+                                          ? '...'
+                                          : story.is_saved
+                                          ? 'Na biblioteca'
+                                          : 'Adicionar à biblioteca'}
+                                      </button>
+                                    ) : (
+                                      <Link
+                                        href="/login"
+                                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-white/45 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
+                                      >
+                                        Entrar para salvar
+                                      </Link>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-
-                              {story.description && (
-                                <p className="mt-3 line-clamp-2 text-sm leading-6 text-white/35">
-                                  {story.description}
-                                </p>
-                              )}
-
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                {story.rating && (
-                                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/40">
-                                    {story.rating}
-                                  </span>
-                                )}
-
-                                {story.status && (
-                                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/40">
-                                    {story.status}
-                                  </span>
-                                )}
                               </div>
                             </div>
-                          </div>
-                        </Link>
-                      ))}
+                          </article>
+                        )
+                      )}
                     </div>
                   </div>
                 )}
@@ -480,20 +915,29 @@ export default function ExplorarContent() {
               Filtre por universo
             </p>
 
-            <h2 className="text-3xl font-black">Fandoms</h2>
+            <h2 className="text-3xl font-black">
+              Fandoms
+            </h2>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {fandoms.map((fandom, index) => (
-              <CategoryCard
-                key={fandom}
-                title={fandom}
-                type="Fandom"
-                index={index}
-                active={selectedFandom === fandom}
-                onClick={() => selectFandom(fandom)}
-              />
-            ))}
+            {fandoms.map(
+              (fandom, index) => (
+                <CategoryCard
+                  key={fandom}
+                  title={fandom}
+                  type="Fandom"
+                  index={index}
+                  active={
+                    selectedFandom ===
+                    fandom
+                  }
+                  onClick={() =>
+                    selectFandom(fandom)
+                  }
+                />
+              )
+            )}
           </div>
         </section>
 
@@ -509,16 +953,23 @@ export default function ExplorarContent() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {genres.map((genre, index) => (
-              <CategoryCard
-                key={genre}
-                title={genre}
-                type="Gênero"
-                index={index}
-                active={selectedGenre === genre}
-                onClick={() => selectGenre(genre)}
-              />
-            ))}
+            {genres.map(
+              (genre, index) => (
+                <CategoryCard
+                  key={genre}
+                  title={genre}
+                  type="Gênero"
+                  index={index}
+                  active={
+                    selectedGenre ===
+                    genre
+                  }
+                  onClick={() =>
+                    selectGenre(genre)
+                  }
+                />
+              )
+            )}
           </div>
         </section>
 
@@ -601,22 +1052,31 @@ export default function ExplorarContent() {
 function Avatar({
   src,
   name,
+  size = 'normal',
 }: {
   src: string | null;
   name: string;
+  size?: 'small' | 'normal';
 }) {
+  const classes =
+    size === 'small'
+      ? 'h-7 w-7 text-[10px]'
+      : 'h-12 w-12 text-sm';
+
   if (src) {
     return (
       <img
         src={src}
         alt=""
-        className="h-12 w-12 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+        className={`${classes} shrink-0 rounded-full object-cover ring-1 ring-white/10`}
       />
     );
   }
 
   return (
-    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ff68ae] to-[#ff91c4] text-sm font-black text-[#180d15]">
+    <div
+      className={`${classes} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ff68ae] to-[#ff91c4] font-black text-[#180d15]`}
+    >
       {name.charAt(0).toUpperCase()}
     </div>
   );
@@ -761,7 +1221,9 @@ function CategoryCard({
         </h3>
 
         <span className="mt-4 inline-block text-xs text-white/30 transition group-hover:text-white/50">
-          {active ? 'Selecionado' : 'Explorar'}
+          {active
+            ? 'Selecionado'
+            : 'Explorar'}
         </span>
       </div>
     </button>
