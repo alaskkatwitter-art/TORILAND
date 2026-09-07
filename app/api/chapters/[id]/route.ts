@@ -70,13 +70,34 @@ function cleanHtml(value: unknown) {
   }
 
   return value
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi, '')
-    .replace(/<object[\s\S]*?>[\s\S]*?<\/object>/gi, '')
-    .replace(/<embed[\s\S]*?>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, '')
-    .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
-    .replace(/javascript\s*:/gi, '')
+    .replace(
+      /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
+      ''
+    )
+    .replace(
+      /<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi,
+      ''
+    )
+    .replace(
+      /<object[\s\S]*?>[\s\S]*?<\/object>/gi,
+      ''
+    )
+    .replace(
+      /<embed[\s\S]*?>/gi,
+      ''
+    )
+    .replace(
+      /\son[a-z]+\s*=\s*(['"]).*?\1/gi,
+      ''
+    )
+    .replace(
+      /\son[a-z]+\s*=\s*[^\s>]+/gi,
+      ''
+    )
+    .replace(
+      /javascript\s*:/gi,
+      ''
+    )
     .trim();
 }
 
@@ -90,6 +111,32 @@ function normalizePublicationStatus(
     value === 'unpublished'
   ) {
     return value;
+  }
+
+  return 'draft';
+}
+
+function getCurrentPublicationStatus(
+  chapter: {
+    publication_status?: string | null;
+    published?: boolean | null;
+  }
+):
+  | 'draft'
+  | 'scheduled'
+  | 'published'
+  | 'unpublished' {
+  if (
+    chapter.publication_status === 'draft' ||
+    chapter.publication_status === 'scheduled' ||
+    chapter.publication_status === 'published' ||
+    chapter.publication_status === 'unpublished'
+  ) {
+    return chapter.publication_status;
+  }
+
+  if (chapter.published === true) {
+    return 'published';
   }
 
   return 'draft';
@@ -182,7 +229,8 @@ export async function GET(
 
       return NextResponse.json(
         {
-          error: 'Não foi possível carregar o capítulo.',
+          error:
+            'Não foi possível carregar o capítulo.',
         },
         {
           status: 500,
@@ -226,23 +274,25 @@ export async function GET(
       );
     }
 
-    const { data: previousChapter, error: previousError } =
-      await supabase
-        .from('chapters')
-        .select(
-          'id, story_id, chapter_number, title, published'
-        )
-        .eq('story_id', chapter.story_id)
-        .eq('published', true)
-        .lt(
-          'chapter_number',
-          chapter.chapter_number
-        )
-        .order('chapter_number', {
-          ascending: false,
-        })
-        .limit(1)
-        .maybeSingle();
+    const {
+      data: previousChapter,
+      error: previousError,
+    } = await supabase
+      .from('chapters')
+      .select(
+        'id, story_id, chapter_number, title, published'
+      )
+      .eq('story_id', chapter.story_id)
+      .eq('published', true)
+      .lt(
+        'chapter_number',
+        chapter.chapter_number
+      )
+      .order('chapter_number', {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle();
 
     if (previousError) {
       console.error(
@@ -251,23 +301,25 @@ export async function GET(
       );
     }
 
-    const { data: nextChapter, error: nextError } =
-      await supabase
-        .from('chapters')
-        .select(
-          'id, story_id, chapter_number, title, published'
-        )
-        .eq('story_id', chapter.story_id)
-        .eq('published', true)
-        .gt(
-          'chapter_number',
-          chapter.chapter_number
-        )
-        .order('chapter_number', {
-          ascending: true,
-        })
-        .limit(1)
-        .maybeSingle();
+    const {
+      data: nextChapter,
+      error: nextError,
+    } = await supabase
+      .from('chapters')
+      .select(
+        'id, story_id, chapter_number, title, published'
+      )
+      .eq('story_id', chapter.story_id)
+      .eq('published', true)
+      .gt(
+        'chapter_number',
+        chapter.chapter_number
+      )
+      .order('chapter_number', {
+        ascending: true,
+      })
+      .limit(1)
+      .maybeSingle();
 
     if (nextError) {
       console.error(
@@ -298,7 +350,8 @@ export async function GET(
 
     return NextResponse.json(
       {
-        error: 'Não foi possível carregar o capítulo.',
+        error:
+          'Não foi possível carregar o capítulo.',
       },
       {
         status: 500,
@@ -364,25 +417,34 @@ export async function PUT(
       );
     }
 
-    const { data: chapter, error: chapterError } =
-      await supabase
-        .from('chapters')
-        .select(`
-          id,
-          story_id,
-          chapter_number,
-          title,
-          body,
-          published,
-          created_at,
-          author_notes,
-          original_published_at,
-          republished_at,
-          updated_at,
-          publication_status
-        `)
-        .eq('id', id)
-        .maybeSingle();
+    /*
+     * Busca o capítulo atual ANTES da edição.
+     *
+     * Isso é importante porque usamos o status atual
+     * como fallback caso o frontend não envie
+     * publication_status.
+     */
+    const {
+      data: chapter,
+      error: chapterError,
+    } = await supabase
+      .from('chapters')
+      .select(`
+        id,
+        story_id,
+        chapter_number,
+        title,
+        body,
+        published,
+        created_at,
+        author_notes,
+        original_published_at,
+        republished_at,
+        updated_at,
+        publication_status
+      `)
+      .eq('id', id)
+      .maybeSingle();
 
     if (chapterError) {
       console.error(
@@ -392,7 +454,8 @@ export async function PUT(
 
       return NextResponse.json(
         {
-          error: 'Não foi possível encontrar o capítulo.',
+          error:
+            'Não foi possível encontrar o capítulo.',
         },
         {
           status: 500,
@@ -417,12 +480,14 @@ export async function PUT(
      * Confirma que o capítulo pertence a uma obra
      * do usuário autenticado.
      */
-    const { data: story, error: storyError } =
-      await supabase
-        .from('stories')
-        .select('id, author_id')
-        .eq('id', chapter.story_id)
-        .maybeSingle();
+    const {
+      data: story,
+      error: storyError,
+    } = await supabase
+      .from('stories')
+      .select('id, author_id')
+      .eq('id', chapter.story_id)
+      .maybeSingle();
 
     if (storyError) {
       console.error(
@@ -432,7 +497,8 @@ export async function PUT(
 
       return NextResponse.json(
         {
-          error: 'Não foi possível verificar a autoria.',
+          error:
+            'Não foi possível verificar a autoria.',
         },
         {
           status: 500,
@@ -441,7 +507,10 @@ export async function PUT(
       );
     }
 
-    if (!story || story.author_id !== userId) {
+    if (
+      !story ||
+      story.author_id !== userId
+    ) {
       return NextResponse.json(
         {
           error:
@@ -454,17 +523,27 @@ export async function PUT(
       );
     }
 
-    const formData = await request.formData();
+    const formData =
+      await request.formData();
 
-    const titleValue = formData.get('title');
-    const bodyValue = formData.get('body');
-    const notesValue = formData.get('author_notes');
-    const statusValue = formData.get(
-      'publication_status'
-    );
-    const scheduledForValue = formData.get(
-      'scheduled_for'
-    );
+    const titleValue =
+      formData.get('title');
+
+    const bodyValue =
+      formData.get('body');
+
+    const notesValue =
+      formData.get('author_notes');
+
+    const statusValue =
+      formData.get(
+        'publication_status'
+      );
+
+    const scheduledForValue =
+      formData.get(
+        'scheduled_for'
+      );
 
     const title =
       typeof titleValue === 'string'
@@ -481,13 +560,55 @@ export async function PUT(
         ? notesValue.trim()
         : chapter.author_notes || '';
 
+    /*
+     * ========================================================
+     * CORREÇÃO PRINCIPAL
+     * ========================================================
+     *
+     * Antes:
+     *
+     * normalizePublicationStatus(null)
+     *      ↓
+     * draft
+     *
+     * Isso fazia um capítulo publicado virar
+     * rascunho quando o frontend não enviava
+     * publication_status.
+     *
+     * Agora:
+     *
+     * - se o frontend enviar um status válido,
+     *   usamos o status enviado;
+     *
+     * - se NÃO enviar status,
+     *   preservamos o status atual do capítulo.
+     */
+    const statusWasProvided =
+      typeof statusValue === 'string' &&
+      statusValue.trim().length > 0;
+
     const publicationStatus =
-      normalizePublicationStatus(statusValue);
+      statusWasProvided
+        ? normalizePublicationStatus(
+            statusValue
+          )
+        : getCurrentPublicationStatus(
+            chapter
+          );
+
+    /*
+     * Também verificamos se o frontend enviou
+     * scheduled_for.
+     */
+    const scheduledForWasProvided =
+      typeof scheduledForValue === 'string' &&
+      scheduledForValue.trim().length > 0;
 
     if (!title) {
       return NextResponse.json(
         {
-          error: 'O capítulo precisa ter um título.',
+          error:
+            'O capítulo precisa ter um título.',
         },
         {
           status: 400,
@@ -512,7 +633,8 @@ export async function PUT(
     if (!body) {
       return NextResponse.json(
         {
-          error: 'O capítulo não pode estar vazio.',
+          error:
+            'O capítulo não pode estar vazio.',
         },
         {
           status: 400,
@@ -535,13 +657,20 @@ export async function PUT(
     }
 
     /*
-     * Agenda.
+     * ========================================================
+     * AGENDAMENTO
+     * ========================================================
      */
-    let scheduledDate: Date | null = null;
 
-    if (publicationStatus === 'scheduled') {
+    let scheduledDate: Date | null =
+      null;
+
+    if (
+      publicationStatus === 'scheduled'
+    ) {
       if (
-        typeof scheduledForValue !== 'string' ||
+        typeof scheduledForValue !==
+          'string' ||
         !scheduledForValue.trim()
       ) {
         return NextResponse.json(
@@ -556,7 +685,11 @@ export async function PUT(
         );
       }
 
-      if (!isFutureDate(scheduledForValue)) {
+      if (
+        !isFutureDate(
+          scheduledForValue
+        )
+      ) {
         return NextResponse.json(
           {
             error:
@@ -569,25 +702,38 @@ export async function PUT(
         );
       }
 
-      scheduledDate = new Date(scheduledForValue);
+      scheduledDate =
+        new Date(
+          scheduledForValue
+        );
     }
 
     /*
-     * Descobrimos se o capítulo está sendo publicado
-     * pela primeira vez ou republicado.
+     * Se não foi enviado status, preservamos
+     * o estado atual.
+     *
+     * Portanto:
+     *
+     * published → continua published
+     * draft → continua draft
+     * scheduled → continua scheduled
+     * unpublished → continua unpublished
      */
     const wasPreviouslyPublished =
       Boolean(
         chapter.original_published_at
       ) ||
-      chapter.publication_status === 'published' ||
+      chapter.publication_status ===
+        'published' ||
       chapter.published === true;
 
     const isNowPublished =
-      publicationStatus === 'published';
+      publicationStatus ===
+      'published';
 
     let originalPublishedAt =
-      chapter.original_published_at || null;
+      chapter.original_published_at ||
+      null;
 
     let republishedAt =
       chapter.republished_at || null;
@@ -600,7 +746,8 @@ export async function PUT(
       isNowPublished &&
       !originalPublishedAt
     ) {
-      originalPublishedAt = new Date().toISOString();
+      originalPublishedAt =
+        new Date().toISOString();
     }
 
     /*
@@ -611,55 +758,62 @@ export async function PUT(
     if (
       isNowPublished &&
       wasPreviouslyPublished &&
-      chapter.publication_status !== 'published'
+      chapter.publication_status !==
+        'published'
     ) {
-      republishedAt = new Date().toISOString();
+      republishedAt =
+        new Date().toISOString();
     }
 
     /*
-     * Se o capítulo está sendo retirado do ar,
-     * não apagamos nenhuma das datas anteriores.
+     * Só será false quando o status escolhido
+     * realmente for diferente de published.
      */
     const published =
-      publicationStatus === 'published';
+      publicationStatus ===
+      'published';
 
     /*
-     * Atualiza o capítulo.
+     * ========================================================
+     * ATUALIZA O CAPÍTULO
+     * ========================================================
      */
-    const { data: updatedChapter, error: updateError } =
-      await supabase
-        .from('chapters')
-        .update({
-          title,
-          body,
-          author_notes:
-            authorNotes || null,
-          published,
-          publication_status:
-            publicationStatus,
-          original_published_at:
-            originalPublishedAt,
-          republished_at:
-            republishedAt,
-          updated_at:
-            new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select(`
-          id,
-          story_id,
-          chapter_number,
-          title,
-          body,
-          published,
-          created_at,
-          author_notes,
-          original_published_at,
-          republished_at,
-          updated_at,
-          publication_status
-        `)
-        .single();
+    const {
+      data: updatedChapter,
+      error: updateError,
+    } = await supabase
+      .from('chapters')
+      .update({
+        title,
+        body,
+        author_notes:
+          authorNotes || null,
+        published,
+        publication_status:
+          publicationStatus,
+        original_published_at:
+          originalPublishedAt,
+        republished_at:
+          republishedAt,
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select(`
+        id,
+        story_id,
+        chapter_number,
+        title,
+        body,
+        published,
+        created_at,
+        author_notes,
+        original_published_at,
+        republished_at,
+        updated_at,
+        publication_status
+      `)
+      .single();
 
     if (updateError) {
       console.error(
@@ -671,7 +825,8 @@ export async function PUT(
         {
           error:
             'Não foi possível salvar as alterações.',
-          details: updateError.message,
+          details:
+            updateError.message,
         },
         {
           status: 500,
@@ -681,30 +836,44 @@ export async function PUT(
     }
 
     /*
-     * Trata o agendamento.
+     * ========================================================
+     * AGENDAMENTO
+     * ========================================================
      *
-     * Não criamos outro sistema de calendário.
-     * Usamos a tabela scheduled_chapters que já existe.
+     * Usamos a tabela scheduled_chapters
+     * que já existe.
      */
-    const { data: existingSchedule } =
-      await supabase
-        .from('scheduled_chapters')
-        .select('chapter_id')
-        .eq('chapter_id', id)
-        .maybeSingle();
 
-    if (publicationStatus === 'scheduled') {
+    const {
+      data: existingSchedule,
+    } = await supabase
+      .from('scheduled_chapters')
+      .select('chapter_id')
+      .eq('chapter_id', id)
+      .maybeSingle();
+
+    if (
+      publicationStatus ===
+      'scheduled'
+    ) {
       if (existingSchedule) {
-        const { error: scheduleUpdateError } =
-          await supabase
-            .from('scheduled_chapters')
-            .update({
-              scheduled_for:
-                scheduledDate!.toISOString(),
-            })
-            .eq('chapter_id', id);
+        const {
+          error:
+            scheduleUpdateError,
+        } = await supabase
+          .from('scheduled_chapters')
+          .update({
+            scheduled_for:
+              scheduledDate!.toISOString(),
+          })
+          .eq(
+            'chapter_id',
+            id
+          );
 
-        if (scheduleUpdateError) {
+        if (
+          scheduleUpdateError
+        ) {
           console.error(
             'Erro ao atualizar agendamento:',
             scheduleUpdateError
@@ -717,21 +886,28 @@ export async function PUT(
             },
             {
               status: 500,
-              headers: noCacheHeaders(),
+              headers:
+                noCacheHeaders(),
             }
           );
         }
       } else {
-        const { error: scheduleInsertError } =
-          await supabase
-            .from('scheduled_chapters')
-            .insert({
-              chapter_id: id,
-              scheduled_for:
-                scheduledDate!.toISOString(),
-            });
+        const {
+          error:
+            scheduleInsertError,
+        } = await supabase
+          .from(
+            'scheduled_chapters'
+          )
+          .insert({
+            chapter_id: id,
+            scheduled_for:
+              scheduledDate!.toISOString(),
+          });
 
-        if (scheduleInsertError) {
+        if (
+          scheduleInsertError
+        ) {
           console.error(
             'Erro ao criar agendamento:',
             scheduleInsertError
@@ -744,19 +920,29 @@ export async function PUT(
             },
             {
               status: 500,
-              headers: noCacheHeaders(),
+              headers:
+                noCacheHeaders(),
             }
           );
         }
       }
-    } else if (existingSchedule) {
-      const { error: scheduleDeleteError } =
-        await supabase
-          .from('scheduled_chapters')
-          .delete()
-          .eq('chapter_id', id);
+    } else if (
+      existingSchedule
+    ) {
+      const {
+        error:
+          scheduleDeleteError,
+      } = await supabase
+        .from('scheduled_chapters')
+        .delete()
+        .eq(
+          'chapter_id',
+          id
+        );
 
-      if (scheduleDeleteError) {
+      if (
+        scheduleDeleteError
+      ) {
         console.error(
           'Erro ao remover agendamento:',
           scheduleDeleteError
@@ -765,50 +951,61 @@ export async function PUT(
     }
 
     /*
-     * Processamento das novas imagens/GIFs.
-     *
-     * O frontend envia:
-     *
-     * media
-     *
-     * várias vezes.
+     * ========================================================
+     * NOVAS MÍDIAS
+     * ========================================================
      */
-    const mediaFiles = formData
-      .getAll('media')
-      .filter(
-        (item): item is File =>
-          item instanceof File &&
-          item.size > 0
-      );
+
+    const mediaFiles =
+      formData
+        .getAll('media')
+        .filter(
+          (
+            item
+          ): item is File =>
+            item instanceof File &&
+            item.size > 0
+        );
 
     /*
-     * Mídias antigas que o editor quer manter.
-     *
-     * O frontend pode enviar:
-     *
-     * existing_media_ids
+     * ========================================================
+     * MÍDIAS EXISTENTES
+     * ========================================================
      */
-    const existingMediaIds = formData
-      .getAll('existing_media_ids')
-      .filter(
-        (item): item is string =>
-          typeof item === 'string' &&
-          item.trim().length > 0
-      );
+
+    const existingMediaIds =
+      formData
+        .getAll(
+          'existing_media_ids'
+        )
+        .filter(
+          (
+            item
+          ): item is string =>
+            typeof item ===
+              'string' &&
+            item.trim()
+              .length > 0
+        );
 
     /*
      * Busca todas as mídias atuais.
      */
-    const { data: currentMedia, error: currentMediaError } =
-      await supabase
-        .from('chapter_media')
-        .select(
-          'id, media_url, media_type, position'
-        )
-        .eq('chapter_id', id)
-        .order('position', {
-          ascending: true,
-        });
+    const {
+      data: currentMedia,
+      error: currentMediaError,
+    } = await supabase
+      .from('chapter_media')
+      .select(
+        'id, media_url, media_type, position'
+      )
+      .eq(
+        'chapter_id',
+        id
+      )
+      .order('position', {
+        ascending: true,
+      });
 
     if (currentMediaError) {
       console.error(
@@ -835,8 +1032,11 @@ export async function PUT(
      * IDs existentes que continuarão no capítulo.
      */
     const keptExistingMedia =
-      currentMediaList.filter((item) =>
-        existingMediaIds.includes(item.id)
+      currentMediaList.filter(
+        (item) =>
+          existingMediaIds.includes(
+            item.id
+          )
       );
 
     const totalMedia =
@@ -850,7 +1050,9 @@ export async function PUT(
       return NextResponse.json(
         {
           error:
-            `Um capítulo pode ter no máximo ${MAX_MEDIA_PER_CHAPTER} imagens ou GIFs.`,
+            'Um capítulo pode ter no máximo ' +
+            MAX_MEDIA_PER_CHAPTER +
+            ' imagens ou GIFs.',
         },
         {
           status: 400,
@@ -860,41 +1062,60 @@ export async function PUT(
     }
 
     /*
-     * Validação de cada arquivo antes do upload.
+     * ========================================================
+     * VALIDAÇÃO DOS ARQUIVOS
+     * ========================================================
      */
-    for (const file of mediaFiles) {
-      if (file.size > MAX_FILE_SIZE) {
+
+    for (
+      const file of mediaFiles
+    ) {
+      if (
+        file.size >
+        MAX_FILE_SIZE
+      ) {
         return NextResponse.json(
           {
             error:
-              `O arquivo "${file.name}" ultrapassa o limite de 5 MB.`,
+              'O arquivo "' +
+              file.name +
+              '" ultrapassa o limite de 5 MB.',
           },
           {
             status: 400,
-            headers: noCacheHeaders(),
+            headers:
+              noCacheHeaders(),
           }
         );
       }
 
       if (
-        !ALLOWED_MEDIA_TYPES[file.type]
+        !ALLOWED_MEDIA_TYPES[
+          file.type
+        ]
       ) {
         return NextResponse.json(
           {
             error:
-              `O arquivo "${file.name}" possui um formato não permitido. Use JPG, PNG, WEBP ou GIF.`,
+              'O arquivo "' +
+              file.name +
+              '" possui um formato não permitido. Use JPG, PNG, WEBP ou GIF.',
           },
           {
             status: 400,
-            headers: noCacheHeaders(),
+            headers:
+              noCacheHeaders(),
           }
         );
       }
     }
 
     /*
-     * Remove mídias que o autor excluiu do editor.
+     * ========================================================
+     * REMOVE MÍDIAS EXCLUÍDAS
+     * ========================================================
      */
+
     const mediaToDelete =
       currentMediaList.filter(
         (item) =>
@@ -903,7 +1124,9 @@ export async function PUT(
           )
       );
 
-    for (const media of mediaToDelete) {
+    for (
+      const media of mediaToDelete
+    ) {
       try {
         const publicUrl =
           media.media_url;
@@ -912,18 +1135,29 @@ export async function PUT(
           '/storage/v1/object/public/chapter-media/';
 
         const markerIndex =
-          publicUrl.indexOf(marker);
+          publicUrl.indexOf(
+            marker
+          );
 
-        if (markerIndex !== -1) {
+        if (
+          markerIndex !== -1
+        ) {
           const storagePath =
             publicUrl.substring(
-              markerIndex + marker.length
+              markerIndex +
+                marker.length
             );
 
-          const { error: removeError } =
+          const {
+            error: removeError,
+          } =
             await supabase.storage
-              .from('chapter-media')
-              .remove([storagePath]);
+              .from(
+                'chapter-media'
+              )
+              .remove([
+                storagePath,
+              ]);
 
           if (removeError) {
             console.error(
@@ -932,20 +1166,29 @@ export async function PUT(
             );
           }
         }
-      } catch (storageError) {
+      } catch (
+        storageError
+      ) {
         console.error(
           'Erro ao processar remoção de mídia:',
           storageError
         );
       }
 
-      const { error: deleteMediaError } =
-        await supabase
-          .from('chapter_media')
-          .delete()
-          .eq('id', media.id);
+      const {
+        error:
+          deleteMediaError,
+      } = await supabase
+        .from('chapter_media')
+        .delete()
+        .eq(
+          'id',
+          media.id
+        );
 
-      if (deleteMediaError) {
+      if (
+        deleteMediaError
+      ) {
         console.error(
           'Erro ao remover mídia da tabela:',
           deleteMediaError
@@ -954,32 +1197,49 @@ export async function PUT(
     }
 
     /*
-     * Reorganiza as posições das mídias mantidas.
+     * ========================================================
+     * REORGANIZA POSIÇÕES
+     * ========================================================
      */
+
     for (
       let index = 0;
-      index < keptExistingMedia.length;
+      index <
+      keptExistingMedia.length;
       index++
     ) {
       const media =
-        keptExistingMedia[index];
+        keptExistingMedia[
+          index
+        ];
 
       await supabase
-        .from('chapter_media')
+        .from(
+          'chapter_media'
+        )
         .update({
-          position: index,
+          position:
+            index,
         })
-        .eq('id', media.id);
+        .eq(
+          'id',
+          media.id
+        );
     }
 
     /*
-     * Upload das novas mídias.
+     * ========================================================
+     * UPLOAD DAS NOVAS MÍDIAS
+     * ========================================================
      */
-    const uploadedMedia = [];
+
+    const uploadedMedia =
+      [];
 
     for (
       let index = 0;
-      index < mediaFiles.length;
+      index <
+      mediaFiles.length;
       index++
     ) {
       const file =
@@ -996,19 +1256,31 @@ export async function PUT(
         );
 
       const uniqueName =
-        `${crypto.randomUUID()}.${extension}`;
+        crypto.randomUUID() +
+        '.' +
+        extension;
 
       const storagePath =
-        `${userId}/${chapter.story_id}/${id}/${uniqueName}`;
+        userId +
+        '/' +
+        chapter.story_id +
+        '/' +
+        id +
+        '/' +
+        uniqueName;
 
       const fileBuffer =
         Buffer.from(
           await file.arrayBuffer()
         );
 
-      const { error: uploadError } =
+      const {
+        error: uploadError,
+      } =
         await supabase.storage
-          .from('chapter-media')
+          .from(
+            'chapter-media'
+          )
           .upload(
             storagePath,
             fileBuffer,
@@ -1028,20 +1300,26 @@ export async function PUT(
         return NextResponse.json(
           {
             error:
-              `Não foi possível enviar o arquivo "${file.name}".`,
+              'Não foi possível enviar o arquivo "' +
+              file.name +
+              '".',
           },
           {
             status: 500,
-            headers: noCacheHeaders(),
+            headers:
+              noCacheHeaders(),
           }
         );
       }
 
       const {
-        data: publicUrlData,
+        data:
+          publicUrlData,
       } =
         supabase.storage
-          .from('chapter-media')
+          .from(
+            'chapter-media'
+          )
           .getPublicUrl(
             storagePath
           );
@@ -1052,12 +1330,16 @@ export async function PUT(
 
       const {
         data: mediaRow,
-        error: mediaInsertError,
+        error:
+          mediaInsertError,
       } =
         await supabase
-          .from('chapter_media')
+          .from(
+            'chapter_media'
+          )
           .insert({
-            chapter_id: id,
+            chapter_id:
+              id,
             media_url:
               publicUrlData.publicUrl,
             media_type:
@@ -1074,18 +1356,18 @@ export async function PUT(
           `)
           .single();
 
-      if (mediaInsertError) {
+      if (
+        mediaInsertError
+      ) {
         console.error(
           'Erro ao salvar referência da mídia:',
           mediaInsertError
         );
 
-        /*
-         * Se a tabela falhar, tentamos remover
-         * o arquivo que acabou de ser enviado.
-         */
         await supabase.storage
-          .from('chapter-media')
+          .from(
+            'chapter-media'
+          )
           .remove([
             storagePath,
           ]);
@@ -1097,7 +1379,8 @@ export async function PUT(
           },
           {
             status: 500,
-            headers: noCacheHeaders(),
+            headers:
+              noCacheHeaders(),
           }
         );
       }
@@ -1108,27 +1391,41 @@ export async function PUT(
     }
 
     /*
-     * Busca o estado final das mídias.
+     * ========================================================
+     * ESTADO FINAL DAS MÍDIAS
+     * ========================================================
      */
-    const { data: finalMedia } =
-      await supabase
-        .from('chapter_media')
-        .select(`
-          id,
-          chapter_id,
-          media_url,
-          media_type,
-          position,
-          created_at
-        `)
-        .eq('chapter_id', id)
-        .order('position', {
-          ascending: true,
-        });
+
+    const {
+      data: finalMedia,
+    } = await supabase
+      .from('chapter_media')
+      .select(`
+        id,
+        chapter_id,
+        media_url,
+        media_type,
+        position,
+        created_at
+      `)
+      .eq(
+        'chapter_id',
+        id
+      )
+      .order('position', {
+        ascending: true,
+      });
+
+    /*
+     * ========================================================
+     * RESPOSTA FINAL
+     * ========================================================
+     */
 
     return NextResponse.json(
       {
         success: true,
+
         message:
           publicationStatus ===
           'published'
@@ -1140,16 +1437,36 @@ export async function PUT(
                   'unpublished'
                 ? 'Capítulo retirado do ar com sucesso!'
                 : 'Rascunho salvo com sucesso!',
-        chapter: updatedChapter,
+
+        chapter:
+          updatedChapter,
+
         media:
           finalMedia || [],
+
         scheduled:
           publicationStatus ===
           'scheduled',
+
         scheduled_for:
           scheduledDate
             ? scheduledDate.toISOString()
             : null,
+
+        /*
+         * Informações úteis para o frontend
+         * confirmar qual status realmente foi salvo.
+         */
+        publication_status:
+          publicationStatus,
+
+        published,
+
+        status_was_provided:
+          statusWasProvided,
+
+        scheduled_for_was_provided:
+          scheduledForWasProvided,
       },
       {
         status: 200,
