@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
@@ -7,30 +8,12 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY!
 );
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
+    const cookieStore = await cookies();
 
-    const sessionCookie = cookieHeader
-      .split(';')
-      .map((cookie) => cookie.trim())
-      .find((cookie) =>
-        cookie.startsWith('toriland_session=')
-      );
-
-    if (!sessionCookie) {
-      return NextResponse.json(
-        {
-          authenticated: false,
-          user: null,
-        },
-        { status: 401 }
-      );
-    }
-
-    const sessionToken = decodeURIComponent(
-      sessionCookie.substring('toriland_session='.length)
-    );
+    const sessionToken =
+      cookieStore.get('toriland_session')?.value;
 
     if (!sessionToken) {
       return NextResponse.json(
@@ -54,7 +37,22 @@ export async function GET(request: Request) {
         .eq('token_hash', tokenHash)
         .maybeSingle();
 
-    if (sessionError || !session) {
+    if (sessionError) {
+      console.error(
+        'ERRO AO PROCURAR SESSÃO:',
+        sessionError
+      );
+
+      return NextResponse.json(
+        {
+          authenticated: false,
+          user: null,
+        },
+        { status: 401 }
+      );
+    }
+
+    if (!session) {
       return NextResponse.json(
         {
           authenticated: false,
@@ -91,7 +89,22 @@ export async function GET(request: Request) {
         .eq('user_id', session.user_id)
         .maybeSingle();
 
-    if (profileError || !profile) {
+    if (profileError) {
+      console.error(
+        'ERRO AO PROCURAR PERFIL:',
+        profileError
+      );
+
+      return NextResponse.json(
+        {
+          authenticated: false,
+          user: null,
+        },
+        { status: 401 }
+      );
+    }
+
+    if (!profile) {
       return NextResponse.json(
         {
           authenticated: false,
@@ -105,7 +118,12 @@ export async function GET(request: Request) {
       authenticated: true,
       user: profile,
     });
-  } catch {
+  } catch (error) {
+    console.error(
+      'ERRO AO VERIFICAR AUTENTICAÇÃO:',
+      error
+    );
+
     return NextResponse.json(
       {
         authenticated: false,
