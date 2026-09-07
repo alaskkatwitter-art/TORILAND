@@ -34,9 +34,7 @@ type Story = {
   created_at?: string | null;
   updated_at?: string | null;
   author_id?: string | null;
-  user_id?: string | null;
   chapters_count?: number | null;
-  chapter_count?: number | null;
   likes_count?: number | null;
   views_count?: number | null;
 };
@@ -220,15 +218,6 @@ function RefreshIcon() {
    HELPERS
 ========================================================= */
 
-function getInitial(user: CurrentUser | null) {
-  const name =
-    user?.display_name ||
-    user?.username ||
-    'U';
-
-  return name.charAt(0).toUpperCase();
-}
-
 function formatDate(dateString?: string | null) {
   if (!dateString) {
     return '';
@@ -281,7 +270,7 @@ function getStoryStatus(status?: string | null) {
 }
 
 /* =========================================================
-   CARD DA HISTÓRIA
+   CARD
 ========================================================= */
 
 function StoryCard({
@@ -292,15 +281,11 @@ function StoryCard({
   const status = getStoryStatus(story.status);
 
   const chapterCount =
-    story.chapters_count ??
-    story.chapter_count ??
-    0;
+    story.chapters_count ?? 0;
 
   return (
     <article className="group overflow-hidden rounded-[26px] border border-white/[0.07] bg-[#100c11]/90 shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition duration-300 hover:border-[#ff78b9]/20 hover:shadow-[0_20px_70px_rgba(255,120,185,0.06)]">
       <div className="flex flex-col sm:flex-row">
-        {/* CAPA */}
-
         <Link
           href={`/historia/${story.id}`}
           className="relative block h-[220px] shrink-0 overflow-hidden bg-[#171117] sm:h-[250px] sm:w-[175px]"
@@ -319,8 +304,6 @@ function StoryCard({
 
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
         </Link>
-
-        {/* CONTEÚDO */}
 
         <div className="flex min-w-0 flex-1 flex-col p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
@@ -395,9 +378,7 @@ function StoryCard({
               {story.updated_at && (
                 <span>
                   Atualizada{' '}
-                  {formatDate(
-                    story.updated_at
-                  )}
+                  {formatDate(story.updated_at)}
                 </span>
               )}
             </div>
@@ -449,7 +430,7 @@ export default function MinhasHistoriasPage() {
     useState('');
 
   /* =======================================================
-     USUÁRIO
+     AUTENTICAÇÃO
   ======================================================= */
 
   const loadCurrentUser =
@@ -462,41 +443,52 @@ export default function MinhasHistoriasPage() {
           }
         );
 
+        if (!response.ok) {
+          router.replace('/login');
+          return null;
+        }
+
         const data =
           await response.json();
 
         if (
-          response.ok &&
-          data.authenticated &&
-          data.user
+          !data.authenticated ||
+          !data.user
         ) {
-          setCurrentUser(data.user);
-          return data.user as CurrentUser;
+          router.replace('/login');
+          return null;
         }
 
-        setCurrentUser(null);
-        router.replace('/login');
-        return null;
+        const user =
+          data.user as CurrentUser;
+
+        setCurrentUser(user);
+
+        return user;
       } catch (err) {
         console.error(
           'Erro ao carregar usuário:',
           err
         );
 
-        setCurrentUser(null);
         router.replace('/login');
+
         return null;
       }
     }, [router]);
 
   /* =======================================================
      HISTÓRIAS
+     
+     IMPORTANTE:
+     Esta função NÃO depende de currentUser.
+     Isso impede o loop de renderização.
   ======================================================= */
 
   const loadStories =
     useCallback(
       async (
-        user?: CurrentUser | null,
+        user: CurrentUser,
         showRefresh = false
       ) => {
         if (showRefresh) {
@@ -508,170 +500,89 @@ export default function MinhasHistoriasPage() {
         setError('');
 
         try {
-          const activeUser =
-            user || currentUser;
-
-          /*
-           * A API /api/stories já existe no projeto
-           * e é utilizada pelo Feed.
-           *
-           * Primeiro tentamos obter as histórias
-           * dela. Depois filtramos pelo usuário logado.
-           */
-
           const response =
             await fetch(
-              '/api/stories',
+              '/api/my-stories',
               {
                 cache: 'no-store',
               }
             );
 
-          if (!response.ok) {
-            throw new Error(
-              'Não foi possível carregar suas histórias.'
-            );
-          }
-
           const data =
             await response.json();
 
+          if (!response.ok) {
+            throw new Error(
+              data?.error ||
+                'Não foi possível carregar suas histórias.'
+            );
+          }
+
           const incoming =
-            Array.isArray(data)
-              ? data
-              : Array.isArray(data.stories)
+            Array.isArray(data?.stories)
               ? data.stories
               : [];
 
-          /*
-           * A API de stories pode retornar objetos
-           * diferentes do formato de Story.
-           *
-           * Fazemos a normalização sem quebrar
-           * caso algum campo não exista.
-           */
-
           const normalized: Story[] =
             incoming
-              .map(
-                (item: any) => {
-                  const story =
-                    item.story || item;
-
-                  return {
-                    id:
-                      story.id ||
-                      item.story_id ||
-                      '',
-                    title:
-                      story.title ||
-                      item.title ||
-                      'Sem título',
-                    description:
-                      story.description ||
-                      item.description ||
-                      null,
-                    cover_url:
-                      story.cover_url ||
-                      item.cover_url ||
-                      null,
-                    status:
-                      story.status ||
-                      item.status ||
-                      null,
-                    genre:
-                      story.genre ||
-                      item.genre ||
-                      null,
-                    fandom:
-                      story.fandom ||
-                      item.fandom ||
-                      null,
-                    created_at:
-                      story.created_at ||
-                      item.created_at ||
-                      null,
-                    updated_at:
-                      story.updated_at ||
-                      item.updated_at ||
-                      null,
-                    author_id:
-                      story.author_id ||
-                      story.user_id ||
-                      item.author_id ||
-                      item.user_id ||
-                      item.profile?.id ||
-                      null,
-                    user_id:
-                      story.user_id ||
-                      item.user_id ||
-                      item.profile?.id ||
-                      null,
-                    chapters_count:
-                      story.chapters_count ??
-                      story.chapter_count ??
-                      item.chapters_count ??
-                      item.chapter_count ??
-                      null,
-                    chapter_count:
-                      story.chapter_count ??
-                      story.chapters_count ??
-                      item.chapter_count ??
-                      item.chapters_count ??
-                      null,
-                    likes_count:
-                      story.likes_count ??
-                      item.likes_count ??
-                      null,
-                    views_count:
-                      story.views_count ??
-                      item.views_count ??
-                      null,
-                  };
-                }
-              )
+              .map((story: any) => ({
+                id:
+                  String(
+                    story.id || ''
+                  ),
+                title:
+                  story.title ||
+                  'Sem título',
+                description:
+                  story.description ||
+                  null,
+                cover_url:
+                  story.cover_url ||
+                  null,
+                status:
+                  story.status ||
+                  null,
+                genre:
+                  story.genre ||
+                  null,
+                fandom:
+                  story.fandom ||
+                  null,
+                created_at:
+                  story.created_at ||
+                  null,
+                updated_at:
+                  story.updated_at ||
+                  null,
+                author_id:
+                  story.author_id ||
+                  null,
+                chapters_count:
+                  story.chapters_count ??
+                  0,
+                likes_count:
+                  story.likes_count ??
+                  null,
+                views_count:
+                  story.views_count ??
+                  null,
+              }))
               .filter(
                 (story: Story) =>
                   Boolean(story.id)
               );
 
           /*
-           * Se a API devolver o dono da história,
-           * filtramos pelo usuário logado.
-           *
-           * Se a API não trouxer essa informação,
-           * não filtramos aqui para evitar esconder
-           * histórias indevidamente.
+           * Segurança extra no cliente:
+           * só mostramos histórias cujo author_id
+           * corresponde ao usuário autenticado.
            */
-
-          let userStories =
-            normalized;
-
-          if (activeUser?.id) {
-            const storiesWithOwner =
-              normalized.filter(
-                (story) =>
-                  story.author_id ||
-                  story.user_id
-              );
-
-            if (
-              storiesWithOwner.length > 0
-            ) {
-              userStories =
-                storiesWithOwner.filter(
-                  (story) =>
-                    story.author_id ===
-                      activeUser.id ||
-                    story.user_id ===
-                      activeUser.id
-                );
-            }
-          }
-
-          /*
-           * Remove duplicadas.
-           */
+          const userStories =
+            normalized.filter(
+              (story) =>
+                story.author_id ===
+                user.id
+            );
 
           const uniqueStories =
             Array.from(
@@ -706,11 +617,13 @@ export default function MinhasHistoriasPage() {
           setRefreshing(false);
         }
       },
-      [currentUser]
+      []
     );
 
   /* =======================================================
      CARREGAMENTO INICIAL
+     
+     RODA UMA ÚNICA VEZ.
   ======================================================= */
 
   useEffect(() => {
@@ -720,13 +633,14 @@ export default function MinhasHistoriasPage() {
       const user =
         await loadCurrentUser();
 
-      if (cancelled) {
+      if (
+        cancelled ||
+        !user
+      ) {
         return;
       }
 
-      if (user) {
-        await loadStories(user);
-      }
+      await loadStories(user);
     }
 
     initialize();
@@ -780,8 +694,6 @@ export default function MinhasHistoriasPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#080609] text-white">
-      {/* BACKGROUND */}
-
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-40 top-[-180px] h-[500px] w-[500px] rounded-full bg-[#ff4d9d]/[0.08] blur-[130px]" />
 
@@ -790,11 +702,7 @@ export default function MinhasHistoriasPage() {
         <div className="absolute bottom-[-200px] left-[35%] h-[450px] w-[450px] rounded-full bg-[#ff78b9]/[0.035] blur-[130px]" />
       </div>
 
-      {/* CONTEÚDO */}
-
       <div className="relative mx-auto min-h-screen w-full max-w-[1180px] px-4 pb-20 pt-5 sm:px-6 lg:px-8 lg:pt-8">
-        {/* HEADER */}
-
         <header className="mb-8 flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <Link
@@ -823,15 +731,18 @@ export default function MinhasHistoriasPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() =>
-                loadStories(
-                  currentUser,
-                  true
-                )
-              }
+              onClick={() => {
+                if (currentUser) {
+                  loadStories(
+                    currentUser,
+                    true
+                  );
+                }
+              }}
               disabled={
                 loading ||
-                refreshing
+                refreshing ||
+                !currentUser
               }
               className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] text-white/45 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9] disabled:opacity-40"
               aria-label="Atualizar histórias"
@@ -865,8 +776,6 @@ export default function MinhasHistoriasPage() {
           </div>
         </header>
 
-        {/* INTRO */}
-
         <section className="mb-7 overflow-hidden rounded-[30px] border border-[#ff78b9]/10 bg-gradient-to-br from-[#ff78b9]/[0.09] via-[#100c11]/90 to-[#c63dff]/[0.05] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.24)] sm:p-8">
           <div className="max-w-3xl">
             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#ff78b9]">
@@ -886,8 +795,6 @@ export default function MinhasHistoriasPage() {
             </p>
           </div>
         </section>
-
-        {/* ESTATÍSTICAS */}
 
         <div className="mb-7 grid grid-cols-3 gap-3">
           <div className="rounded-[22px] border border-white/[0.07] bg-white/[0.025] p-4 sm:p-5">
@@ -921,29 +828,27 @@ export default function MinhasHistoriasPage() {
           </div>
         </div>
 
-        {/* ERRO */}
-
         {error && (
           <div className="mb-6 rounded-2xl border border-red-400/15 bg-red-400/[0.05] px-5 py-4">
             <p className="text-sm font-semibold text-red-300">
               {error}
             </p>
 
-            <button
-              type="button"
-              onClick={() =>
-                loadStories(
-                  currentUser
-                )
-              }
-              className="mt-2 text-xs font-bold text-red-300 underline underline-offset-2"
-            >
-              Tentar novamente
-            </button>
+            {currentUser && (
+              <button
+                type="button"
+                onClick={() =>
+                  loadStories(
+                    currentUser
+                  )
+                }
+                className="mt-2 text-xs font-bold text-red-300 underline underline-offset-2"
+              >
+                Tentar novamente
+              </button>
+            )}
           </div>
         )}
-
-        {/* TÍTULO */}
 
         <div className="mb-5 flex items-end justify-between gap-4">
           <div>
@@ -963,8 +868,6 @@ export default function MinhasHistoriasPage() {
             Criar nova →
           </Link>
         </div>
-
-        {/* LOADING */}
 
         {loading ? (
           <div className="space-y-5">
@@ -992,8 +895,6 @@ export default function MinhasHistoriasPage() {
             )}
           </div>
         ) : stories.length === 0 ? (
-          /* VAZIO */
-
           <div className="flex min-h-[430px] items-center justify-center rounded-[28px] border border-white/[0.06] bg-white/[0.015]">
             <div className="max-w-md px-6 text-center">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05] text-[#ff78b9]/50">
@@ -1022,8 +923,6 @@ export default function MinhasHistoriasPage() {
             </div>
           </div>
         ) : (
-          /* HISTÓRIAS */
-
           <div className="space-y-5">
             {stories.map(
               (story) => (
