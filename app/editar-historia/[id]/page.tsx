@@ -1,4 +1,4 @@
-```tsx
+
 'use client';
 
 import React, {
@@ -3560,4 +3560,3 @@ export default function EditarHistoriaPage() {
     </main>
   );
 }
-```
