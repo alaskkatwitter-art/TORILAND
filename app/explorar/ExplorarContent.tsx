@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 const fandoms = [
   'House of the Dragon',
@@ -23,54 +23,16 @@ const genres = [
   'Ficção',
 ];
 
-const featuredStories = [
-  {
-    title: 'Histórias em destaque',
-    description:
-      'Descubra histórias que estão chamando a atenção dos leitores no Nooklie.',
-  },
-  {
-    title: 'Atualizadas recentemente',
-    description:
-      'Encontre capítulos novos e acompanhe histórias que continuam sendo atualizadas.',
-  },
-  {
-    title: 'Para descobrir',
-    description:
-      'Explore diferentes fandoms e gêneros até encontrar sua próxima leitura.',
-  },
-];
-
 export default function ExplorarContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
 
-  const initialSearch = searchParams.get('q') || '';
+  const query = searchParams.get('q') || '';
+  const selectedFandom = searchParams.get('fandom') || '';
+  const selectedGenre = searchParams.get('genre') || '';
 
-  const [search, setSearch] = useState(initialSearch);
-  const [activeFilter, setActiveFilter] = useState('Todos');
-
-  const filters = ['Todos', 'Fandoms', 'Gêneros'];
-
-  const filteredFandoms = useMemo(() => {
-    if (!search.trim()) return fandoms;
-
-    return fandoms.filter((item) =>
-      item.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [search]);
-
-  const filteredGenres = useMemo(() => {
-    if (!search.trim()) return genres;
-
-    return genres.filter((item) =>
-      item.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [search]);
-
-  function handleSearch(value: string) {
-    setSearch(value);
-
+  function updateSearch(value: string) {
     const params = new URLSearchParams(searchParams.toString());
 
     if (value.trim()) {
@@ -79,289 +41,229 @@ export default function ExplorarContent() {
       params.delete('q');
     }
 
-    router.replace(`/explorar?${params.toString()}`, {
-      scroll: false,
-    });
+    router.replace(`${pathname}?${params.toString()}`);
   }
 
-  function goToFandom(fandom: string) {
-    router.push(
-      `/fandom/${encodeURIComponent(
-        fandom.toLowerCase().replace(/\s+/g, '-')
-      )}`
-    );
+  function selectFandom(fandom: string) {
+    const params = new URLSearchParams(searchParams.toString());
+
+    params.delete('q');
+    params.delete('genre');
+
+    if (selectedFandom === fandom) {
+      params.delete('fandom');
+    } else {
+      params.set('fandom', fandom);
+    }
+
+    const queryString = params.toString();
+
+    router.push(queryString ? `${pathname}?${queryString}` : pathname);
   }
 
-  function goToGenre(genre: string) {
-    router.push(
-      `/genero/${encodeURIComponent(
-        genre.toLowerCase().replace(/\s+/g, '-')
-      )}`
-    );
+  function selectGenre(genre: string) {
+    const params = new URLSearchParams(searchParams.toString());
+
+    params.delete('q');
+    params.delete('fandom');
+
+    if (selectedGenre === genre) {
+      params.delete('genre');
+    } else {
+      params.set('genre', genre);
+    }
+
+    const queryString = params.toString();
+
+    router.push(queryString ? `${pathname}?${queryString}` : pathname);
   }
+
+  const hasFilters = Boolean(query || selectedFandom || selectedGenre);
 
   return (
-    <main className="min-h-screen bg-[#100b12] text-white">
+    <main className="min-h-screen overflow-x-hidden bg-[#100b12] text-white">
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#100b12]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center gap-6 px-5 py-4">
-          <button
-            type="button"
-            onClick={() => router.push('/')}
+          <Link
+            href="/"
             className="group flex shrink-0 items-center gap-2"
+            aria-label="Ir para o início"
           >
             <CloudLogo />
 
             <span className="text-xl font-black tracking-[0.18em] text-[#ff78b9] transition group-hover:text-[#ff9bca]">
               NOOKLIE
             </span>
-          </button>
+          </Link>
 
           <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">
-            <NavButton
-              label="Início"
-              onClick={() => router.push('/')}
-            />
-
-            <NavButton
-              label="Explorar"
-              active
-              onClick={() => router.push('/explorar')}
-            />
-
-            <NavButton
-              label="Escrever"
-              onClick={() => router.push('/escrever')}
-            />
-
-            <NavButton
-              label="Fandoms"
-              onClick={() => router.push('/fandoms')}
-            />
-
-            <NavButton
-              label="Notícias"
-              onClick={() => router.push('/noticias')}
-            />
+            <NavLink href="/" label="Início" />
+            <NavLink href="/explorar" label="Explorar" active />
+            <NavLink href="/escrever" label="Escrever" />
+            <NavLink href="/fandoms" label="Fandoms" />
+            <NavLink href="/noticias" label="Notícias" />
           </nav>
 
-          <div className="ml-auto flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="hidden rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/60 transition hover:border-[#ff78b9]/30 hover:text-white sm:block"
-            >
-              Voltar
-            </button>
-          </div>
+          <Link
+            href="/login"
+            className="ml-auto shrink-0 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/70 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
+          >
+            Entrar
+          </Link>
         </div>
 
         <div className="overflow-x-auto border-t border-white/5 md:hidden">
           <nav className="mx-auto flex min-w-max items-center justify-center gap-1 px-4 py-2">
-            <MobileNavButton
-              label="Início"
-              onClick={() => router.push('/')}
-            />
-
-            <MobileNavButton
-              label="Explorar"
-              active
-              onClick={() => router.push('/explorar')}
-            />
-
-            <MobileNavButton
-              label="Escrever"
-              onClick={() => router.push('/escrever')}
-            />
-
-            <MobileNavButton
-              label="Fandoms"
-              onClick={() => router.push('/fandoms')}
-            />
-
-            <MobileNavButton
-              label="Notícias"
-              onClick={() => router.push('/noticias')}
-            />
+            <MobileNavLink href="/" label="Início" />
+            <MobileNavLink href="/explorar" label="Explorar" active />
+            <MobileNavLink href="/escrever" label="Escrever" />
+            <MobileNavLink href="/fandoms" label="Fandoms" />
+            <MobileNavLink href="/noticias" label="Notícias" />
           </nav>
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-5">
-        <section className="relative overflow-hidden py-14 md:py-20">
-          <div className="pointer-events-none absolute -left-32 top-0 h-96 w-96 rounded-full bg-[#ff4fa3]/10 blur-3xl" />
+      <div className="relative mx-auto max-w-7xl px-5">
+        <div className="pointer-events-none absolute -left-40 top-0 h-[34rem] w-[34rem] rounded-full bg-[#ff4fa3]/10 blur-3xl" />
 
-          <div className="pointer-events-none absolute right-0 top-10 h-80 w-80 rounded-full bg-[#ff78b9]/5 blur-3xl" />
+        <div className="pointer-events-none absolute -right-40 top-20 h-[32rem] w-[32rem] rounded-full bg-[#ff78b9]/10 blur-3xl" />
 
-          <div className="relative">
-            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#ff78b9]">
-              Descubra
-            </p>
+        <section className="relative py-16 md:py-20">
+          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#ff78b9]">
+            Descobrir
+          </p>
 
-            <h1 className="mt-3 max-w-3xl text-4xl font-black leading-tight md:text-6xl">
-              Encontre sua próxima
-              <span className="block bg-gradient-to-r from-[#ff68ae] to-[#ff9acb] bg-clip-text text-transparent">
-                obsessão.
-              </span>
-            </h1>
+          <h1 className="mt-4 max-w-4xl text-4xl font-black leading-[1.05] md:text-6xl">
+            Encontre sua próxima{' '}
+            <span className="bg-gradient-to-r from-[#ff68ae] to-[#ff9acb] bg-clip-text text-transparent">
+              história.
+            </span>
+          </h1>
 
-            <p className="mt-5 max-w-2xl text-base leading-7 text-white/50 md:text-lg">
-              Explore histórias, fandoms e gêneros. Descubra novos autores
-              e encontre universos para chamar de seus.
-            </p>
+          <p className="mt-5 max-w-2xl text-base leading-7 text-white/50 md:text-lg">
+            Explore histórias por fandom, gênero ou palavra-chave e descubra
+            novos universos para acompanhar.
+          </p>
 
-            <div className="mt-9 flex items-center rounded-2xl border border-white/10 bg-[#191219] px-5 py-4 transition focus-within:border-[#ff78b9]/30 focus-within:bg-[#1d141c]">
-              <SearchIcon />
+          <div className="mt-9 flex items-center rounded-2xl border border-white/10 bg-[#191219] px-5 py-4 transition focus-within:border-[#ff78b9]/30 focus-within:bg-[#1d141c]">
+            <SearchIcon />
 
-              <input
-                value={search}
-                onChange={(event) =>
-                  handleSearch(event.target.value)
-                }
-                placeholder="Pesquisar histórias, fandoms ou gêneros..."
-                className="ml-3 w-full bg-transparent text-sm outline-none placeholder:text-white/30"
-              />
-            </div>
+            <input
+              value={query}
+              onChange={(event) => updateSearch(event.target.value)}
+              placeholder="Pesquisar histórias, autores, fandoms ou gêneros..."
+              className="ml-3 w-full bg-transparent text-sm outline-none placeholder:text-white/30"
+            />
           </div>
         </section>
 
-        <section className="pb-16">
-          <div className="mb-6 flex flex-wrap gap-2">
-            {filters.map((filter) => (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setActiveFilter(filter)}
-                className={`rounded-full px-5 py-2.5 text-sm font-medium transition ${
-                  activeFilter === filter
-                    ? 'bg-gradient-to-r from-[#ff5fab] to-[#ff8fc5] text-[#180d15]'
-                    : 'border border-white/10 bg-white/5 text-white/50 hover:border-[#ff78b9]/20 hover:text-white'
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
+        <section className="relative pb-14">
+          <div className="mb-6 flex flex-col gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
+              Filtre por universo
+            </p>
+
+            <h2 className="text-3xl font-black">Fandoms</h2>
           </div>
 
-          {(activeFilter === 'Todos' ||
-            activeFilter === 'Fandoms') && (
-            <div className="mb-14">
-              <SectionHeading
-                title="Fandoms"
-                subtitle="Explore histórias dos universos que você já conhece."
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {fandoms.map((fandom, index) => (
+              <CategoryCard
+                key={fandom}
+                title={fandom}
+                type="Fandom"
+                index={index}
+                active={selectedFandom === fandom}
+                onClick={() => selectFandom(fandom)}
               />
-
-              {filteredFandoms.length === 0 ? (
-                <EmptySearch />
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredFandoms.map((fandom, index) => (
-                    <CategoryCard
-                      key={fandom}
-                      title={fandom}
-                      type="Fandom"
-                      index={index}
-                      onClick={() => goToFandom(fandom)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {(activeFilter === 'Todos' ||
-            activeFilter === 'Gêneros') && (
-            <div>
-              <SectionHeading
-                title="Gêneros"
-                subtitle="Escolha o tipo de história que você quer encontrar."
-              />
-
-              {filteredGenres.length === 0 ? (
-                <EmptySearch />
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {filteredGenres.map((genre, index) => (
-                    <CategoryCard
-                      key={genre}
-                      title={genre}
-                      type="Gênero"
-                      index={index}
-                      onClick={() => goToGenre(genre)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+            ))}
+          </div>
         </section>
 
-        <section className="pb-20">
-          <SectionHeading
-            title="Explore o Nooklie"
-            subtitle="Há mais para descobrir além da busca."
-          />
+        <section className="relative pb-16">
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
+              Filtre por estilo
+            </p>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {featuredStories.map((item) => (
-              <button
-                key={item.title}
-                type="button"
-                onClick={() => router.push('/fandoms')}
-                className="group rounded-2xl border border-white/10 bg-gradient-to-br from-[#21131e] to-[#171018] p-6 text-left transition duration-300 hover:-translate-y-1 hover:border-[#ff78b9]/25"
-              >
-                <div className="mb-5 h-10 w-10 rounded-xl bg-[#ff78b9]/10" />
+            <h2 className="mt-2 text-3xl font-black">Gêneros</h2>
+          </div>
 
-                <h3 className="text-lg font-bold transition group-hover:text-[#ff9bca]">
-                  {item.title}
-                </h3>
-
-                <p className="mt-2 text-sm leading-6 text-white/40">
-                  {item.description}
-                </p>
-
-                <span className="mt-5 inline-block text-xs font-medium uppercase tracking-[0.15em] text-[#ff78b9]/60 transition group-hover:text-[#ff9bca]">
-                  Explorar
-                </span>
-              </button>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {genres.map((genre, index) => (
+              <CategoryCard
+                key={genre}
+                title={genre}
+                type="Gênero"
+                index={index}
+                active={selectedGenre === genre}
+                onClick={() => selectGenre(genre)}
+              />
             ))}
+          </div>
+        </section>
+
+        <section className="relative mb-20 overflow-hidden rounded-[2rem] border border-[#ff78b9]/15 bg-gradient-to-r from-[#291522] via-[#21131e] to-[#171018]">
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#ff78b9]/10 blur-3xl" />
+
+          <div className="relative flex flex-col items-start justify-between gap-8 p-8 md:flex-row md:items-center md:p-12">
+            <div className="max-w-2xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
+                Nooklie
+              </p>
+
+              <h2 className="mt-3 text-3xl font-black md:text-4xl">
+                Descubra algo novo.
+              </h2>
+
+              <p className="mt-4 leading-7 text-white/50">
+                Explore diferentes fandoms e gêneros para encontrar histórias
+                que combinam com você.
+              </p>
+            </div>
+
+            {hasFilters ? (
+              <Link
+                href="/explorar"
+                className="shrink-0 rounded-full border border-white/10 bg-white/5 px-7 py-3.5 font-bold transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
+              >
+                Limpar filtros
+              </Link>
+            ) : (
+              <Link
+                href="/fandoms"
+                className="shrink-0 rounded-full bg-gradient-to-r from-[#ff68ae] to-[#ff91c4] px-7 py-3.5 font-bold text-[#180d15] transition duration-300 hover:-translate-y-0.5 hover:brightness-110"
+              >
+                Ver fandoms
+              </Link>
+            )}
           </div>
         </section>
       </div>
 
       <footer className="border-t border-white/10 bg-[#0b080d]">
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-5 py-10 text-sm text-white/35">
-          <div className="flex flex-wrap items-center justify-center gap-6">
-            <button
-              type="button"
-              onClick={() => router.push('/')}
+          <div className="flex items-center gap-6">
+            <Link
+              href="/"
               className="transition hover:text-[#ff9bca]"
             >
-              Início
-            </button>
+              Sobre
+            </Link>
 
-            <button
-              type="button"
-              onClick={() => router.push('/explorar')}
+            <Link
+              href="/"
               className="transition hover:text-[#ff9bca]"
             >
-              Explorar
-            </button>
+              Termos
+            </Link>
 
-            <button
-              type="button"
-              onClick={() => router.push('/fandoms')}
+            <Link
+              href="/"
               className="transition hover:text-[#ff9bca]"
             >
-              Fandoms
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push('/noticias')}
-              className="transition hover:text-[#ff9bca]"
-            >
-              Notícias
-            </button>
+              Privacidade
+            </Link>
           </div>
 
           <p className="text-white/25">
@@ -377,19 +279,18 @@ export default function ExplorarContent() {
   );
 }
 
-function NavButton({
+function NavLink({
+  href,
   label,
   active = false,
-  onClick,
 }: {
+  href: string;
   label: string;
   active?: boolean;
-  onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <Link
+      href={href}
       className={`relative rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-300 ${
         active
           ? 'bg-gradient-to-r from-[#ff5fab] to-[#ff8fc5] text-[#180d15] shadow-[0_0_20px_rgba(255,120,185,0.15)]'
@@ -397,23 +298,22 @@ function NavButton({
       }`}
     >
       {label}
-    </button>
+    </Link>
   );
 }
 
-function MobileNavButton({
+function MobileNavLink({
+  href,
   label,
   active = false,
-  onClick,
 }: {
+  href: string;
   label: string;
   active?: boolean;
-  onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <Link
+      href={href}
       className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
         active
           ? 'bg-gradient-to-r from-[#ff5fab] to-[#ff8fc5] text-[#180d15]'
@@ -421,27 +321,7 @@ function MobileNavButton({
       }`}
     >
       {label}
-    </button>
-  );
-}
-
-function SectionHeading({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="mb-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
-        Descubra
-      </p>
-
-      <h2 className="mt-2 text-3xl font-black">{title}</h2>
-
-      <p className="mt-1 text-sm text-white/40">{subtitle}</p>
-    </div>
+    </Link>
   );
 }
 
@@ -449,11 +329,13 @@ function CategoryCard({
   title,
   type,
   index,
+  active,
   onClick,
 }: {
   title: string;
   type: 'Fandom' | 'Gênero';
   index: number;
+  active: boolean;
   onClick: () => void;
 }) {
   const gradients = [
@@ -469,9 +351,13 @@ function CategoryCard({
     <button
       type="button"
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br ${
+      className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-5 text-left transition duration-300 hover:-translate-y-0.5 ${
         gradients[index % gradients.length]
-      } p-5 text-left transition duration-300 hover:-translate-y-0.5 hover:border-[#ff78b9]/30`}
+      } ${
+        active
+          ? 'border-[#ff78b9]/50 shadow-[0_0_30px_rgba(255,120,185,0.12)]'
+          : 'border-white/10 hover:border-[#ff78b9]/30'
+      }`}
     >
       <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full border border-white/5 bg-white/5 transition duration-500 group-hover:scale-125" />
 
@@ -485,24 +371,10 @@ function CategoryCard({
         </h3>
 
         <span className="mt-4 inline-block text-xs text-white/30 transition group-hover:text-white/50">
-          Explorar
+          {active ? 'Selecionado' : 'Explorar'}
         </span>
       </div>
     </button>
-  );
-}
-
-function EmptySearch() {
-  return (
-    <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center">
-      <h3 className="font-medium text-white/60">
-        Nenhum resultado encontrado
-      </h3>
-
-      <p className="mt-2 text-sm text-white/30">
-        Tente pesquisar por outro termo.
-      </p>
-    </div>
   );
 }
 
