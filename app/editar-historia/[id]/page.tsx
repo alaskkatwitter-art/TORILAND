@@ -1,681 +1,2118 @@
 'use client';
 
 import React, {
-ChangeEvent,
-FormEvent,
-KeyboardEvent,
-MouseEvent,
-useEffect,
-useRef,
-useState,
+  ChangeEvent,
+  FormEvent,
+  KeyboardEvent,
+  MouseEvent,
+  useEffect,
+  useRef,
+  useState,
 } from 'react';
 import {
-useParams,
-useRouter,
-useSearchParams,
+  useParams,
+  useRouter,
+  useSearchParams,
 } from 'next/navigation';
 
 type Tag = {
-id?: string;
-name: string;
+  id?: string;
+  name: string;
 };
 
+type PublicationStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'published'
+  | 'unpublished';
+
 type StoryChapter = {
-id: string;
-chapter_number: number;
-title: string;
-published: boolean;
-scheduled_for: string | null;
-is_scheduled: boolean;
-publication_status?:
-| 'draft'
-| 'scheduled'
-| 'published'
-| 'unpublished';
+  id: string;
+  chapter_number: number;
+  title: string;
+  published: boolean;
+  scheduled_for: string | null;
+  is_scheduled: boolean;
+  publication_status?: PublicationStatus;
 };
 
 type Story = {
-id: string;
-title: string;
-description: string;
-cover_url: string | null;
-status: string;
-rating: string;
-genre: string;
-tags: Tag[];
-chapters: StoryChapter[];
+  id: string;
+  title: string;
+  description: string;
+  cover_url: string | null;
+  status: string;
+  rating: string;
+  genre: string;
+  tags: Tag[];
+  chapters: StoryChapter[];
 };
 
 type ChapterMedia = {
-id: string;
-media_url: string;
-media_type: 'image' | 'gif';
-created_at?: string;
+  id: string;
+  media_url: string;
+  media_type: 'image' | 'gif';
+  position?: number;
+  created_at?: string;
 };
 
 type Chapter = {
-id: string;
-story_id: string;
-chapter_number: number;
-title: string;
-body: string;
-published: boolean;
-created_at: string;
-updated_at?: string | null;
-publication_status:
-| 'draft'
-| 'scheduled'
-| 'published'
-| 'unpublished';
-original_published_at: string | null;
-republished_at: string | null;
-author_notes: string;
-scheduled_for?: string | null;
-media?: ChapterMedia[];
+  id: string;
+  story_id: string;
+  chapter_number: number;
+  title: string;
+  body: string;
+  published: boolean;
+  created_at: string;
+  updated_at?: string | null;
+  publication_status: PublicationStatus;
+  original_published_at: string | null;
+  republished_at: string | null;
+  author_notes: string;
+  scheduled_for?: string | null;
+  media?: ChapterMedia[];
 };
 
 type ChapterResponse = {
-chapter?: Chapter;
-media?: ChapterMedia[];
-scheduled?: boolean;
-published?: boolean;
-scheduled_for?: string | null;
-error?: string;
+  chapter?: Chapter;
+  media?: ChapterMedia[];
+  scheduled?: boolean;
+  published?: boolean;
+  scheduled_for?: string | null;
+  error?: string;
 };
 
 type EditorMedia = {
-id: string;
-url: string;
-type: 'image' | 'gif';
-existing: boolean;
-file?: File;
+  id: string;
+  url: string;
+  type: 'image' | 'gif';
+  existing: boolean;
+  file?: File;
 };
 
 const MAX_MEDIA = 25;
 const MAX_MEDIA_SIZE = 5 * 1024 * 1024;
 
 const ALLOWED_MEDIA_TYPES = [
-'image/jpeg',
-'image/png',
-'image/webp',
-'image/gif',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
 ];
 
 function formatDate(value: string | null | undefined) {
-if (!value) return '—';
+  if (!value) return '—';
 
-const date = new Date(value);
+  const date = new Date(value);
 
-if (Number.isNaN(date.getTime())) {
-return '—';
-}
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
 
-return date.toLocaleString('pt-BR', {
-dateStyle: 'short',
-timeStyle: 'short',
-});
+  return date.toLocaleString('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
 }
 
 function formatDateForInput(value: string | null | undefined) {
-if (!value) return '';
+  if (!value) return '';
 
-const date = new Date(value);
+  const date = new Date(value);
 
-if (Number.isNaN(date.getTime())) {
-return '';
-}
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
 
-const pad = (number: number) =>
-String(number).padStart(2, '0');
+  const pad = (number: number) =>
+    String(number).padStart(2, '0');
 
-return (
-date.getFullYear() +
-'-' +
-pad(date.getMonth() + 1) +
-'-' +
-pad(date.getDate()) +
-'T' +
-pad(date.getHours()) +
-':' +
-pad(date.getMinutes())
-);
+  return (
+    date.getFullYear() +
+    '-' +
+    pad(date.getMonth() + 1) +
+    '-' +
+    pad(date.getDate()) +
+    'T' +
+    pad(date.getHours()) +
+    ':' +
+    pad(date.getMinutes())
+  );
 }
 
 function getLocalDateTimeInputMin() {
-const date = new Date();
+  const date = new Date();
 
-const pad = (number: number) =>
-String(number).padStart(2, '0');
+  const pad = (number: number) =>
+    String(number).padStart(2, '0');
 
-return (
-date.getFullYear() +
-'-' +
-pad(date.getMonth() + 1) +
-'-' +
-pad(date.getDate()) +
-'T' +
-pad(date.getHours()) +
-':' +
-pad(date.getMinutes())
-);
+  return (
+    date.getFullYear() +
+    '-' +
+    pad(date.getMonth() + 1) +
+    '-' +
+    pad(date.getDate()) +
+    'T' +
+    pad(date.getHours()) +
+    ':' +
+    pad(date.getMinutes())
+  );
 }
 
 function getStatusLabel(
-status: Chapter['publication_status'],
-published?: boolean
+  status: PublicationStatus,
+  published?: boolean
 ) {
-if (status === 'scheduled') {
-return 'AGENDADO';
-}
+  if (status === 'scheduled') {
+    return 'AGENDADO';
+  }
 
-if (status === 'published' || published) {
-return 'PUBLICADO';
-}
+  if (status === 'published' || published) {
+    return 'PUBLICADO';
+  }
 
-if (status === 'unpublished') {
-return 'FORA DO AR';
-}
+  if (status === 'unpublished') {
+    return 'FORA DO AR';
+  }
 
-return 'RASCUNHO';
+  return 'RASCUNHO';
 }
 
 function getStatusClass(
-status: Chapter['publication_status'],
-published?: boolean
+  status: PublicationStatus,
+  published?: boolean
 ) {
-if (status === 'scheduled') {
-return 'border-violet-400/20 bg-violet-500/10 text-violet-200';
-}
+  if (status === 'scheduled') {
+    return 'border-violet-400/20 bg-violet-500/10 text-violet-200';
+  }
 
-if (status === 'published' || published) {
-return 'border-emerald-400/20 bg-emerald-500/10 text-emerald-200';
-}
+  if (status === 'published' || published) {
+    return 'border-emerald-400/20 bg-emerald-500/10 text-emerald-200';
+  }
 
-if (status === 'unpublished') {
-return 'border-orange-400/20 bg-orange-500/10 text-orange-200';
-}
+  if (status === 'unpublished') {
+    return 'border-orange-400/20 bg-orange-500/10 text-orange-200';
+  }
 
-return 'border-white/10 bg-white/[0.04] text-gray-400';
+  return 'border-white/10 bg-white/[0.04] text-gray-400';
 }
 
 function sanitizeHtml(html: string) {
-if (!html) return '';
+  if (!html) return '';
 
-if (typeof window === 'undefined') {
-return html;
-}
+  if (typeof window === 'undefined') {
+    return html;
+  }
 
-const documentNode = new DOMParser().parseFromString(
-html,
-'text/html'
-);
-
-documentNode
-.querySelectorAll(
-'script, iframe, object, embed, style, link'
-)
-.forEach((element) => {
-element.remove();
-});
-
-documentNode
-.querySelectorAll('*')
-.forEach((element) => {
-Array.from(element.attributes).forEach(
-(attribute) => {
-const name = attribute.name.toLowerCase();
-const value = attribute.value.trim();
-
-```
-      if (name.startsWith('on')) {
-        element.removeAttribute(attribute.name);
-        return;
-      }
-
-      if (
-        ['href', 'src', 'action', 'formaction'].includes(
-          name
-        ) &&
-        value.toLowerCase().startsWith('javascript:')
-      ) {
-        element.removeAttribute(attribute.name);
-      }
-    }
+  const documentNode = new DOMParser().parseFromString(
+    html,
+    'text/html'
   );
-});
-```
 
-documentNode
-.querySelectorAll('a')
-.forEach((anchor) => {
-anchor.setAttribute('target', '_blank');
-anchor.setAttribute(
-'rel',
-'noopener noreferrer nofollow'
-);
-});
+  documentNode
+    .querySelectorAll(
+      'script, iframe, object, embed, style, link'
+    )
+    .forEach((element) => {
+      element.remove();
+    });
 
-return documentNode.body.innerHTML;
+  documentNode
+    .querySelectorAll('*')
+    .forEach((element) => {
+      Array.from(element.attributes).forEach(
+        (attribute) => {
+          const name =
+            attribute.name.toLowerCase();
+
+          const value =
+            attribute.value.trim();
+
+          if (name.startsWith('on')) {
+            element.removeAttribute(attribute.name);
+            return;
+          }
+
+          if (
+            ['href', 'src', 'action', 'formaction'].includes(
+              name
+            ) &&
+            value
+              .toLowerCase()
+              .startsWith('javascript:')
+          ) {
+            element.removeAttribute(attribute.name);
+          }
+        }
+      );
+    });
+
+  documentNode
+    .querySelectorAll('a')
+    .forEach((anchor) => {
+      anchor.setAttribute(
+        'target',
+        '_blank'
+      );
+
+      anchor.setAttribute(
+        'rel',
+        'noopener noreferrer nofollow'
+      );
+    });
+
+  return documentNode.body.innerHTML;
 }
 
 export default function EditarHistoriaPage() {
-const params = useParams();
-const router = useRouter();
-const searchParams = useSearchParams();
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-const id = String(params.id);
+  const id = String(params.id);
 
-const editorRef =
-useRef<HTMLDivElement | null>(null);
+  const editorRef =
+    useRef<HTMLDivElement | null>(null);
 
-const mediaInputRef =
-useRef<HTMLInputElement | null>(null);
+  const mediaInputRef =
+    useRef<HTMLInputElement | null>(null);
 
-const coverInputRef =
-useRef<HTMLInputElement | null>(null);
+  const coverInputRef =
+    useRef<HTMLInputElement | null>(null);
 
-const linkInputRef =
-useRef<HTMLInputElement | null>(null);
+  const linkInputRef =
+    useRef<HTMLInputElement | null>(null);
 
-const savedSelectionRef =
-useRef<Range | null>(null);
+  const savedSelectionRef =
+    useRef<Range | null>(null);
 
-const storyRef =
-useRef<Story | null>(null);
+  const storyRef =
+    useRef<Story | null>(null);
 
-const [story, setStory] =
-useState<Story | null>(null);
+  const [story, setStory] =
+    useState<Story | null>(null);
 
-const [chapter, setChapter] =
-useState<Chapter | null>(null);
+  const [chapter, setChapter] =
+    useState<Chapter | null>(null);
 
-const [selectedChapterId, setSelectedChapterId] =
-useState<string | null>(
-searchParams.get('chapter')
-);
-
-const [title, setTitle] =
-useState('');
-
-const [description, setDescription] =
-useState('');
-
-const [status, setStatus] =
-useState('');
-
-const [rating, setRating] =
-useState('');
-
-const [genre, setGenre] =
-useState('');
-
-const [tags, setTags] =
-useState<string[]>([]);
-
-const [tagInput, setTagInput] =
-useState('');
-
-const [coverPreview, setCoverPreview] =
-useState<string | null>(null);
-
-const [chapterTitle, setChapterTitle] =
-useState('');
-
-const [chapterBody, setChapterBody] =
-useState('');
-
-const [authorNotes, setAuthorNotes] =
-useState('');
-
-const [chapterStatus, setChapterStatus] =
-useState<Chapter['publication_status']>(
-'draft'
-);
-
-const [scheduledFor, setScheduledFor] =
-useState('');
-
-const [chapterMedia, setChapterMedia] =
-useState<EditorMedia[]>([]);
-
-const [previewMode, setPreviewMode] =
-useState(false);
-
-const [loading, setLoading] =
-useState(true);
-
-const [loadingChapter, setLoadingChapter] =
-useState(false);
-
-const [savingStory, setSavingStory] =
-useState(false);
-
-const [savingChapter, setSavingChapter] =
-useState(false);
-
-const [mediaUploading, setMediaUploading] =
-useState(false);
-
-const [error, setError] =
-useState('');
-
-const [success, setSuccess] =
-useState('');
-
-const [showLinkBox, setShowLinkBox] =
-useState(false);
-
-const [linkValue, setLinkValue] =
-useState('');
-
-function saveSelection() {
-if (!editorRef.current) return;
-
-```
-const selection = window.getSelection();
-
-if (!selection || selection.rangeCount === 0) {
-  return;
-}
-
-const range = selection.getRangeAt(0);
-
-if (
-  editorRef.current.contains(range.commonAncestorContainer)
-) {
-  savedSelectionRef.current =
-    range.cloneRange();
-}
-```
-
-}
-
-function restoreSelection() {
-if (!savedSelectionRef.current) return;
-
-```
-const selection = window.getSelection();
-
-if (!selection) return;
-
-selection.removeAllRanges();
-selection.addRange(
-  savedSelectionRef.current
-);
-```
-
-}
-
-function syncEditorBody() {
-if (!editorRef.current) {
-return chapterBody;
-}
-
-```
-const value = editorRef.current.innerHTML;
-
-setChapterBody(value);
-
-return value;
-```
-
-}
-
-useEffect(() => {
-let cancelled = false;
-
-```
-async function loadStory() {
-  setLoading(true);
-  setError('');
-
-  try {
-    const response = await fetch(
-      `/api/stories/${id}`,
-      {
-        cache: 'no-store',
-      }
+  const [selectedChapterId, setSelectedChapterId] =
+    useState<string | null>(
+      searchParams.get('chapter')
     );
 
-    const data = await response.json();
+  const [title, setTitle] =
+    useState('');
 
-    if (!response.ok) {
-      throw new Error(
-        data.error ||
-          'Não foi possível carregar a obra.'
-      );
-    }
+  const [description, setDescription] =
+    useState('');
 
-    const loadedStory: Story =
-      data.story || data;
+  const [status, setStatus] =
+    useState('');
 
-    if (!loadedStory?.id) {
-      throw new Error(
-        'Resposta inválida da obra.'
-      );
-    }
+  const [rating, setRating] =
+    useState('');
 
-    if (cancelled) return;
+  const [genre, setGenre] =
+    useState('');
 
-    const normalizedChapters =
-      Array.isArray(
-        loadedStory.chapters
-      )
-        ? loadedStory.chapters.map(
-            (item: StoryChapter) => ({
-              ...item,
-              scheduled_for:
-                item.scheduled_for || null,
-              is_scheduled:
-                item.is_scheduled ||
-                item.publication_status ===
-                  'scheduled',
-            })
-          )
-        : [];
+  const [tags, setTags] =
+    useState<string[]>([]);
 
-    const normalizedStory: Story = {
-      ...loadedStory,
-      chapters: normalizedChapters,
-      tags: Array.isArray(
-        loadedStory.tags
-      )
-        ? loadedStory.tags
-        : [],
-    };
+  const [tagInput, setTagInput] =
+    useState('');
 
-    storyRef.current =
-      normalizedStory;
+  const [coverPreview, setCoverPreview] =
+    useState<string | null>(null);
 
-    setStory(normalizedStory);
-    setTitle(
-      normalizedStory.title || ''
-    );
-    setDescription(
-      normalizedStory.description || ''
-    );
-    setStatus(
-      normalizedStory.status || ''
-    );
-    setRating(
-      normalizedStory.rating || ''
-    );
-    setGenre(
-      normalizedStory.genre || ''
-    );
-    setTags(
-      normalizedStory.tags.map(
-        (tag) =>
-          typeof tag === 'string'
-            ? tag
-            : tag.name
-      )
-    );
-    setCoverPreview(
-      normalizedStory.cover_url || null
-    );
+  const [chapterTitle, setChapterTitle] =
+    useState('');
 
-    const requestedChapter =
-      searchParams.get('chapter');
+  const [chapterBody, setChapterBody] =
+    useState('');
+
+  const [authorNotes, setAuthorNotes] =
+    useState('');
+
+  const [chapterStatus, setChapterStatus] =
+    useState<PublicationStatus>('draft');
+
+  const [scheduledFor, setScheduledFor] =
+    useState('');
+
+  const [chapterMedia, setChapterMedia] =
+    useState<EditorMedia[]>([]);
+
+  const [previewMode, setPreviewMode] =
+    useState(false);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [loadingChapter, setLoadingChapter] =
+    useState(false);
+
+  const [savingStory, setSavingStory] =
+    useState(false);
+
+  const [savingChapter, setSavingChapter] =
+    useState(false);
+
+  const [mediaUploading, setMediaUploading] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+  const [success, setSuccess] =
+    useState('');
+
+  const [showLinkBox, setShowLinkBox] =
+    useState(false);
+
+  const [linkValue, setLinkValue] =
+    useState('');
+
+  function saveSelection() {
+    if (!editorRef.current) return;
+
+    const selection =
+      window.getSelection();
 
     if (
-      requestedChapter &&
-      normalizedChapters.some(
-        (item) =>
-          item.id === requestedChapter
+      !selection ||
+      selection.rangeCount === 0
+    ) {
+      return;
+    }
+
+    const range =
+      selection.getRangeAt(0);
+
+    if (
+      editorRef.current.contains(
+        range.commonAncestorContainer
       )
     ) {
-      setSelectedChapterId(
-        requestedChapter
-      );
-    } else if (
-      requestedChapter
-    ) {
-      setSelectedChapterId(null);
-    }
-  } catch (caughtError) {
-    if (cancelled) return;
-
-    setError(
-      caughtError instanceof Error
-        ? caughtError.message
-        : 'Erro ao carregar a obra.'
-    );
-  } finally {
-    if (!cancelled) {
-      setLoading(false);
+      savedSelectionRef.current =
+        range.cloneRange();
     }
   }
-}
 
-void loadStory();
+  function restoreSelection() {
+    if (!savedSelectionRef.current) {
+      return;
+    }
 
-return () => {
-  cancelled = true;
-};
-```
+    const selection =
+      window.getSelection();
 
-}, [id, searchParams]);
+    if (!selection) return;
 
-useEffect(() => {
-if (!selectedChapterId) {
-setChapter(null);
-setLoadingChapter(false);
-return;
-}
+    selection.removeAllRanges();
 
-```
-let cancelled = false;
+    selection.addRange(
+      savedSelectionRef.current
+    );
+  }
 
-async function loadChapter() {
-  setLoadingChapter(true);
-  setError('');
-  setSuccess('');
+  function syncEditorBody() {
+    if (!editorRef.current) {
+      return chapterBody;
+    }
 
-  try {
-    const response = await fetch(
-      `/api/chapters/${selectedChapterId}`,
-      {
-        cache: 'no-store',
+    const value =
+      editorRef.current.innerHTML;
+
+    setChapterBody(value);
+
+    return value;
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStory() {
+      setLoading(true);
+      setError('');
+
+      try {
+        const response =
+          await fetch(
+            `/api/stories/${id}`,
+            {
+              cache: 'no-store',
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              'Não foi possível carregar a obra.'
+          );
+        }
+
+        const loadedStory: Story =
+          data.story || data;
+
+        if (!loadedStory?.id) {
+          throw new Error(
+            'Resposta inválida da obra.'
+          );
+        }
+
+        if (cancelled) return;
+
+        const normalizedChapters =
+          Array.isArray(
+            loadedStory.chapters
+          )
+            ? loadedStory.chapters.map(
+                (
+                  item: StoryChapter
+                ) => ({
+                  ...item,
+                  scheduled_for:
+                    item.scheduled_for ||
+                    null,
+                  is_scheduled:
+                    item.is_scheduled ||
+                    item.publication_status ===
+                      'scheduled',
+                })
+              )
+            : [];
+
+        const normalizedStory: Story =
+          {
+            ...loadedStory,
+            chapters:
+              normalizedChapters,
+            tags:
+              Array.isArray(
+                loadedStory.tags
+              )
+                ? loadedStory.tags
+                : [],
+          };
+
+        storyRef.current =
+          normalizedStory;
+
+        setStory(
+          normalizedStory
+        );
+
+        setTitle(
+          normalizedStory.title ||
+            ''
+        );
+
+        setDescription(
+          normalizedStory.description ||
+            ''
+        );
+
+        setStatus(
+          normalizedStory.status ||
+            ''
+        );
+
+        setRating(
+          normalizedStory.rating ||
+            ''
+        );
+
+        setGenre(
+          normalizedStory.genre ||
+            ''
+        );
+
+        setTags(
+          normalizedStory.tags.map(
+            (tag) =>
+              typeof tag === 'string'
+                ? tag
+                : tag.name
+          )
+        );
+
+        setCoverPreview(
+          normalizedStory.cover_url ||
+            null
+        );
+
+        const requestedChapter =
+          searchParams.get(
+            'chapter'
+          );
+
+        if (
+          requestedChapter &&
+          normalizedChapters.some(
+            (item) =>
+              item.id ===
+              requestedChapter
+          )
+        ) {
+          setSelectedChapterId(
+            requestedChapter
+          );
+        } else if (
+          requestedChapter
+        ) {
+          setSelectedChapterId(
+            null
+          );
+        }
+      } catch (caughtError) {
+        if (cancelled) return;
+
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : 'Erro ao carregar a obra.'
+        );
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadStory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, searchParams]);
+
+  useEffect(() => {
+    if (!selectedChapterId) {
+      setChapter(null);
+      setLoadingChapter(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadChapter() {
+      setLoadingChapter(true);
+      setError('');
+      setSuccess('');
+
+      try {
+        const response =
+          await fetch(
+            `/api/chapters/${selectedChapterId}`,
+            {
+              cache: 'no-store',
+            }
+          );
+
+        const data: ChapterResponse =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              'Não foi possível carregar o capítulo.'
+          );
+        }
+
+        if (!data.chapter) {
+          throw new Error(
+            'Capítulo não encontrado.'
+          );
+        }
+
+        if (cancelled) return;
+
+        const loadedChapter =
+          data.chapter;
+
+        const currentStory =
+          storyRef.current;
+
+        const storyChapter =
+          currentStory?.chapters?.find(
+            (item) =>
+              item.id ===
+              loadedChapter.id
+          );
+
+        const resolvedScheduledFor =
+          data.scheduled_for ??
+          loadedChapter.scheduled_for ??
+          storyChapter?.scheduled_for ??
+          null;
+
+        const normalizedChapter: Chapter =
+          {
+            ...loadedChapter,
+            scheduled_for:
+              resolvedScheduledFor,
+            author_notes:
+              loadedChapter.author_notes ||
+              '',
+          };
+
+        setChapter(
+          normalizedChapter
+        );
+
+        setChapterTitle(
+          normalizedChapter.title ||
+            ''
+        );
+
+        setChapterBody(
+          normalizedChapter.body ||
+            ''
+        );
+
+        setAuthorNotes(
+          normalizedChapter.author_notes ||
+            ''
+        );
+
+        setChapterStatus(
+          normalizedChapter.publication_status ||
+            (
+              normalizedChapter.published
+                ? 'published'
+                : 'draft'
+            )
+        );
+
+        setScheduledFor(
+          formatDateForInput(
+            resolvedScheduledFor
+          )
+        );
+
+        const loadedMedia =
+          data.media ||
+          normalizedChapter.media ||
+          [];
+
+        setChapterMedia(
+          loadedMedia.map(
+            (media) => ({
+              id: media.id,
+              url: media.media_url,
+              type:
+                media.media_type ===
+                'gif'
+                  ? 'gif'
+                  : 'image',
+              existing: true,
+            })
+          )
+        );
+
+        savedSelectionRef.current =
+          null;
+
+        const currentUrl =
+          new URL(
+            window.location.href
+          );
+
+        currentUrl.searchParams.set(
+          'chapter',
+          normalizedChapter.id
+        );
+
+        window.history.replaceState(
+          null,
+          '',
+          currentUrl.toString()
+        );
+      } catch (caughtError) {
+        if (cancelled) return;
+
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : 'Erro ao carregar o capítulo.'
+        );
+
+        setChapter(null);
+      } finally {
+        if (!cancelled) {
+          setLoadingChapter(false);
+        }
+      }
+    }
+
+    void loadChapter();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChapterId]);
+
+  useEffect(() => {
+    if (!editorRef.current) return;
+    if (!chapter) return;
+
+    if (
+      editorRef.current.innerHTML !==
+      chapterBody
+    ) {
+      editorRef.current.innerHTML =
+        chapterBody || '';
+    }
+  }, [chapter, chapterBody]);
+
+  useEffect(() => {
+    if (!showLinkBox) return;
+
+    const timer =
+      window.setTimeout(() => {
+        linkInputRef.current?.focus();
+      }, 50);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [showLinkBox]);
+
+  function selectChapter(
+    chapterId: string
+  ) {
+    setSelectedChapterId(
+      chapterId
+    );
+
+    setPreviewMode(false);
+    setShowLinkBox(false);
+    setLinkValue('');
+    setError('');
+    setSuccess('');
+
+    const currentUrl =
+      new URL(
+        window.location.href
+      );
+
+    currentUrl.searchParams.set(
+      'chapter',
+      chapterId
+    );
+
+    router.replace(
+      currentUrl.pathname +
+        '?' +
+        currentUrl.searchParams.toString()
+    );
+  }
+
+  async function handleCoverChange(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const file =
+      event.target.files?.[0];
+
+    if (!file) return;
+
+    if (
+      !ALLOWED_MEDIA_TYPES.includes(
+        file.type
+      )
+    ) {
+      setError(
+        'Formato de capa inválido.'
+      );
+      return;
+    }
+
+    if (
+      file.size >
+      10 * 1024 * 1024
+    ) {
+      setError(
+        'A capa pode ter no máximo 10 MB.'
+      );
+      return;
+    }
+
+    setSavingStory(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData =
+        new FormData();
+
+      formData.append(
+        'cover',
+        file
+      );
+
+      const response =
+        await fetch(
+          `/api/stories/${id}`,
+          {
+            method: 'PUT',
+            body: formData,
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Não foi possível alterar a capa.'
+        );
+      }
+
+      const newCover =
+        data.story?.cover_url ||
+        data.cover_url ||
+        null;
+
+      if (newCover) {
+        setCoverPreview(
+          newCover
+        );
+
+        setStory(
+          (current) =>
+            current
+              ? {
+                  ...current,
+                  cover_url:
+                    newCover,
+                }
+              : current
+        );
+      }
+
+      setSuccess(
+        'Capa alterada com sucesso.'
+      );
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Erro ao alterar a capa.'
+      );
+    } finally {
+      setSavingStory(false);
+
+      if (
+        coverInputRef.current
+      ) {
+        coverInputRef.current.value =
+          '';
+      }
+    }
+  }
+
+  function addTag(value?: string) {
+    const valueToAdd =
+      (
+        value ??
+        tagInput
+      ).trim();
+
+    if (!valueToAdd) return;
+
+    const newTags =
+      valueToAdd
+        .split(',')
+        .map((item) =>
+          item.trim()
+        )
+        .filter(Boolean);
+
+    setTags((current) => {
+      const result = [
+        ...current,
+      ];
+
+      for (
+        const tag of newTags
+      ) {
+        if (
+          result.length >=
+          30
+        ) {
+          break;
+        }
+
+        if (
+          !result.some(
+            (item) =>
+              item.toLowerCase() ===
+              tag.toLowerCase()
+          )
+        ) {
+          result.push(tag);
+        }
+      }
+
+      return result;
+    });
+
+    setTagInput('');
+  }
+
+  function removeTag(
+    index: number
+  ) {
+    setTags((current) =>
+      current.filter(
+        (_, itemIndex) =>
+          itemIndex !== index
+      )
+    );
+  }
+
+  function handleTagKeyDown(
+    event: KeyboardEvent<HTMLInputElement>
+  ) {
+    if (
+      event.key === 'Enter' ||
+      event.key === ','
+    ) {
+      event.preventDefault();
+      addTag();
+    }
+
+    if (
+      event.key === 'Backspace' &&
+      !tagInput &&
+      tags.length > 0
+    ) {
+      setTags((current) =>
+        current.slice(
+          0,
+          -1
+        )
+      );
+    }
+  }
+
+  async function handleSaveStory(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (!title.trim()) {
+      setError(
+        'O título da obra é obrigatório.'
+      );
+      return;
+    }
+
+    setSavingStory(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData =
+        new FormData();
+
+      formData.append(
+        'title',
+        title.trim()
+      );
+
+      formData.append(
+        'description',
+        description
+      );
+
+      formData.append(
+        'status',
+        status
+      );
+
+      formData.append(
+        'rating',
+        rating
+      );
+
+      formData.append(
+        'genre',
+        genre
+      );
+
+      tags.forEach((tag) => {
+        formData.append(
+          'tags',
+          tag
+        );
+      });
+
+      const response =
+        await fetch(
+          `/api/stories/${id}`,
+          {
+            method: 'PUT',
+            body: formData,
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Não foi possível salvar a obra.'
+        );
+      }
+
+      const updatedStory =
+        data.story;
+
+      if (updatedStory) {
+        const normalizedStory: Story =
+          {
+            ...updatedStory,
+            chapters:
+              Array.isArray(
+                updatedStory.chapters
+              )
+                ? updatedStory.chapters
+                : story?.chapters ||
+                  [],
+            tags:
+              Array.isArray(
+                updatedStory.tags
+              )
+                ? updatedStory.tags
+                : tags.map(
+                    (name) => ({
+                      name,
+                    })
+                  ),
+          };
+
+        storyRef.current =
+          normalizedStory;
+
+        setStory(
+          normalizedStory
+        );
+
+        setTitle(
+          normalizedStory.title ||
+            title
+        );
+
+        setDescription(
+          normalizedStory.description ||
+            description
+        );
+
+        setStatus(
+          normalizedStory.status ||
+            status
+        );
+
+        setRating(
+          normalizedStory.rating ||
+            rating
+        );
+
+        setGenre(
+          normalizedStory.genre ||
+            genre
+        );
+
+        setCoverPreview(
+          normalizedStory.cover_url ||
+            coverPreview
+        );
+      }
+
+      setSuccess(
+        'Informações da obra salvas com sucesso.'
+      );
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Erro ao salvar a obra.'
+      );
+    } finally {
+      setSavingStory(false);
+    }
+  }
+
+  function executeCommand(
+    command: string,
+    value?: string
+  ) {
+    restoreSelection();
+
+    document.execCommand(
+      command,
+      false,
+      value
+    );
+
+    saveSelection();
+    syncEditorBody();
+  }
+
+  function setAlignment(
+    alignment:
+      | 'left'
+      | 'center'
+      | 'right'
+  ) {
+    restoreSelection();
+
+    const command =
+      'justify' +
+      alignment
+        .charAt(0)
+        .toUpperCase() +
+      alignment.slice(1);
+
+    document.execCommand(
+      command,
+      false
+    );
+
+    saveSelection();
+    syncEditorBody();
+  }
+
+  function addLink() {
+    const value =
+      linkValue.trim();
+
+    if (!value) return;
+
+    let url = value;
+
+    if (
+      !/^https?:\/\//i.test(
+        url
+      )
+    ) {
+      url =
+        'https://' +
+        url;
+    }
+
+    restoreSelection();
+
+    document.execCommand(
+      'createLink',
+      false,
+      url
+    );
+
+    saveSelection();
+    syncEditorBody();
+
+    setLinkValue('');
+    setShowLinkBox(false);
+  }
+
+  function createPendingMediaMarker(
+    mediaId: string,
+    type: 'image' | 'gif'
+  ) {
+    return (
+      '<div class="chapter-media-placeholder" ' +
+      'data-pending-media-id="' +
+      mediaId +
+      '" ' +
+      'data-media-type="' +
+      type +
+      '">' +
+      'Carregando mídia...' +
+      '</div>'
+    );
+  }
+
+  function insertPendingMediaBatch(
+    mediaItems: EditorMedia[]
+  ) {
+    restoreSelection();
+
+    const html =
+      mediaItems
+        .map((media) =>
+          createPendingMediaMarker(
+            media.id,
+            media.type
+          )
+        )
+        .join('');
+
+    document.execCommand(
+      'insertHTML',
+      false,
+      html
+    );
+
+    saveSelection();
+    syncEditorBody();
+  }
+
+  function handleMediaSelect(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const files =
+      Array.from(
+        event.target.files || []
+      );
+
+    if (
+      files.length === 0
+    ) {
+      return;
+    }
+
+    setError('');
+
+    const remaining =
+      MAX_MEDIA -
+      chapterMedia.length;
+
+    if (
+      remaining <= 0
+    ) {
+      setError(
+        'Este capítulo já possui o limite de ' +
+          MAX_MEDIA +
+          ' mídias.'
+      );
+      return;
+    }
+
+    const selected =
+      files.slice(
+        0,
+        remaining
+      );
+
+    const invalid =
+      selected.find(
+        (file) =>
+          !ALLOWED_MEDIA_TYPES.includes(
+            file.type
+          ) ||
+          file.size >
+            MAX_MEDIA_SIZE
+      );
+
+    if (invalid) {
+      setError(
+        'Cada mídia deve ser JPG, PNG, WEBP ou GIF e ter no máximo 5 MB.'
+      );
+      return;
+    }
+
+    const newMedia: EditorMedia[] =
+      selected.map(
+        (file) => ({
+          id:
+            crypto.randomUUID(),
+          url:
+            URL.createObjectURL(
+              file
+            ),
+          type:
+            file.type ===
+            'image/gif'
+              ? 'gif'
+              : 'image',
+          existing: false,
+          file,
+        })
+      );
+
+    setChapterMedia(
+      (current) => [
+        ...current,
+        ...newMedia,
+      ]
+    );
+
+    insertPendingMediaBatch(
+      newMedia
+    );
+
+    if (
+      mediaInputRef.current
+    ) {
+      mediaInputRef.current.value =
+        '';
+    }
+  }
+
+  function replacePendingMediaWithRealUrls(
+    body: string,
+    pending: EditorMedia[],
+    uploaded: ChapterMedia[]
+  ) {
+    let result = body;
+
+    pending.forEach(
+      (item, index) => {
+        const uploadedMedia =
+          uploaded[index];
+
+        if (!uploadedMedia) {
+          return;
+        }
+
+        const marker =
+          new RegExp(
+            '<div[^>]*data-pending-media-id=["\\\']' +
+              item.id +
+              '["\\\'][^>]*>.*?<\\/div>',
+            'gi'
+          );
+
+        const imageHtml =
+          '<img src="' +
+          uploadedMedia.media_url +
+          '" alt="Imagem do capítulo" data-media-id="' +
+          uploadedMedia.id +
+          '" data-media-type="' +
+          uploadedMedia.media_type +
+          '" loading="lazy" style="max-width: 100%; height: auto;">';
+
+        result =
+          result.replace(
+            marker,
+            imageHtml
+          );
       }
     );
 
-    const data: ChapterResponse =
-      await response.json();
+    return result;
+  }
 
-    if (!response.ok) {
-      throw new Error(
-        data.error ||
-          'Não foi possível carregar o capítulo.'
-      );
-    }
-
-    if (!data.chapter) {
-      throw new Error(
-        'Capítulo não encontrado.'
-      );
-    }
-
-    if (cancelled) return;
-
-    const loadedChapter =
-      data.chapter;
-
-    const currentStory =
-      storyRef.current;
-
-    const storyChapter =
-      currentStory?.chapters?.find(
+  function removeMedia(
+    mediaId: string
+  ) {
+    const media =
+      chapterMedia.find(
         (item) =>
-          item.id ===
-          loadedChapter.id
+          item.id === mediaId
       );
 
-    const resolvedScheduledFor =
-      data.scheduled_for ??
-      loadedChapter.scheduled_for ??
-      storyChapter?.scheduled_for ??
-      null;
+    if (
+      media &&
+      !media.existing
+    ) {
+      URL.revokeObjectURL(
+        media.url
+      );
+    }
 
-    const normalizedChapter: Chapter =
-      {
-        ...loadedChapter,
-        scheduled_for:
-          resolvedScheduledFor,
-        author_notes:
-          loadedChapter.author_notes ||
-          '',
-      };
-
-    setChapter(
-      normalizedChapter
+    setChapterMedia(
+      (current) =>
+        current.filter(
+          (item) =>
+            item.id !==
+            mediaId
+        )
     );
 
-    setChapterTitle(
-      normalizedChapter.title || ''
-    );
+    if (editorRef.current) {
+      const element =
+        editorRef.current.querySelector(
+          '[data-media-id="' +
+            mediaId +
+            '"]'
+        );
+
+      element?.remove();
+
+      const pendingElement =
+        editorRef.current.querySelector(
+          '[data-pending-media-id="' +
+            mediaId +
+            '"]'
+        );
+
+      pendingElement?.remove();
+
+      syncEditorBody();
+    }
+  }
+
+  async function saveChapter(
+    targetStatus?: PublicationStatus
+  ) {
+    if (!chapter) return;
+
+    const finalStatus =
+      targetStatus ||
+      chapterStatus;
+
+    if (
+      finalStatus ===
+        'scheduled' &&
+      !scheduledFor
+    ) {
+      setError(
+        'Escolha a data e o horário da publicação.'
+      );
+      return;
+    }
+
+    if (
+      finalStatus ===
+      'scheduled'
+    ) {
+      const selectedDate =
+        new Date(
+          scheduledFor
+        );
+
+      if (
+        Number.isNaN(
+          selectedDate.getTime()
+        ) ||
+        selectedDate.getTime() <=
+          Date.now()
+      ) {
+        setError(
+          'A data de publicação precisa estar no futuro.'
+        );
+        return;
+      }
+    }
+
+    const body =
+      syncEditorBody();
+
+    const sanitizedBody =
+      sanitizeHtml(body);
+
+    const plainText =
+      sanitizedBody
+        .replace(
+          /<[^>]+>/g,
+          ''
+        )
+        .replace(
+          /&nbsp;/gi,
+          ' '
+        )
+        .trim();
+
+    if (
+      !sanitizedBody ||
+      sanitizedBody ===
+        '<br>' ||
+      plainText === ''
+    ) {
+      setError(
+        'O conteúdo do capítulo não pode estar vazio.'
+      );
+      return;
+    }
+
+    if (
+      !chapterTitle.trim()
+    ) {
+      setError(
+        'O título do capítulo é obrigatório.'
+      );
+      return;
+    }
+
+    if (
+      chapterTitle.trim()
+        .length > 150
+    ) {
+      setError(
+        'O título do capítulo pode ter no máximo 150 caracteres.'
+      );
+      return;
+    }
+
+    if (
+      authorNotes.length > 5000
+    ) {
+      setError(
+        'As notas do autor podem ter no máximo 5000 caracteres.'
+      );
+      return;
+    }
+
+    const pending =
+      chapterMedia.filter(
+        (media) =>
+          !media.existing &&
+          media.file
+      );
+
+    let existing =
+      chapterMedia.filter(
+        (media) =>
+          media.existing
+      );
+
+    try {
+      setSavingChapter(true);
+      setError('');
+      setSuccess('');
+
+      let workingBody =
+        sanitizedBody;
+
+      let finalMediaIds =
+        existing.map(
+          (media) =>
+            media.id
+        );
+
+      /*
+       * PRIMEIRO PASSO:
+       *
+       * Enviamos as novas mídias.
+       *
+       * IMPORTANTE:
+       * O status NÃO é mais forçado para draft.
+       *
+       * Preservamos o status que o usuário está
+       * realmente salvando.
+       */
+      if (
+        pending.length > 0
+      ) {
+        setMediaUploading(true);
+
+        const uploadData =
+          new FormData();
+
+        uploadData.append(
+          'title',
+          chapterTitle.trim()
+        );
+
+        uploadData.append(
+          'body',
+          workingBody
+        );
+
+        uploadData.append(
+          'author_notes',
+          authorNotes
+        );
+
+        uploadData.append(
+          'publication_status',
+          finalStatus
+        );
+
+        existing.forEach(
+          (media) => {
+            uploadData.append(
+              'existing_media_ids',
+              media.id
+            );
+          }
+        );
+
+        pending.forEach(
+          (media) => {
+            if (media.file) {
+              uploadData.append(
+                'media',
+                media.file
+              );
+            }
+          }
+        );
+
+        if (
+          finalStatus ===
+            'scheduled' &&
+          scheduledFor
+        ) {
+          uploadData.append(
+            'scheduled_for',
+            new Date(
+              scheduledFor
+            ).toISOString()
+          );
+        }
+
+        const uploadResponse =
+          await fetch(
+            `/api/chapters/${chapter.id}`,
+            {
+              method: 'PUT',
+              body: uploadData,
+            }
+          );
+
+        const uploadResult:
+          ChapterResponse =
+          await uploadResponse.json();
+
+        if (
+          !uploadResponse.ok
+        ) {
+          throw new Error(
+            uploadResult.error ||
+              'Não foi possível enviar as mídias.'
+          );
+        }
+
+        const returnedMedia =
+          uploadResult.media ||
+          [];
+
+        const newMedia =
+          returnedMedia.filter(
+            (media) =>
+              !existing.some(
+                (item) =>
+                  item.id ===
+                  media.id
+              )
+          );
+
+        if (
+          newMedia.length !==
+          pending.length
+        ) {
+          throw new Error(
+            'Algumas mídias não foram salvas corretamente.'
+          );
+        }
+
+        workingBody =
+          replacePendingMediaWithRealUrls(
+            workingBody,
+            pending,
+            newMedia
+          );
+
+        finalMediaIds =
+          returnedMedia.map(
+            (media) =>
+              media.id
+          );
+
+        existing =
+          returnedMedia.map(
+            (media) => ({
+              id: media.id,
+              url: media.media_url,
+              type:
+                media.media_type ===
+                'gif'
+                  ? 'gif'
+                  : 'image',
+              existing: true,
+            })
+          );
+
+        setChapterMedia(
+          existing
+        );
+
+        pending.forEach(
+          (media) => {
+            URL.revokeObjectURL(
+              media.url
+            );
+          }
+        );
+
+        setMediaUploading(false);
+      }
+
+      /*
+       * SEGUNDO PASSO:
+       *
+       * Salva definitivamente título,
+       * conteúdo, mídias, notas e status.
+       */
+      const formData =
+        new FormData();
+
+      formData.append(
+        'title',
+        chapterTitle.trim()
+      );
+
+      formData.append(
+        'body',
+        workingBody
+      );
+
+      formData.append(
+        'author_notes',
+        authorNotes
+      );
+
+      formData.append(
+        'publication_status',
+        finalStatus
+      );
+
+      finalMediaIds.forEach(
+        (mediaId) => {
+          formData.append(
+            'existing_media_ids',
+            mediaId
+          );
+        }
+      );
+
+      if (
+        finalStatus ===
+        'scheduled'
+      ) {
+        formData.append(
+          'scheduled_for',
+          new Date(
+            scheduledFor
+          ).toISOString()
+        );
+      }
+
+      const response =
+        await fetch(
+          `/api/chapters/${chapter.id}`,
+          {
+            method: 'PUT',
+            body: formData,
+          }
+        );
+
+      const data:
+        ChapterResponse =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Não foi possível salvar o capítulo.'
+        );
+      }
+
+      if (!data.chapter) {
+        throw new Error(
+          'O servidor não retornou o capítulo salvo.'
+        );
+      }
+
+      const savedChapter =
+        data.chapter;
+
+      const resolvedScheduledFor =
+        finalStatus ===
+        'scheduled'
+          ? data.scheduled_for ??
+            savedChapter.scheduled_for ??
+            new Date(
+              scheduledFor
+            ).toISOString()
+          : null;
+
+      const normalizedSavedChapter:
+        Chapter = {
+          ...savedChapter,
+          scheduled_for:
+            resolvedScheduledFor,
+          author_notes:
+            savedChapter.author_notes ||
+            '',
+        };
+
+      setChapter(
+        normalizedSavedChapter
+      );
+
+      setChapterStatus(
+        savedChapter.publication_status
+      );
+
+      setChapterBody(
+        savedChapter.body ||
+          workingBody
+      );
+
+      setScheduledFor(
+        resolvedScheduledFor
+          ? formatDateForInput(
+              resolvedScheduledFor
+            )
+          : ''
+      );
+
+      if (data.media) {
+        setChapterMedia(
+          data.media.map(
+            (media) => ({
+              id: media.id,
+              url: media.media_url,
+              type:
+                media.media_type ===
+                'gif'
+                  ? 'gif'
+                  : 'image',
+              existing: true,
+            })
+          )
+        );
+      }
+
+      if (editorRef.current) {
+        editorRef.current.innerHTML =
+          savedChapter.body ||
+          workingBody;
+      }
+
+      savedSelectionRef.current =
+        null;
+
+      if (
+        finalStatus ===
+        'published'
+      ) {
+        setSuccess(
+          'Capítulo publicado com sucesso.'
+        );
+      } else if (
+        finalStatus ===
+        'scheduled'
+      ) {
+        setSuccess(
+          'Capítulo agendado com sucesso.'
+        );
+      } else if (
+        finalStatus ===
+        'unpublished'
+      ) {
+        setSuccess(
+          'Capítulo retirado do ar.'
+        );
+      } else {
+        setSuccess(
+          'Rascunho salvo com sucesso.'
+        );
+      }
+
+      setStory(
+        (currentStory) => {
+          if (!currentStory) {
+            return currentStory;
+          }
+
+          const updatedChapters =
+            currentStory.chapters.map(
+              (item) => {
+                if (
+                  item.id !==
+                  savedChapter.id
+                ) {
+                  return item;
+                }
+
+                return {
+                  ...item,
+                  title:
+                    savedChapter.title,
+                  published:
+                    savedChapter.published,
+                  publication_status:
+                    savedChapter.publication_status,
+                  scheduled_for:
+                    resolvedScheduledFor,
+                  is_scheduled:
+                    savedChapter.publication_status ===
+                    'scheduled',
+                };
+              }
+            );
+
+          const updatedStory =
+            {
+              ...currentStory,
+              chapters:
+                updatedChapters,
+            };
+
+          storyRef.current =
+            updatedStory;
+
+          return updatedStory;
+        }
+      );
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Erro ao salvar o capítulo.'
+      );
+    } finally {
+      setSavingChapter(false);
+      setMediaUploading(false);
+    }
+  }
+
+  function handleEditorInput() {
+    if (!editorRef.current) return;
 
     setChapterBody(
-      normalizedChapter.body || ''
+      editorRef.current.innerHTML
     );
 
-    setAuthorNotes(
-      normalizedChapter.author_notes ||
-        ''
+    saveSelection();
+  }
+
+  function handleEditorPaste(
+    event: React.ClipboardEvent<HTMLDivElement>
+  ) {
+    event.preventDefault();
+
+    const text =
+      event.clipboardData.getData(
+        'text/plain'
+      );
+
+    document.execCommand(
+      'insertText',
+      false,
+      text
+    );
+
+    saveSelection();
+    syncEditorBody();
+  }
+
+  function handleEditorKeyDown(
+    event: KeyboardEvent<HTMLDivElement>
+  ) {
+    if (
+      (event.ctrlKey ||
+        event.metaKey) &&
+      event.key.toLowerCase() ===
+        's'
+    ) {
+      event.preventDefault();
+
+      /*
+       * CORREÇÃO:
+       *
+       * Ctrl+S preserva o status atual.
+       *
+       * Antes:
+       * saveChapter('draft')
+       *
+       * Isso fazia um capítulo PUBLICADO
+       * virar RASCUNHO ao apertar Ctrl+S.
+       */
+      void saveChapter(
+        chapterStatus
+      );
+
+      return;
+    }
+
+    saveSelection();
+  }
+
+  function handleChapterFormSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    void saveChapter(
+      chapterStatus
+    );
+  }
+
+  function addHorizontalRule() {
+    restoreSelection();
+
+    document.execCommand(
+      'insertHorizontalRule',
+      false
+    );
+
+    saveSelection();
+    syncEditorBody();
+  }
+
+  function handleScheduleChange(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    setScheduledFor(
+      event.target.value
     );
 
     setChapterStatus(
-      normalizedChapter.publication_status ||
-        (normalizedChapter.published
-          ? 'published'
-          : 'draft')
+      'scheduled'
+    );
+  }
+
+  function handleMediaButtonClick(
+    event?: MouseEvent<HTMLButtonElement>
+  ) {
+    event?.preventDefault();
+
+    saveSelection();
+
+    if (
+      chapterMedia.length >=
+      MAX_MEDIA
+    ) {
+      setError(
+        'Este capítulo já possui o limite de ' +
+          MAX_MEDIA +
+          ' mídias.'
+      );
+      return;
+    }
+
+    mediaInputRef.current?.click();
+  }
+
+  function clearChapterSelection() {
+    chapterMedia.forEach(
+      (media) => {
+        if (!media.existing) {
+          URL.revokeObjectURL(
+            media.url
+          );
+        }
+      }
     );
 
-    setScheduledFor(
-      formatDateForInput(
-        resolvedScheduledFor
-      )
+    setSelectedChapterId(
+      null
     );
 
-    const loadedMedia =
-      data.media ||
-      normalizedChapter.media ||
-      [];
-
-    setChapterMedia(
-      loadedMedia.map(
-        (media) => ({
-          id: media.id,
-          url: media.media_url,
-          type:
-            media.media_type ===
-            'gif'
-              ? 'gif'
-              : 'image',
-          existing: true,
-        })
-      )
-    );
+    setChapter(null);
+    setChapterTitle('');
+    setChapterBody('');
+    setAuthorNotes('');
+    setChapterStatus('draft');
+    setScheduledFor('');
+    setChapterMedia([]);
+    setPreviewMode(false);
+    setShowLinkBox(false);
+    setLinkValue('');
+    setError('');
+    setSuccess('');
 
     savedSelectionRef.current =
       null;
@@ -685,2622 +2122,1141 @@ async function loadChapter() {
         window.location.href
       );
 
-    currentUrl.searchParams.set(
-      'chapter',
-      normalizedChapter.id
+    currentUrl.searchParams.delete(
+      'chapter'
     );
 
-    window.history.replaceState(
-      null,
-      '',
-      currentUrl.toString()
-    );
-  } catch (caughtError) {
-    if (cancelled) return;
-
-    setError(
-      caughtError instanceof Error
-        ? caughtError.message
-        : 'Erro ao carregar o capítulo.'
-    );
-
-    setChapter(null);
-  } finally {
-    if (!cancelled) {
-      setLoadingChapter(false);
-    }
-  }
-}
-
-void loadChapter();
-
-return () => {
-  cancelled = true;
-};
-```
-
-}, [selectedChapterId]);
-
-useEffect(() => {
-if (!editorRef.current) return;
-if (!chapter) return;
-
-```
-if (
-  editorRef.current.innerHTML !==
-  chapterBody
-) {
-  editorRef.current.innerHTML =
-    chapterBody || '';
-}
-```
-
-}, [chapter, chapterBody]);
-
-useEffect(() => {
-if (!showLinkBox) return;
-
-```
-const timer = window.setTimeout(() => {
-  linkInputRef.current?.focus();
-}, 50);
-
-return () => {
-  window.clearTimeout(timer);
-};
-```
-
-}, [showLinkBox]);
-
-function selectChapter(
-chapterId: string
-) {
-setSelectedChapterId(chapterId);
-setPreviewMode(false);
-setShowLinkBox(false);
-setLinkValue('');
-setError('');
-setSuccess('');
-
-```
-const currentUrl =
-  new URL(window.location.href);
-
-currentUrl.searchParams.set(
-  'chapter',
-  chapterId
-);
-
-router.replace(
-  currentUrl.pathname +
-    '?' +
-    currentUrl.searchParams.toString()
-);
-```
-
-}
-
-async function handleCoverChange(
-event: ChangeEvent<HTMLInputElement>
-) {
-const file =
-event.target.files?.[0];
-
-```
-if (!file) return;
-
-if (
-  !ALLOWED_MEDIA_TYPES.includes(
-    file.type
-  )
-) {
-  setError(
-    'Formato de capa inválido.'
-  );
-  return;
-}
-
-if (
-  file.size >
-  10 * 1024 * 1024
-) {
-  setError(
-    'A capa pode ter no máximo 10 MB.'
-  );
-  return;
-}
-
-setSavingStory(true);
-setError('');
-setSuccess('');
-
-try {
-  const formData =
-    new FormData();
-
-  formData.append(
-    'cover',
-    file
-  );
-
-  const response =
-    await fetch(
-      `/api/stories/${id}`,
-      {
-        method: 'PUT',
-        body: formData,
-      }
-    );
-
-  const data =
-    await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data.error ||
-        'Não foi possível alterar a capa.'
+    router.replace(
+      currentUrl.pathname
     );
   }
 
-  const newCover =
-    data.story?.cover_url ||
-    data.cover_url ||
-    null;
-
-  if (newCover) {
-    setCoverPreview(newCover);
-
-    setStory(
-      (current) =>
-        current
-          ? {
-              ...current,
-              cover_url:
-                newCover,
-            }
-          : current
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#0b090c] text-white">
+        <div className="min-h-screen flex items-center justify-center">
+          <p className="text-sm text-gray-500">
+            Carregando obra...
+          </p>
+        </div>
+      </main>
     );
   }
 
-  setSuccess(
-    'Capa alterada com sucesso.'
-  );
-} catch (caughtError) {
-  setError(
-    caughtError instanceof Error
-      ? caughtError.message
-      : 'Erro ao alterar a capa.'
-  );
-} finally {
-  setSavingStory(false);
+  if (!story) {
+    return (
+      <main className="min-h-screen bg-[#0b090c] text-white">
+        <div className="mx-auto max-w-2xl px-6 py-20 text-center">
+          <p className="text-red-300">
+            {error ||
+              'Obra não encontrada.'}
+          </p>
 
-  if (
-    coverInputRef.current
-  ) {
-    coverInputRef.current.value =
-      '';
-  }
-}
-```
-
-}
-
-function addTag(value?: string) {
-const valueToAdd =
-(
-value ??
-tagInput
-).trim();
-
-```
-if (!valueToAdd) return;
-
-const newTags =
-  valueToAdd
-    .split(',')
-    .map((item) =>
-      item.trim()
-    )
-    .filter(Boolean);
-
-setTags((current) => {
-  const result = [
-    ...current,
-  ];
-
-  for (const tag of newTags) {
-    if (
-      result.length >=
-      30
-    ) {
-      break;
-    }
-
-    if (
-      !result.some(
-        (item) =>
-          item.toLowerCase() ===
-          tag.toLowerCase()
-      )
-    ) {
-      result.push(tag);
-    }
-  }
-
-  return result;
-});
-
-setTagInput('');
-```
-
-}
-
-function removeTag(
-index: number
-) {
-setTags((current) =>
-current.filter(
-(_, itemIndex) =>
-itemIndex !== index
-)
-);
-}
-
-function handleTagKeyDown(
-event: KeyboardEvent<HTMLInputElement>
-) {
-if (
-event.key === 'Enter' ||
-event.key === ','
-) {
-event.preventDefault();
-addTag();
-}
-
-```
-if (
-  event.key === 'Backspace' &&
-  !tagInput &&
-  tags.length > 0
-) {
-  setTags((current) =>
-    current.slice(
-      0,
-      -1
-    )
-  );
-}
-```
-
-}
-
-async function handleSaveStory(
-event: FormEvent<HTMLFormElement>
-) {
-event.preventDefault();
-
-```
-if (!title.trim()) {
-  setError(
-    'O título da obra é obrigatório.'
-  );
-  return;
-}
-
-setSavingStory(true);
-setError('');
-setSuccess('');
-
-try {
-  const formData =
-    new FormData();
-
-  formData.append(
-    'title',
-    title.trim()
-  );
-
-  formData.append(
-    'description',
-    description
-  );
-
-  formData.append(
-    'status',
-    status
-  );
-
-  formData.append(
-    'rating',
-    rating
-  );
-
-  formData.append(
-    'genre',
-    genre
-  );
-
-  tags.forEach((tag) => {
-    formData.append(
-      'tags',
-      tag
-    );
-  });
-
-  const response =
-    await fetch(
-      `/api/stories/${id}`,
-      {
-        method: 'PUT',
-        body: formData,
-      }
-    );
-
-  const data =
-    await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data.error ||
-        'Não foi possível salvar a obra.'
-    );
-  }
-
-  const updatedStory =
-    data.story;
-
-  if (updatedStory) {
-    const normalizedStory: Story =
-      {
-        ...updatedStory,
-        chapters:
-          Array.isArray(
-            updatedStory.chapters
-          )
-            ? updatedStory.chapters
-            : story?.chapters ||
-              [],
-        tags:
-          Array.isArray(
-            updatedStory.tags
-          )
-            ? updatedStory.tags
-            : tags.map(
-                (name) => ({
-                  name,
-                })
-              ),
-      };
-
-    storyRef.current =
-      normalizedStory;
-
-    setStory(
-      normalizedStory
-    );
-
-    setTitle(
-      normalizedStory.title ||
-        title
-    );
-
-    setDescription(
-      normalizedStory.description ||
-        description
-    );
-
-    setStatus(
-      normalizedStory.status ||
-        status
-    );
-
-    setRating(
-      normalizedStory.rating ||
-        rating
-    );
-
-    setGenre(
-      normalizedStory.genre ||
-        genre
-    );
-
-    setCoverPreview(
-      normalizedStory.cover_url ||
-        coverPreview
-    );
-  }
-
-  setSuccess(
-    'Informações da obra salvas com sucesso.'
-  );
-} catch (caughtError) {
-  setError(
-    caughtError instanceof Error
-      ? caughtError.message
-      : 'Erro ao salvar a obra.'
-  );
-} finally {
-  setSavingStory(false);
-}
-```
-
-}
-
-function executeCommand(
-command: string,
-value?: string
-) {
-restoreSelection();
-
-```
-document.execCommand(
-  command,
-  false,
-  value
-);
-
-saveSelection();
-syncEditorBody();
-```
-
-}
-
-function setAlignment(
-alignment:
-| 'left'
-| 'center'
-| 'right'
-) {
-restoreSelection();
-
-```
-document.execCommand(
-  'justify' + 
-    alignment.charAt(0).toUpperCase() +
-    alignment.slice(1),
-  false
-);
-
-saveSelection();
-syncEditorBody();
-```
-
-}
-
-function addLink() {
-const value =
-linkValue.trim();
-
-```
-if (!value) return;
-
-let url = value;
-
-if (
-  !/^https?:\/\//i.test(
-    url
-  )
-) {
-  url =
-    'https://' + url;
-}
-
-restoreSelection();
-
-document.execCommand(
-  'createLink',
-  false,
-  url
-);
-
-saveSelection();
-syncEditorBody();
-
-setLinkValue('');
-setShowLinkBox(false);
-```
-
-}
-
-function createPendingMediaMarker(
-mediaId: string,
-type: 'image' | 'gif'
-) {
-return (
-'<div class="chapter-media-placeholder" ' +
-'data-pending-media-id="' +
-mediaId +
-'" ' +
-'data-media-type="' +
-type +
-'">' +
-'Carregando mídia...' +
-'</div>'
-);
-}
-
-function insertPendingMediaBatch(
-mediaItems: EditorMedia[]
-) {
-restoreSelection();
-
-```
-const html =
-  mediaItems
-    .map((media) =>
-      createPendingMediaMarker(
-        media.id,
-        media.type
-      )
-    )
-    .join('');
-
-document.execCommand(
-  'insertHTML',
-  false,
-  html
-);
-
-saveSelection();
-syncEditorBody();
-```
-
-}
-
-function handleMediaSelect(
-event: ChangeEvent<HTMLInputElement>
-) {
-const files =
-Array.from(
-event.target.files || []
-);
-
-```
-if (
-  files.length === 0
-) {
-  return;
-}
-
-setError('');
-
-const remaining =
-  MAX_MEDIA -
-  chapterMedia.length;
-
-if (
-  remaining <= 0
-) {
-  setError(
-    `Este capítulo já possui o limite de ${MAX_MEDIA} mídias.`
-  );
-  return;
-}
-
-const selected =
-  files.slice(
-    0,
-    remaining
-  );
-
-const invalid =
-  selected.find(
-    (file) =>
-      !ALLOWED_MEDIA_TYPES.includes(
-        file.type
-      ) ||
-      file.size >
-        MAX_MEDIA_SIZE
-  );
-
-if (invalid) {
-  setError(
-    'Cada mídia deve ser JPG, PNG, WEBP ou GIF e ter no máximo 5 MB.'
-  );
-  return;
-}
-
-const newMedia: EditorMedia[] =
-  selected.map(
-    (file) => ({
-      id:
-        crypto.randomUUID(),
-      url:
-        URL.createObjectURL(
-          file
-        ),
-      type:
-        file.type ===
-        'image/gif'
-          ? 'gif'
-          : 'image',
-      existing: false,
-      file,
-    })
-  );
-
-setChapterMedia(
-  (current) => [
-    ...current,
-    ...newMedia,
-  ]
-);
-
-insertPendingMediaBatch(
-  newMedia
-);
-
-if (
-  mediaInputRef.current
-) {
-  mediaInputRef.current.value =
-    '';
-}
-```
-
-}
-
-function replacePendingMediaWithRealUrls(
-body: string,
-pending: EditorMedia[],
-uploaded: ChapterMedia[]
-) {
-let result = body;
-
-```
-pending.forEach(
-  (item, index) => {
-    const uploadedMedia =
-      uploaded[index];
-
-    if (!uploadedMedia) {
-      return;
-    }
-
-    const marker =
-      new RegExp(
-        '<div[^>]*data-pending-media-id=["\\\']' +
-          item.id +
-          '["\\\'][^>]*>.*?<\\/div>',
-        'gi'
-      );
-
-    const imageHtml =
-      '<img src="' +
-      uploadedMedia.media_url +
-      '" alt="Imagem do capítulo" data-media-id="' +
-      uploadedMedia.id +
-      '" data-media-type="' +
-      uploadedMedia.media_type +
-      '" loading="lazy" style="max-width: 100%; height: auto;">';
-
-    result =
-      result.replace(
-        marker,
-        imageHtml
-      );
-  }
-);
-
-return result;
-```
-
-}
-
-function removeMedia(
-mediaId: string
-) {
-const media =
-chapterMedia.find(
-(item) =>
-item.id === mediaId
-);
-
-```
-if (
-  media &&
-  !media.existing
-) {
-  URL.revokeObjectURL(
-    media.url
-  );
-}
-
-setChapterMedia(
-  (current) =>
-    current.filter(
-      (item) =>
-        item.id !== mediaId
-    )
-);
-
-if (editorRef.current) {
-  const element =
-    editorRef.current.querySelector(
-      `[data-media-id="${mediaId}"]`
-    );
-
-  element?.remove();
-
-  const pendingElement =
-    editorRef.current.querySelector(
-      `[data-pending-media-id="${mediaId}"]`
-    );
-
-  pendingElement?.remove();
-
-  syncEditorBody();
-}
-```
-
-}
-
-async function saveChapter(
-targetStatus?: Chapter['publication_status']
-) {
-if (!chapter) return;
-
-```
-/*
- * IMPORTANTE:
- *
- * Quando o usuário está editando um capítulo publicado,
- * devemos preservar o status publicado.
- *
- * O status só muda quando o usuário explicitamente escolhe
- * outro status ou clica em "Salvar rascunho".
- */
-const finalStatus =
-  targetStatus ||
-  chapterStatus;
-
-if (
-  finalStatus ===
-    'scheduled' &&
-  !scheduledFor
-) {
-  setError(
-    'Escolha a data e o horário da publicação.'
-  );
-  return;
-}
-
-if (
-  finalStatus ===
-    'scheduled'
-) {
-  const selectedDate =
-    new Date(
-      scheduledFor
-    );
-
-  if (
-    Number.isNaN(
-      selectedDate.getTime()
-    ) ||
-    selectedDate.getTime() <=
-      Date.now()
-  ) {
-    setError(
-      'A data de publicação precisa estar no futuro.'
-    );
-    return;
-  }
-}
-
-const body =
-  syncEditorBody();
-
-const sanitizedBody =
-  sanitizeHtml(body);
-
-const plainText =
-  sanitizedBody
-    .replace(
-      /<[^>]+>/g,
-      ''
-    )
-    .replace(
-      /&nbsp;/gi,
-      ' '
-    )
-    .trim();
-
-if (
-  !sanitizedBody ||
-  sanitizedBody ===
-    '<br>' ||
-  plainText === ''
-) {
-  setError(
-    'O conteúdo do capítulo não pode estar vazio.'
-  );
-  return;
-}
-
-if (
-  !chapterTitle.trim()
-) {
-  setError(
-    'O título do capítulo é obrigatório.'
-  );
-  return;
-}
-
-if (
-  chapterTitle.trim()
-    .length > 150
-) {
-  setError(
-    'O título do capítulo pode ter no máximo 150 caracteres.'
-  );
-  return;
-}
-
-if (
-  authorNotes.length > 5000
-) {
-  setError(
-    'As notas do autor podem ter no máximo 5000 caracteres.'
-  );
-  return;
-}
-
-const pending =
-  chapterMedia.filter(
-    (media) =>
-      !media.existing &&
-      media.file
-  );
-
-let existing =
-  chapterMedia.filter(
-    (media) =>
-      media.existing
-  );
-
-try {
-  setSavingChapter(true);
-  setError('');
-  setSuccess('');
-
-  let workingBody =
-    sanitizedBody;
-
-  let finalMediaIds =
-    existing.map(
-      (media) =>
-        media.id
-    );
-
-  /*
-   * PRIMEIRO PASSO:
-   * Envia somente as novas mídias.
-   *
-   * CORREÇÃO IMPORTANTE:
-   * Não forçamos mais publication_status = "draft"
-   * neste PUT intermediário.
-   *
-   * Isso evita que um capítulo publicado seja rebaixado
-   * para rascunho durante o upload.
-   */
-  if (
-    pending.length > 0
-  ) {
-    setMediaUploading(true);
-
-    const uploadData =
-      new FormData();
-
-    uploadData.append(
-      'title',
-      chapterTitle.trim()
-    );
-
-    uploadData.append(
-      'body',
-      workingBody
-    );
-
-    uploadData.append(
-      'author_notes',
-      authorNotes
-    );
-
-    /*
-     * Preserva o status atual durante o upload.
-     * O PUT final abaixo continua sendo responsável por
-     * definir o status definitivo.
-     */
-    uploadData.append(
-      'publication_status',
-      chapterStatus
-    );
-
-    existing.forEach(
-      (media) => {
-        uploadData.append(
-          'existing_media_ids',
-          media.id
-        );
-      }
-    );
-
-    pending.forEach(
-      (media) => {
-        if (media.file) {
-          uploadData.append(
-            'media',
-            media.file
-          );
-        }
-      }
-    );
-
-    if (
-      chapterStatus ===
-      'scheduled' &&
-      scheduledFor
-    ) {
-      uploadData.append(
-        'scheduled_for',
-        new Date(
-          scheduledFor
-        ).toISOString()
-      );
-    }
-
-    const uploadResponse =
-      await fetch(
-        `/api/chapters/${chapter.id}`,
-        {
-          method: 'PUT',
-          body: uploadData,
-        }
-      );
-
-    const uploadResult:
-      ChapterResponse =
-      await uploadResponse.json();
-
-    if (
-      !uploadResponse.ok
-    ) {
-      throw new Error(
-        uploadResult.error ||
-          'Não foi possível enviar as mídias.'
-      );
-    }
-
-    const returnedMedia =
-      uploadResult.media ||
-      [];
-
-    const newMedia =
-      returnedMedia.filter(
-        (media) =>
-          !existing.some(
-            (item) =>
-              item.id ===
-              media.id
-          )
-      );
-
-    if (
-      newMedia.length !==
-      pending.length
-    ) {
-      throw new Error(
-        'Algumas mídias não foram salvas corretamente.'
-      );
-    }
-
-    workingBody =
-      replacePendingMediaWithRealUrls(
-        workingBody,
-        pending,
-        newMedia
-      );
-
-    finalMediaIds =
-      returnedMedia.map(
-        (media) =>
-          media.id
-      );
-
-    existing =
-      returnedMedia.map(
-        (media) => ({
-          id: media.id,
-          url: media.media_url,
-          type:
-            media.media_type ===
-            'gif'
-              ? 'gif'
-              : 'image',
-          existing: true,
-        })
-      );
-
-    setChapterMedia(
-      existing
-    );
-
-    pending.forEach(
-      (media) => {
-        URL.revokeObjectURL(
-          media.url
-        );
-      }
-    );
-
-    setMediaUploading(false);
-  }
-
-  /*
-   * SEGUNDO PASSO:
-   * Salva o capítulo com o status definitivo.
-   */
-  const formData =
-    new FormData();
-
-  formData.append(
-    'title',
-    chapterTitle.trim()
-  );
-
-  formData.append(
-    'body',
-    workingBody
-  );
-
-  formData.append(
-    'author_notes',
-    authorNotes
-  );
-
-  formData.append(
-    'publication_status',
-    finalStatus
-  );
-
-  finalMediaIds.forEach(
-    (mediaId) => {
-      formData.append(
-        'existing_media_ids',
-        mediaId
-      );
-    }
-  );
-
-  if (
-    finalStatus ===
-    'scheduled'
-  ) {
-    formData.append(
-      'scheduled_for',
-      new Date(
-        scheduledFor
-      ).toISOString()
-    );
-  }
-
-  const response =
-    await fetch(
-      `/api/chapters/${chapter.id}`,
-      {
-        method: 'PUT',
-        body: formData,
-      }
-    );
-
-  const data:
-    ChapterResponse =
-    await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data.error ||
-        'Não foi possível salvar o capítulo.'
-    );
-  }
-
-  if (!data.chapter) {
-    throw new Error(
-      'O servidor não retornou o capítulo salvo.'
-    );
-  }
-
-  const savedChapter =
-    data.chapter;
-
-  const resolvedScheduledFor =
-    finalStatus ===
-    'scheduled'
-      ? data.scheduled_for ??
-        savedChapter.scheduled_for ??
-        new Date(
-          scheduledFor
-        ).toISOString()
-      : null;
-
-  const normalizedSavedChapter:
-    Chapter = {
-      ...savedChapter,
-      scheduled_for:
-        resolvedScheduledFor,
-      author_notes:
-        savedChapter.author_notes ||
-        '',
-    };
-
-  setChapter(
-    normalizedSavedChapter
-  );
-
-  setChapterStatus(
-    savedChapter.publication_status
-  );
-
-  setChapterBody(
-    savedChapter.body ||
-      workingBody
-  );
-
-  setScheduledFor(
-    resolvedScheduledFor
-      ? formatDateForInput(
-          resolvedScheduledFor
-        )
-      : ''
-  );
-
-  if (data.media) {
-    setChapterMedia(
-      data.media.map(
-        (media) => ({
-          id: media.id,
-          url: media.media_url,
-          type:
-            media.media_type ===
-            'gif'
-              ? 'gif'
-              : 'image',
-          existing: true,
-        })
-      )
-    );
-  }
-
-  if (editorRef.current) {
-    editorRef.current.innerHTML =
-      savedChapter.body ||
-      workingBody;
-  }
-
-  savedSelectionRef.current =
-    null;
-
-  if (
-    finalStatus ===
-    'published'
-  ) {
-    setSuccess(
-      'Capítulo publicado com sucesso.'
-    );
-  } else if (
-    finalStatus ===
-    'scheduled'
-  ) {
-    setSuccess(
-      'Capítulo agendado com sucesso.'
-    );
-  } else if (
-    finalStatus ===
-    'unpublished'
-  ) {
-    setSuccess(
-      'Capítulo retirado do ar.'
-    );
-  } else {
-    setSuccess(
-      'Rascunho salvo com sucesso.'
-    );
-  }
-
-  /*
-   * Atualiza a lista lateral imediatamente.
-   */
-  setStory((currentStory) => {
-    if (!currentStory) {
-      return currentStory;
-    }
-
-    const updatedChapters =
-      currentStory.chapters.map(
-        (item) => {
-          if (
-            item.id !==
-            savedChapter.id
-          ) {
-            return item;
-          }
-
-          return {
-            ...item,
-            title:
-              savedChapter.title,
-            published:
-              savedChapter.published,
-            publication_status:
-              savedChapter.publication_status,
-            scheduled_for:
-              resolvedScheduledFor,
-            is_scheduled:
-              savedChapter.publication_status ===
-              'scheduled',
-          };
-        }
-      );
-
-    const updatedStory =
-      {
-        ...currentStory,
-        chapters:
-          updatedChapters,
-      };
-
-    storyRef.current =
-      updatedStory;
-
-    return updatedStory;
-  });
-} catch (caughtError) {
-  setError(
-    caughtError instanceof Error
-      ? caughtError.message
-      : 'Erro ao salvar o capítulo.'
-  );
-} finally {
-  setSavingChapter(false);
-  setMediaUploading(false);
-}
-```
-
-}
-
-function handleEditorInput() {
-if (!editorRef.current) return;
-
-```
-setChapterBody(
-  editorRef.current.innerHTML
-);
-
-saveSelection();
-```
-
-}
-
-function handleEditorPaste(
-event: React.ClipboardEvent<HTMLDivElement>
-) {
-event.preventDefault();
-
-```
-const text =
-  event.clipboardData.getData(
-    'text/plain'
-  );
-
-document.execCommand(
-  'insertText',
-  false,
-  text
-);
-
-saveSelection();
-syncEditorBody();
-```
-
-}
-
-function handleEditorKeyDown(
-event: KeyboardEvent<HTMLDivElement>
-) {
-if (
-(event.ctrlKey ||
-event.metaKey) &&
-event.key.toLowerCase() ===
-'s'
-) {
-event.preventDefault();
-
-```
-  /*
-   * Ctrl+S significa explicitamente
-   * "Salvar rascunho".
-   */
-  void saveChapter(
-    'draft'
-  );
-
-  return;
-}
-
-saveSelection();
-```
-
-}
-
-function handleChapterFormSubmit(
-event: FormEvent<HTMLFormElement>
-) {
-event.preventDefault();
-
-```
-void saveChapter(
-  chapterStatus
-);
-```
-
-}
-
-function addHorizontalRule() {
-restoreSelection();
-
-```
-document.execCommand(
-  'insertHorizontalRule',
-  false
-);
-
-saveSelection();
-syncEditorBody();
-```
-
-}
-
-function handleScheduleChange(
-event: ChangeEvent<HTMLInputElement>
-) {
-setScheduledFor(
-event.target.value
-);
-
-```
-setChapterStatus(
-  'scheduled'
-);
-```
-
-}
-
-function handleMediaButtonClick(
-event?: MouseEvent<HTMLButtonElement>
-) {
-event?.preventDefault();
-
-```
-saveSelection();
-
-if (
-  chapterMedia.length >=
-  MAX_MEDIA
-) {
-  setError(
-    `Este capítulo já possui o limite de ${MAX_MEDIA} mídias.`
-  );
-  return;
-}
-
-mediaInputRef.current?.click();
-```
-
-}
-
-function clearChapterSelection() {
-chapterMedia.forEach(
-(media) => {
-if (!media.existing) {
-URL.revokeObjectURL(
-media.url
-);
-}
-}
-);
-
-```
-setSelectedChapterId(
-  null
-);
-
-setChapter(null);
-setChapterTitle('');
-setChapterBody('');
-setAuthorNotes('');
-setChapterStatus('draft');
-setScheduledFor('');
-setChapterMedia([]);
-setPreviewMode(false);
-setShowLinkBox(false);
-setLinkValue('');
-setError('');
-setSuccess('');
-savedSelectionRef.current =
-  null;
-
-const currentUrl =
-  new URL(
-    window.location.href
-  );
-
-currentUrl.searchParams.delete(
-  'chapter'
-);
-
-router.replace(
-  currentUrl.pathname
-);
-```
-
-}
-
-if (loading) {
-return ( <main className="min-h-screen bg-[#0b090c] text-white"> <div className="min-h-screen flex items-center justify-center"> <p className="text-sm text-gray-500">
-Carregando obra... </p> </div> </main>
-);
-}
-
-if (!story) {
-return ( <main className="min-h-screen bg-[#0b090c] text-white"> <div className="mx-auto max-w-2xl px-6 py-20 text-center"> <p className="text-red-300">
-{error ||
-'Obra não encontrada.'} </p>
-
-```
-      <button
-        type="button"
-        onClick={() =>
-          router.push(
-            `/historia/${id}`
-          )
-        }
-        className="mt-6 rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium hover:bg-pink-400 transition"
-      >
-        Voltar para a obra
-      </button>
-    </div>
-  </main>
-);
-```
-
-}
-
-return ( <main className="min-h-screen bg-[#0b090c] text-white"> <style jsx global>{`
-.chapter-editor {
-min-height: 900px;
-outline: none;
-white-space: pre-wrap;
-word-break: break-word;
-overflow-wrap: anywhere;
-font: inherit;
-}
-
-```
-    .chapter-editor:empty:before {
-      content: 'Comece a escrever seu capítulo...';
-      color: rgba(156, 163, 175, 0.35);
-      pointer-events: none;
-    }
-
-    .chapter-editor p {
-      margin: 0 0 1.25rem;
-    }
-
-    .chapter-editor h2 {
-      font-size: 1.75rem;
-      line-height: 1.3;
-      font-weight: 600;
-      margin: 1.5rem 0 1rem;
-    }
-
-    .chapter-editor h3 {
-      font-size: 1.35rem;
-      line-height: 1.35;
-      font-weight: 600;
-      margin: 1.5rem 0 1rem;
-    }
-
-    .chapter-editor blockquote {
-      border-left: 3px solid rgba(236, 72, 153, 0.6);
-      padding-left: 1rem;
-      margin: 1.5rem 0;
-      color: rgba(209, 213, 219, 0.8);
-      font-style: italic;
-    }
-
-    .chapter-editor a {
-      color: rgb(244, 114, 182);
-      text-decoration: underline;
-    }
-
-    .chapter-editor img {
-      display: block;
-      max-width: 100%;
-      height: auto;
-      margin: 1.5rem auto;
-      border-radius: 0.75rem;
-    }
-
-    .chapter-editor hr {
-      border: 0;
-      border-top: 1px solid rgba(255, 255, 255, 0.12);
-      margin: 2rem 0;
-    }
-
-    .chapter-media-placeholder {
-      margin: 1.5rem 0;
-      padding: 2rem;
-      border: 1px dashed rgba(236, 72, 153, 0.35);
-      border-radius: 0.75rem;
-      color: rgba(244, 114, 182, 0.7);
-      background: rgba(236, 72, 153, 0.04);
-      text-align: center;
-    }
-
-    .chapter-preview p {
-      margin-bottom: 1.25rem;
-    }
-
-    .chapter-preview h2 {
-      font-size: 1.75rem;
-      line-height: 1.3;
-      font-weight: 600;
-      margin: 1.5rem 0 1rem;
-    }
-
-    .chapter-preview h3 {
-      font-size: 1.35rem;
-      line-height: 1.35;
-      font-weight: 600;
-      margin: 1.5rem 0 1rem;
-    }
-
-    .chapter-preview blockquote {
-      border-left: 3px solid rgba(236, 72, 153, 0.6);
-      padding-left: 1rem;
-      margin: 1.5rem 0;
-      color: rgba(209, 213, 219, 0.8);
-      font-style: italic;
-    }
-
-    .chapter-preview a {
-      color: rgb(244, 114, 182);
-      text-decoration: underline;
-    }
-
-    .chapter-preview img {
-      display: block;
-      max-width: 100%;
-      height: auto;
-      margin: 1.5rem auto;
-      border-radius: 0.75rem;
-    }
-
-    .chapter-preview hr {
-      border: 0;
-      border-top: 1px solid rgba(255, 255, 255, 0.12);
-      margin: 2rem 0;
-    }
-
-    .editor-toolbar-button {
-      min-width: 34px;
-      height: 34px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 9px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.025);
-      color: rgba(209, 213, 219, 0.85);
-      transition: all 0.15s ease;
-    }
-
-    .editor-toolbar-button:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: white;
-    }
-
-    .editor-toolbar-divider {
-      width: 1px;
-      height: 24px;
-      margin: 0 3px;
-      background: rgba(255, 255, 255, 0.1);
-    }
-  `}</style>
-
-  <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0b090c]/95 backdrop-blur">
-    <div className="mx-auto max-w-[1550px] px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-      <button
-        type="button"
-        onClick={() =>
-          router.push(
-            `/historia/${id}`
-          )
-        }
-        className="text-xl font-semibold tracking-tight hover:text-pink-300 transition"
-      >
-        Nooklie
-      </button>
-
-      <div className="flex items-center gap-2">
-        {chapter && (
           <button
             type="button"
             onClick={() =>
-              setPreviewMode(
-                (current) =>
-                  !current
+              router.push(
+                `/historia/${id}`
               )
             }
-            className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
+            className="mt-6 rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium hover:bg-pink-400 transition"
           >
-            {previewMode
-              ? 'Voltar ao editor'
-              : 'Pré-visualizar'}
+            Voltar para a obra
           </button>
-        )}
+        </div>
+      </main>
+    );
+  }
 
-        <button
-          type="button"
-          onClick={() =>
-            router.push(
-              `/historia/${id}`
-            )
-          }
-          className="text-sm text-gray-400 hover:text-white transition"
-        >
-          Sair
-        </button>
-      </div>
-    </div>
-  </header>
+  return (
+    <main className="min-h-screen bg-[#0b090c] text-white">
+      <style jsx global>{`
+        .chapter-editor {
+          min-height: 900px;
+          outline: none;
+          white-space: pre-wrap;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+          font: inherit;
+        }
 
-  <div className="mx-auto max-w-[1550px] px-4 sm:px-6 py-6">
-    {error && (
-      <div className="mb-5 rounded-xl border border-red-400/20 bg-red-500/[0.07] px-4 py-3 text-sm text-red-200">
-        {error}
-      </div>
-    )}
+        .chapter-editor:empty:before {
+          content: 'Comece a escrever seu capítulo...';
+          color: rgba(156, 163, 175, 0.35);
+          pointer-events: none;
+        }
 
-    {success && (
-      <div className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-500/[0.07] px-4 py-3 text-sm text-emerald-200">
-        {success}
-      </div>
-    )}
+        .chapter-editor p {
+          margin: 0 0 1.25rem;
+        }
 
-    {!chapter ? (
-      <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)_350px]">
-        <aside className="lg:sticky lg:top-24 lg:self-start">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-            <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
-              {coverPreview ? (
-                <img
-                  src={coverPreview}
-                  alt={`Capa de ${story.title}`}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-sm text-gray-600">
-                  Sem capa
-                </div>
-              )}
-            </div>
+        .chapter-editor h2 {
+          font-size: 1.75rem;
+          line-height: 1.3;
+          font-weight: 600;
+          margin: 1.5rem 0 1rem;
+        }
 
-            <label className="mt-4 block cursor-pointer rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition">
-              ALTERAR A CAPA
+        .chapter-editor h3 {
+          font-size: 1.35rem;
+          line-height: 1.35;
+          font-weight: 600;
+          margin: 1.5rem 0 1rem;
+        }
 
-              <input
-                ref={coverInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={
-                  handleCoverChange
-                }
-                className="hidden"
-              />
-            </label>
+        .chapter-editor blockquote {
+          border-left: 3px solid rgba(236, 72, 153, 0.6);
+          padding-left: 1rem;
+          margin: 1.5rem 0;
+          color: rgba(209, 213, 219, 0.8);
+          font-style: italic;
+        }
 
-            <p className="mt-2 text-center text-xs text-gray-600">
-              JPG, PNG, WEBP ou GIF
-              <br />
-              até 10 MB
-            </p>
-          </div>
-        </aside>
+        .chapter-editor a {
+          color: rgb(244, 114, 182);
+          text-decoration: underline;
+        }
 
-        <section>
-          <div className="mb-7">
-            <p className="text-xs uppercase tracking-[0.18em] text-pink-300/70">
-              Editar obra
-            </p>
+        .chapter-editor img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          margin: 1.5rem auto;
+          border-radius: 0.75rem;
+        }
 
-            <h1 className="mt-2 text-3xl font-semibold">
-              {story.title}
-            </h1>
+        .chapter-editor hr {
+          border: 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.12);
+          margin: 2rem 0;
+        }
 
-            <p className="mt-2 text-sm text-gray-500">
-              Edite as informações da obra ou escolha um capítulo para editar.
-            </p>
-          </div>
+        .chapter-media-placeholder {
+          margin: 1.5rem 0;
+          padding: 2rem;
+          border: 1px dashed rgba(236, 72, 153, 0.35);
+          border-radius: 0.75rem;
+          color: rgba(244, 114, 182, 0.7);
+          background: rgba(236, 72, 153, 0.04);
+          text-align: center;
+        }
 
-          <form
-            onSubmit={
-              handleSaveStory
+        .chapter-preview p {
+          margin-bottom: 1.25rem;
+        }
+
+        .chapter-preview h2 {
+          font-size: 1.75rem;
+          line-height: 1.3;
+          font-weight: 600;
+          margin: 1.5rem 0 1rem;
+        }
+
+        .chapter-preview h3 {
+          font-size: 1.35rem;
+          line-height: 1.35;
+          font-weight: 600;
+          margin: 1.5rem 0 1rem;
+        }
+
+        .chapter-preview blockquote {
+          border-left: 3px solid rgba(236, 72, 153, 0.6);
+          padding-left: 1rem;
+          margin: 1.5rem 0;
+          color: rgba(209, 213, 219, 0.8);
+          font-style: italic;
+        }
+
+        .chapter-preview a {
+          color: rgb(244, 114, 182);
+          text-decoration: underline;
+        }
+
+        .chapter-preview img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          margin: 1.5rem auto;
+          border-radius: 0.75rem;
+        }
+
+        .chapter-preview hr {
+          border: 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.12);
+          margin: 2rem 0;
+        }
+
+        .editor-toolbar-button {
+          min-width: 34px;
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 9px;
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(255, 255, 255, 0.025);
+          color: rgba(209, 213, 219, 0.85);
+          transition: all 0.15s ease;
+        }
+
+        .editor-toolbar-button:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: white;
+        }
+
+        .editor-toolbar-divider {
+          width: 1px;
+          height: 24px;
+          margin: 0 3px;
+          background: rgba(255, 255, 255, 0.1);
+        }
+      `}</style>
+
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0b090c]/95 backdrop-blur">
+        <div className="mx-auto max-w-[1550px] px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                `/historia/${id}`
+              )
             }
-            className="space-y-6"
+            className="text-xl font-semibold tracking-tight hover:text-pink-300 transition"
           >
-            <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-              <h2 className="text-base font-medium">
-                Informações da obra
-              </h2>
+            Nooklie
+          </button>
 
-              <div className="mt-5">
-                <label className="mb-2 block text-sm text-gray-300">
-                  Título
-                </label>
-
-                <input
-                  value={title}
-                  onChange={(event) =>
-                    setTitle(
-                      event.target.value
-                    )
-                  }
-                  maxLength={150}
-                  required
-                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
-                />
-              </div>
-
-              <div className="mt-5">
-                <label className="mb-2 block text-sm text-gray-300">
-                  Sinopse
-                </label>
-
-                <textarea
-                  value={
-                    description
-                  }
-                  onChange={(event) =>
-                    setDescription(
-                      event.target.value
-                    )
-                  }
-                  maxLength={5000}
-                  rows={8}
-                  className="w-full resize-y rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
-                />
-
-                <div className="mt-1 text-right text-xs text-gray-600">
-                  {description.length}/5000
-                </div>
-              </div>
-
-              <div className="mt-5">
-                <label className="mb-2 block text-sm text-gray-300">
-                  Status da obra
-                </label>
-
-                <select
-                  value={status}
-                  onChange={(event) =>
-                    setStatus(
-                      event.target.value
-                    )
-                  }
-                  className="w-full rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
-                >
-                  <option value="">
-                    Selecione
-                  </option>
-
-                  <option value="EM ANDAMENTO">
-                    EM ANDAMENTO
-                  </option>
-
-                  <option value="CONCLUÍDA">
-                    CONCLUÍDA
-                  </option>
-
-                  <option value="HIATUS">
-                    HIATUS
-                  </option>
-                </select>
-              </div>
-
-              <div className="mt-5">
-                <label className="mb-2 block text-sm text-gray-300">
-                  Classificação
-                </label>
-
-                <select
-                  value={rating}
-                  onChange={(event) =>
-                    setRating(
-                      event.target.value
-                    )
-                  }
-                  className="w-full rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
-                >
-                  <option value="">
-                    Selecione
-                  </option>
-
-                  <option value="Livre">
-                    Livre
-                  </option>
-
-                  <option value="10">
-                    10 anos
-                  </option>
-
-                  <option value="12">
-                    12 anos
-                  </option>
-
-                  <option value="14">
-                    14 anos
-                  </option>
-
-                  <option value="16">
-                    16 anos
-                  </option>
-
-                  <option value="18">
-                    18 anos
-                  </option>
-                </select>
-              </div>
-
-              <div className="mt-5">
-                <label className="mb-2 block text-sm text-gray-300">
-                  Gênero
-                </label>
-
-                <input
-                  value={genre}
-                  onChange={(event) =>
-                    setGenre(
-                      event.target.value
-                    )
-                  }
-                  maxLength={50}
-                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
-                  placeholder="Romance, Fantasia, Drama..."
-                />
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-              <h2 className="text-base font-medium">
-                Tags
-              </h2>
-
-              <p className="mt-1 text-xs text-gray-500">
-                Pressione Enter ou vírgula para adicionar.
-              </p>
-
-              <div className="mt-5 flex min-h-[48px] flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 focus-within:border-pink-400/40">
-                {tags.map(
-                  (tag, index) => (
-                    <span
-                      key={`${tag}-${index}`}
-                      className="inline-flex items-center gap-2 rounded-lg border border-pink-400/20 bg-pink-500/10 px-3 py-1.5 text-sm text-pink-200"
-                    >
-                      {tag}
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          removeTag(
-                            index
-                          )
-                        }
-                        className="text-pink-300/60 hover:text-pink-200 transition"
-                      >
-                        ×
-                      </button>
-                    </span>
+          <div className="flex items-center gap-2">
+            {chapter && (
+              <button
+                type="button"
+                onClick={() =>
+                  setPreviewMode(
+                    (current) =>
+                      !current
                   )
-                )}
-
-                <input
-                  value={
-                    tagInput
-                  }
-                  onChange={(event) =>
-                    setTagInput(
-                      event.target.value
-                    )
-                  }
-                  onKeyDown={
-                    handleTagKeyDown
-                  }
-                  className="min-w-[150px] flex-1 bg-transparent px-1 py-2 text-sm text-white outline-none placeholder:text-gray-600"
-                  placeholder={
-                    tags.length >=
-                    30
-                      ? 'Limite atingido'
-                      : 'Adicionar tag...'
-                  }
-                  disabled={
-                    tags.length >=
-                    30
-                  }
-                />
-              </div>
-
-              <div className="mt-2 text-right text-xs text-gray-600">
-                {tags.length}/30
-              </div>
-            </section>
+                }
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
+              >
+                {previewMode
+                  ? 'Voltar ao editor'
+                  : 'Pré-visualizar'}
+              </button>
+            )}
 
             <button
-              type="submit"
-              disabled={
-                savingStory
+              type="button"
+              onClick={() =>
+                router.push(
+                  `/historia/${id}`
+                )
               }
-              className="w-full rounded-xl bg-pink-500 px-6 py-3 text-sm font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
+              className="text-sm text-gray-400 hover:text-white transition"
             >
-              {savingStory
-                ? 'Salvando...'
-                : 'Salvar informações da obra'}
+              Sair
             </button>
-          </form>
-        </section>
+          </div>
+        </div>
+      </header>
 
-        <aside className="lg:sticky lg:top-24 lg:self-start">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="font-medium">
-                  Capítulos
-                </h2>
+      <div className="mx-auto max-w-[1550px] px-4 sm:px-6 py-6">
+        {error && (
+          <div className="mb-5 rounded-xl border border-red-400/20 bg-red-500/[0.07] px-4 py-3 text-sm text-red-200">
+            {error}
+          </div>
+        )}
 
-                <p className="mt-1 text-xs text-gray-600">
-                  {story.chapters.length}{' '}
-                  {story.chapters
-                    .length === 1
-                    ? 'capítulo'
-                    : 'capítulos'}
+        {success && (
+          <div className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-500/[0.07] px-4 py-3 text-sm text-emerald-200">
+            {success}
+          </div>
+        )}
+
+        {!chapter ? (
+          <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)_350px]">
+            <aside className="lg:sticky lg:top-24 lg:self-start">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                  {coverPreview ? (
+                    <img
+                      src={coverPreview}
+                      alt={
+                        'Capa de ' +
+                        story.title
+                      }
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-sm text-gray-600">
+                      Sem capa
+                    </div>
+                  )}
+                </div>
+
+                <label className="mt-4 block cursor-pointer rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition">
+                  ALTERAR A CAPA
+
+                  <input
+                    ref={
+                      coverInputRef
+                    }
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={
+                      handleCoverChange
+                    }
+                    className="hidden"
+                  />
+                </label>
+
+                <p className="mt-2 text-center text-xs text-gray-600">
+                  JPG, PNG, WEBP ou GIF
+                  <br />
+                  até 10 MB
                 </p>
               </div>
-            </div>
+            </aside>
 
-            <div className="mt-4 space-y-2">
-              {story.chapters
-                .length === 0 ? (
-                <div className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-gray-600">
-                  Sua obra ainda não possui capítulos.
-                </div>
-              ) : (
-                story.chapters.map(
-                  (item) => (
-                    <div
-                      key={
-                        item.id
+            <section>
+              <div className="mb-7">
+                <p className="text-xs uppercase tracking-[0.18em] text-pink-300/70">
+                  Editar obra
+                </p>
+
+                <h1 className="mt-2 text-3xl font-semibold">
+                  {story.title}
+                </h1>
+
+                <p className="mt-2 text-sm text-gray-500">
+                  Edite as informações da obra ou escolha um capítulo para editar.
+                </p>
+              </div>
+
+              <form
+                onSubmit={
+                  handleSaveStory
+                }
+                className="space-y-6"
+              >
+                <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                  <h2 className="text-base font-medium">
+                    Informações da obra
+                  </h2>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm text-gray-300">
+                      Título
+                    </label>
+
+                    <input
+                      value={
+                        title
                       }
-                      className="rounded-xl border border-white/10 bg-black/20 p-3"
+                      onChange={(
+                        event
+                      ) =>
+                        setTitle(
+                          event.target
+                            .value
+                        )
+                      }
+                      maxLength={
+                        150
+                      }
+                      required
+                      className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
+                    />
+                  </div>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm text-gray-300">
+                      Sinopse
+                    </label>
+
+                    <textarea
+                      value={
+                        description
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setDescription(
+                          event.target
+                            .value
+                        )
+                      }
+                      maxLength={
+                        5000
+                      }
+                      rows={8}
+                      className="w-full resize-y rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
+                    />
+
+                    <div className="mt-1 text-right text-xs text-gray-600">
+                      {
+                        description.length
+                      }
+                      /5000
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm text-gray-300">
+                      Status da obra
+                    </label>
+
+                    <select
+                      value={
+                        status
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setStatus(
+                          event.target
+                            .value
+                        )
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-xs text-gray-600">
-                            Capítulo{' '}
-                            {
-                              item.chapter_number
-                            }
-                          </p>
+                      <option value="">
+                        Selecione
+                      </option>
 
-                          <p className="mt-1 truncate text-sm text-gray-200">
-                            {item.title ||
-                              'Sem título'}
-                          </p>
-                        </div>
+                      <option value="EM ANDAMENTO">
+                        EM ANDAMENTO
+                      </option>
 
+                      <option value="CONCLUÍDA">
+                        CONCLUÍDA
+                      </option>
+
+                      <option value="HIATUS">
+                        HIATUS
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm text-gray-300">
+                      Classificação
+                    </label>
+
+                    <select
+                      value={
+                        rating
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setRating(
+                          event.target
+                            .value
+                        )
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
+                    >
+                      <option value="">
+                        Selecione
+                      </option>
+
+                      <option value="Livre">
+                        Livre
+                      </option>
+
+                      <option value="10">
+                        10 anos
+                      </option>
+
+                      <option value="12">
+                        12 anos
+                      </option>
+
+                      <option value="14">
+                        14 anos
+                      </option>
+
+                      <option value="16">
+                        16 anos
+                      </option>
+
+                      <option value="18">
+                        18 anos
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm text-gray-300">
+                      Gênero
+                    </label>
+
+                    <input
+                      value={
+                        genre
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setGenre(
+                          event.target
+                            .value
+                        )
+                      }
+                      maxLength={
+                        50
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
+                      placeholder="Romance, Fantasia, Drama..."
+                    />
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                  <h2 className="text-base font-medium">
+                    Tags
+                  </h2>
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    Pressione Enter ou vírgula para adicionar.
+                  </p>
+
+                  <div className="mt-5 flex min-h-[48px] flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 focus-within:border-pink-400/40">
+                    {tags.map(
+                      (
+                        tag,
+                        index
+                      ) => (
                         <span
-                          className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-medium tracking-wide ${getStatusClass(
-                            item.is_scheduled
-                              ? 'scheduled'
-                              : item.publication_status ||
-                                (item.published
-                                  ? 'published'
-                                  : 'draft'),
-                            item.published
-                          )}`}
+                          key={
+                            tag +
+                            '-' +
+                            index
+                          }
+                          className="inline-flex items-center gap-2 rounded-lg border border-pink-400/20 bg-pink-500/10 px-3 py-1.5 text-sm text-pink-200"
                         >
-                          {item.is_scheduled
-                            ? 'AGENDADO'
-                            : item.publication_status ===
-                              'unpublished'
-                              ? 'FORA DO AR'
-                              : item.published
-                                ? 'PUBLICADO'
-                                : 'RASCUNHO'}
+                          {tag}
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeTag(
+                                index
+                              )
+                            }
+                            className="text-pink-300/60 hover:text-pink-200 transition"
+                          >
+                            ×
+                          </button>
                         </span>
-                      </div>
+                      )
+                    )}
 
-                      {item.scheduled_for && (
-                        <p className="mt-2 text-[11px] text-violet-300/70">
-                          {formatDate(
-                            item.scheduled_for
+                    <input
+                      value={
+                        tagInput
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setTagInput(
+                          event.target
+                            .value
+                        )
+                      }
+                      onKeyDown={
+                        handleTagKeyDown
+                      }
+                      className="min-w-[150px] flex-1 bg-transparent px-1 py-2 text-sm text-white outline-none placeholder:text-gray-600"
+                      placeholder={
+                        tags.length >=
+                        30
+                          ? 'Limite atingido'
+                          : 'Adicionar tag...'
+                      }
+                      disabled={
+                        tags.length >=
+                        30
+                      }
+                    />
+                  </div>
+
+                  <div className="mt-2 text-right text-xs text-gray-600">
+                    {tags.length}/30
+                  </div>
+                </section>
+
+                <button
+                  type="submit"
+                  disabled={
+                    savingStory
+                  }
+                  className="w-full rounded-xl bg-pink-500 px-6 py-3 text-sm font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
+                >
+                  {savingStory
+                    ? 'Salvando...'
+                    : 'Salvar informações da obra'}
+                </button>
+              </form>
+            </section>
+
+            <aside className="lg:sticky lg:top-24 lg:self-start">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-medium">
+                      Capítulos
+                    </h2>
+
+                    <p className="mt-1 text-xs text-gray-600">
+                      {
+                        story.chapters
+                          .length
+                      }{' '}
+                      {story.chapters
+                        .length === 1
+                        ? 'capítulo'
+                        : 'capítulos'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {story.chapters
+                    .length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-gray-600">
+                      Sua obra ainda não possui capítulos.
+                    </div>
+                  ) : (
+                    story.chapters.map(
+                      (
+                        item
+                      ) => (
+                        <div
+                          key={
+                            item.id
+                          }
+                          className="rounded-xl border border-white/10 bg-black/20 p-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs text-gray-600">
+                                Capítulo{' '}
+                                {
+                                  item.chapter_number
+                                }
+                              </p>
+
+                              <p className="mt-1 truncate text-sm text-gray-200">
+                                {item.title ||
+                                  'Sem título'}
+                              </p>
+                            </div>
+
+                            <span
+                              className={
+                                'shrink-0 rounded-full border px-2 py-1 text-[9px] font-medium tracking-wide ' +
+                                getStatusClass(
+                                  item.is_scheduled
+                                    ? 'scheduled'
+                                    : item.publication_status ||
+                                      (
+                                        item.published
+                                          ? 'published'
+                                          : 'draft'
+                                      ),
+                                  item.published
+                                )
+                              }
+                            >
+                              {item.is_scheduled
+                                ? 'AGENDADO'
+                                : item.publication_status ===
+                                  'unpublished'
+                                  ? 'FORA DO AR'
+                                  : item.published
+                                    ? 'PUBLICADO'
+                                    : 'RASCUNHO'}
+                            </span>
+                          </div>
+
+                          {item.scheduled_for && (
+                            <p className="mt-2 text-[11px] text-violet-300/70">
+                              {formatDate(
+                                item.scheduled_for
+                              )}
+                            </p>
                           )}
-                        </p>
-                      )}
 
+                          <button
+                            type="button"
+                            onClick={() =>
+                              selectChapter(
+                                item.id
+                              )
+                            }
+                            className="mt-3 w-full rounded-lg bg-pink-500/10 px-3 py-2 text-xs font-medium text-pink-200 hover:bg-pink-500/20 transition"
+                          >
+                            EDITAR CAPÍTULO
+                          </button>
+                        </div>
+                      )
+                    )
+                  )}
+                </div>
+              </div>
+            </aside>
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+            <aside className="lg:sticky lg:top-24 lg:self-start space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                  {coverPreview ? (
+                    <img
+                      src={coverPreview}
+                      alt={
+                        'Capa de ' +
+                        story.title
+                      }
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-sm text-gray-600">
+                      Sem capa
+                    </div>
+                  )}
+                </div>
+
+                <label className="mt-4 block cursor-pointer rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition">
+                  ALTERAR A CAPA
+
+                  <input
+                    ref={
+                      coverInputRef
+                    }
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={
+                      handleCoverChange
+                    }
+                    className="hidden"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={
+                    clearChapterSelection
+                  }
+                  className="mt-2 w-full rounded-xl border border-white/10 px-4 py-3 text-sm text-gray-400 hover:bg-white/[0.05] hover:text-white transition"
+                >
+                  Voltar para a obra
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-medium">
+                    Capítulos
+                  </h2>
+
+                  <span className="text-xs text-gray-600">
+                    {
+                      story.chapters
+                        .length
+                    }
+                  </span>
+                </div>
+
+                <div className="mt-3 max-h-[500px] overflow-y-auto space-y-2 pr-1">
+                  {story.chapters.map(
+                    (
+                      item
+                    ) => (
                       <button
+                        key={
+                          item.id
+                        }
                         type="button"
                         onClick={() =>
                           selectChapter(
                             item.id
                           )
                         }
-                        className="mt-3 w-full rounded-lg bg-pink-500/10 px-3 py-2 text-xs font-medium text-pink-200 hover:bg-pink-500/20 transition"
+                        className={
+                          'w-full rounded-xl border p-3 text-left transition ' +
+                          (
+                            item.id ===
+                            selectedChapterId
+                              ? 'border-pink-400/40 bg-pink-500/[0.08]'
+                              : 'border-white/10 bg-black/20 hover:bg-white/[0.04]'
+                          )
+                        }
                       >
-                        EDITAR CAPÍTULO
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                              Capítulo{' '}
+                              {
+                                item.chapter_number
+                              }
+                            </p>
+
+                            <p className="mt-1 truncate text-sm text-gray-200">
+                              {item.title ||
+                                'Sem título'}
+                            </p>
+                          </div>
+
+                          <span
+                            className={
+                              'shrink-0 rounded-full border px-2 py-1 text-[8px] ' +
+                              getStatusClass(
+                                item.is_scheduled
+                                  ? 'scheduled'
+                                  : item.publication_status ||
+                                    (
+                                      item.published
+                                        ? 'published'
+                                        : 'draft'
+                                    ),
+                                item.published
+                              )
+                            }
+                          >
+                            {item.is_scheduled
+                              ? 'AGENDADO'
+                              : item.publication_status ===
+                                'unpublished'
+                                ? 'FORA DO AR'
+                                : item.published
+                                  ? 'PUBLICADO'
+                                  : 'RASCUNHO'}
+                          </span>
+                        </div>
+
+                        {item.scheduled_for && (
+                          <p className="mt-2 text-[10px] text-violet-300/60">
+                            {formatDate(
+                              item.scheduled_for
+                            )}
+                          </p>
+                        )}
                       </button>
-                    </div>
-                  )
-                )
-              )}
-            </div>
-          </div>
-        </aside>
-      </div>
-    ) : (
-      <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="lg:sticky lg:top-24 lg:self-start space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-            <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
-              {coverPreview ? (
-                <img
-                  src={coverPreview}
-                  alt={`Capa de ${story.title}`}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-sm text-gray-600">
-                  Sem capa
-                </div>
-              )}
-            </div>
-
-            <label className="mt-4 block cursor-pointer rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition">
-              ALTERAR A CAPA
-
-              <input
-                ref={coverInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={
-                  handleCoverChange
-                }
-                className="hidden"
-              />
-            </label>
-
-            <button
-              type="button"
-              onClick={
-                clearChapterSelection
-              }
-              className="mt-2 w-full rounded-xl border border-white/10 px-4 py-3 text-sm text-gray-400 hover:bg-white/[0.05] hover:text-white transition"
-            >
-              Voltar para a obra
-            </button>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium">
-                Capítulos
-              </h2>
-
-              <span className="text-xs text-gray-600">
-                {story.chapters.length}
-              </span>
-            </div>
-
-            <div className="mt-3 max-h-[500px] overflow-y-auto space-y-2 pr-1">
-              {story.chapters.map(
-                (item) => (
-                  <button
-                    key={
-                      item.id
-                    }
-                    type="button"
-                    onClick={() =>
-                      selectChapter(
-                        item.id
-                      )
-                    }
-                    className={`w-full rounded-xl border p-3 text-left transition ${
-                      item.id ===
-                      selectedChapterId
-                        ? 'border-pink-400/40 bg-pink-500/[0.08]'
-                        : 'border-white/10 bg-black/20 hover:bg-white/[0.04]'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
-                          Capítulo{' '}
-                          {
-                            item.chapter_number
-                          }
-                        </p>
-
-                        <p className="mt-1 truncate text-sm text-gray-200">
-                          {item.title ||
-                            'Sem título'}
-                        </p>
-                      </div>
-
-                      <span
-                        className={`shrink-0 rounded-full border px-2 py-1 text-[8px] ${getStatusClass(
-                          item.is_scheduled
-                            ? 'scheduled'
-                            : item.publication_status ||
-                              (item.published
-                                ? 'published'
-                                : 'draft'),
-                          item.published
-                        )}`}
-                      >
-                        {item.is_scheduled
-                          ? 'AGENDADO'
-                          : item.publication_status ===
-                            'unpublished'
-                            ? 'FORA DO AR'
-                            : item.published
-                              ? 'PUBLICADO'
-                              : 'RASCUNHO'}
-                      </span>
-                    </div>
-
-                    {item.scheduled_for && (
-                      <p className="mt-2 text-[10px] text-violet-300/60">
-                        {formatDate(
-                          item.scheduled_for
-                        )}
-                      </p>
-                    )}
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-        </aside>
-
-        <section className="min-w-0">
-          {loadingChapter ? (
-            <div className="min-h-[700px] flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.02]">
-              <p className="text-sm text-gray-500">
-                Carregando capítulo...
-              </p>
-            </div>
-          ) : (
-            <form
-              onSubmit={
-                handleChapterFormSubmit
-              }
-              className="space-y-4"
-            >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-[0.18em] text-pink-300/70">
-                    Editando capítulo{' '}
-                    {
-                      chapter.chapter_number
-                    }
-                  </p>
-
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded-full border px-3 py-1 text-[10px] tracking-wide ${getStatusClass(
-                        chapterStatus,
-                        chapter.published
-                      )}`}
-                    >
-                      {getStatusLabel(
-                        chapterStatus,
-                        chapter.published
-                      )}
-                    </span>
-
-                    {chapter.original_published_at && (
-                      <span className="text-xs text-gray-600">
-                        Original:{' '}
-                        {formatDate(
-                          chapter.original_published_at
-                        )}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void saveChapter(
-                        'draft'
-                      )
-                    }
-                    disabled={
-                      savingChapter ||
-                      mediaUploading
-                    }
-                    className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white disabled:opacity-50 transition"
-                  >
-                    {savingChapter
-                      ? 'Salvando...'
-                      : 'Salvar rascunho'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void saveChapter(
-                        'published'
-                      )
-                    }
-                    disabled={
-                      savingChapter ||
-                      mediaUploading
-                    }
-                    className="rounded-xl bg-pink-500 px-4 py-2.5 text-sm font-medium hover:bg-pink-400 disabled:opacity-50 transition"
-                  >
-                    {savingChapter
-                      ? 'Salvando...'
-                      : 'Publicar'}
-                  </button>
+                    )
+                  )}
                 </div>
               </div>
+            </aside>
 
-              <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden">
-                <div className="border-b border-white/10 bg-black/20 px-3 sm:px-6 py-3">
-                  <input
-                    value={
-                      chapterTitle
-                    }
-                    onChange={(event) =>
-                      setChapterTitle(
-                        event.target.value
-                      )
-                    }
-                    maxLength={150}
-                    className="w-full border-none bg-transparent px-2 py-3 text-2xl sm:text-3xl font-semibold text-white outline-none placeholder:text-gray-700"
-                    placeholder="Título do capítulo"
-                  />
+            <section className="min-w-0">
+              {loadingChapter ? (
+                <div className="min-h-[700px] flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.02]">
+                  <p className="text-sm text-gray-500">
+                    Carregando capítulo...
+                  </p>
                 </div>
+              ) : (
+                <form
+                  onSubmit={
+                    handleChapterFormSubmit
+                  }
+                  className="space-y-4"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-[0.18em] text-pink-300/70">
+                        Editando capítulo{' '}
+                        {
+                          chapter.chapter_number
+                        }
+                      </p>
 
-                {previewMode ? (
-                  <article className="chapter-preview min-h-[900px] px-4 sm:px-12 lg:px-20 py-10 text-[17px] leading-8 text-gray-200">
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html:
-                          sanitizeHtml(
-                            chapterBody
-                          ) ||
-                          '<p>O capítulo está vazio.</p>',
-                      }}
-                    />
-
-                    {authorNotes.trim() && (
-                      <div className="mt-12 border-t border-white/10 pt-8">
-                        <p className="text-xs uppercase tracking-[0.2em] text-pink-300/70">
-                          NOTAS DO AUTOR
-                        </p>
-
-                        <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-gray-400">
-                          {
-                            authorNotes
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span
+                          className={
+                            'rounded-full border px-3 py-1 text-[10px] tracking-wide ' +
+                            getStatusClass(
+                              chapterStatus,
+                              chapter.published
+                            )
                           }
-                        </p>
+                        >
+                          {getStatusLabel(
+                            chapterStatus,
+                            chapter.published
+                          )}
+                        </span>
+
+                        {chapter.original_published_at && (
+                          <span className="text-xs text-gray-600">
+                            Original:{' '}
+                            {formatDate(
+                              chapter.original_published_at
+                            )}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </article>
-                ) : (
-                  <>
-                    <div className="sticky top-[61px] z-30 border-b border-white/10 bg-[#0d0a0e]/98 backdrop-blur">
-                      <div className="flex flex-wrap items-center gap-1 p-2">
-                        <button
-                          type="button"
-                          onMouseDown={(
-                            event
-                          ) => {
-                            event.preventDefault();
-                            saveSelection();
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void saveChapter(
+                            'draft'
+                          )
+                        }
+                        disabled={
+                          savingChapter ||
+                          mediaUploading
+                        }
+                        className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white disabled:opacity-50 transition"
+                      >
+                        {savingChapter
+                          ? 'Salvando...'
+                          : 'Salvar rascunho'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void saveChapter(
+                            'published'
+                          )
+                        }
+                        disabled={
+                          savingChapter ||
+                          mediaUploading
+                        }
+                        className="rounded-xl bg-pink-500 px-4 py-2.5 text-sm font-medium hover:bg-pink-400 disabled:opacity-50 transition"
+                      >
+                        {savingChapter
+                          ? 'Salvando...'
+                          : 'Publicar'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden">
+                    <div className="border-b border-white/10 bg-black/20 px-3 sm:px-6 py-3">
+                      <input
+                        value={
+                          chapterTitle
+                        }
+                        onChange={(
+                          event
+                        ) =>
+                          setChapterTitle(
+                            event.target
+                              .value
+                          )
+                        }
+                        maxLength={
+                          150
+                        }
+                        className="w-full border-none bg-transparent px-2 py-3 text-2xl sm:text-3xl font-semibold text-white outline-none placeholder:text-gray-700"
+                        placeholder="Título do capítulo"
+                      />
+                    </div>
+
+                    {previewMode ? (
+                      <article className="chapter-preview min-h-[900px] px-4 sm:px-12 lg:px-20 py-10 text-[17px] leading-8 text-gray-200">
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html:
+                              sanitizeHtml(
+                                chapterBody
+                              ) ||
+                              '<p>O capítulo está vazio.</p>',
                           }}
-                          onClick={() =>
-                            executeCommand(
-                              'bold'
-                            )
-                          }
-                          className="editor-toolbar-button font-bold"
-                          title="Negrito"
-                        >
-                          B
-                        </button>
-
-                        <button
-                          type="button"
-                          onMouseDown={(
-                            event
-                          ) => {
-                            event.preventDefault();
-                            saveSelection();
-                          }}
-                          onClick={() =>
-                            executeCommand(
-                              'italic'
-                            )
-                          }
-                          className="editor-toolbar-button italic"
-                          title="Itálico"
-                        >
-                          I
-                        </button>
-
-                        <button
-                          type="button"
-                          onMouseDown={(
-                            event
-                          ) => {
-                            event.preventDefault();
-                            saveSelection();
-                          }}
-                          onClick={() =>
-                            executeCommand(
-                              'underline'
-                            )
-                          }
-                          className="editor-toolbar-button underline"
-                          title="Sublinhado"
-                        >
-                          U
-                        </button>
-
-                        <span className="editor-toolbar-divider" />
-
-                        <button
-                          type="button"
-                          onMouseDown={(
-                            event
-                          ) => {
-                            event.preventDefault();
-                            saveSelection();
-                          }}
-                          onClick={() =>
-                            setAlignment(
-                              'left'
-                            )
-                          }
-                          className="editor-toolbar-button"
-                          title="Alinhar à esquerda"
-                        >
-                          <span className="text-lg">
-                            ≡
-                          </span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onMouseDown={(
-                            event
-                          ) => {
-                            event.preventDefault();
-                            saveSelection();
-                          }}
-                          onClick={() =>
-                            setAlignment(
-                              'center'
-                            )
-                          }
-                          className="editor-toolbar-button"
-                          title="Centralizar"
-                        >
-                          <span className="text-lg">
-                            ≡
-                          </span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onMouseDown={(
-                            event
-                          ) => {
-                            event.preventDefault();
-                            saveSelection();
-                          }}
-                          onClick={() =>
-                            setAlignment(
-                              'right'
-                            )
-                          }
-                          className="editor-toolbar-button"
-                          title="Alinhar à direita"
-                        >
-                          <span className="text-lg">
-                            ≡
-                          </span>
-                        </button>
-
-                        <span className="editor-toolbar-divider" />
-
-                        <button
-                          type="button"
-                          onMouseDown={(
-                            event
-                          ) => {
-                            event.preventDefault();
-                            saveSelection();
-                          }}
-                          onClick={() =>
-                            executeCommand(
-                              'formatBlock',
-                              'h2'
-                            )
-                          }
-                          className="editor-toolbar-button text-xs font-semibold"
-                          title="Título"
-                        >
-                          Título
-                        </button>
-
-                        <button
-                          type="button"
-                          onMouseDown={(
-                            event
-                          ) => {
-                            event.preventDefault();
-                            saveSelection();
-                          }}
-                          onClick={() =>
-                            executeCommand(
-                              'formatBlock',
-                              'blockquote'
-                            )
-                          }
-                          className="editor-toolbar-button text-xs"
-                          title="Citação"
-                        >
-                          Citação
-                        </button>
-
-                        <span className="editor-toolbar-divider" />
-
-                        <button
-                          type="button"
-                          onMouseDown={(
-                            event
-                          ) => {
-                            event.preventDefault();
-                            saveSelection();
-                          }}
-                          onClick={
-                            handleMediaButtonClick
-                          }
-                          className="editor-toolbar-button text-xs"
-                          title="Adicionar imagem ou GIF"
-                        >
-                          Imagem / GIF
-                        </button>
-
-                        <input
-                          ref={
-                            mediaInputRef
-                          }
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,image/gif"
-                          multiple
-                          onChange={
-                            handleMediaSelect
-                          }
-                          className="hidden"
                         />
 
-                        <button
-                          type="button"
-                          onMouseDown={(
-                            event
-                          ) => {
-                            event.preventDefault();
-                            saveSelection();
-                          }}
-                          onClick={() =>
-                            setShowLinkBox(
-                              (current) =>
-                                !current
-                            )
-                          }
-                          className="editor-toolbar-button text-xs"
-                          title="Adicionar link"
-                        >
-                          Link
-                        </button>
+                        {authorNotes.trim() && (
+                          <div className="mt-12 border-t border-white/10 pt-8">
+                            <p className="text-xs uppercase tracking-[0.2em] text-pink-300/70">
+                              NOTAS DO AUTOR
+                            </p>
 
-                        <button
-                          type="button"
-                          onMouseDown={(
-                            event
-                          ) => {
-                            event.preventDefault();
-                            saveSelection();
-                          }}
-                          onClick={
-                            addHorizontalRule
-                          }
-                          className="editor-toolbar-button text-xs"
-                          title="Adicionar separador"
-                        >
-                          Separador
-                        </button>
-
-                        <span className="ml-auto px-2 text-[11px] text-gray-600">
-                          {
-                            chapterMedia.length
-                          }
-                          /{MAX_MEDIA}
-                        </span>
-                      </div>
-
-                      {showLinkBox && (
-                        <div className="border-t border-white/10 p-3">
-                          <div className="flex flex-col gap-2 sm:flex-row">
-                            <input
-                              ref={
-                                linkInputRef
+                            <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-gray-400">
+                              {
+                                authorNotes
                               }
-                              value={
-                                linkValue
-                              }
-                              onChange={(
-                                event
-                              ) =>
-                                setLinkValue(
-                                  event.target.value
-                                )
-                              }
-                              onKeyDown={(
+                            </p>
+                          </div>
+                        )}
+                      </article>
+                    ) : (
+                      <>
+                        <div className="sticky top-[61px] z-30 border-b border-white/10 bg-[#0d0a0e]/98 backdrop-blur">
+                          <div className="flex flex-wrap items-center gap-1 p-2">
+                            <button
+                              type="button"
+                              onMouseDown={(
                                 event
                               ) => {
-                                if (
-                                  event.key ===
-                                  'Enter'
-                                ) {
-                                  event.preventDefault();
-                                  addLink();
-                                }
-
-                                if (
-                                  event.key ===
-                                  'Escape'
-                                ) {
-                                  event.preventDefault();
-                                  setShowLinkBox(
-                                    false
-                                  );
-                                  setLinkValue(
-                                    ''
-                                  );
-                                }
+                                event.preventDefault();
+                                saveSelection();
                               }}
-                              placeholder="https://exemplo.com"
-                              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-pink-400/40"
-                            />
+                              onClick={() =>
+                                executeCommand(
+                                  'bold'
+                                )
+                              }
+                              className="editor-toolbar-button font-bold"
+                              title="Negrito"
+                            >
+                              B
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                executeCommand(
+                                  'italic'
+                                )
+                              }
+                              className="editor-toolbar-button italic"
+                              title="Itálico"
+                            >
+                              I
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                executeCommand(
+                                  'underline'
+                                )
+                              }
+                              className="editor-toolbar-button underline"
+                              title="Sublinhado"
+                            >
+                              U
+                            </button>
+
+                            <span className="editor-toolbar-divider" />
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setAlignment(
+                                  'left'
+                                )
+                              }
+                              className="editor-toolbar-button"
+                              title="Alinhar à esquerda"
+                            >
+                              <span className="text-lg">
+                                ≡
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setAlignment(
+                                  'center'
+                                )
+                              }
+                              className="editor-toolbar-button"
+                              title="Centralizar"
+                            >
+                              <span className="text-lg">
+                                ≡
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setAlignment(
+                                  'right'
+                                )
+                              }
+                              className="editor-toolbar-button"
+                              title="Alinhar à direita"
+                            >
+                              <span className="text-lg">
+                                ≡
+                              </span>
+                            </button>
+
+                            <span className="editor-toolbar-divider" />
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                executeCommand(
+                                  'formatBlock',
+                                  'h2'
+                                )
+                              }
+                              className="editor-toolbar-button text-xs font-semibold"
+                              title="Título"
+                            >
+                              Título
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                executeCommand(
+                                  'formatBlock',
+                                  'blockquote'
+                                )
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Citação"
+                            >
+                              Citação
+                            </button>
+
+                            <span className="editor-toolbar-divider" />
 
                             <button
                               type="button"
@@ -3311,329 +3267,459 @@ font: inherit;
                                 saveSelection();
                               }}
                               onClick={
-                                addLink
+                                handleMediaButtonClick
                               }
-                              className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-medium hover:bg-pink-400 transition"
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar imagem ou GIF"
                             >
-                              Inserir link
+                              Imagem / GIF
                             </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
 
-                    <div
-                      ref={
-                        editorRef
-                      }
-                      contentEditable
-                      suppressContentEditableWarning
-                      onInput={
-                        handleEditorInput
-                      }
-                      onPaste={
-                        handleEditorPaste
-                      }
-                      onKeyDown={
-                        handleEditorKeyDown
-                      }
-                      onMouseUp={
-                        saveSelection
-                      }
-                      onKeyUp={
-                        saveSelection
-                      }
-                      onFocus={
-                        saveSelection
-                      }
-                      className="chapter-editor px-5 sm:px-12 lg:px-20 py-12 text-[17px] leading-8 text-gray-200"
-                      spellCheck
-                    />
-                  </>
-                )}
-              </div>
-
-              {chapterMedia.length >
-                0 && (
-                <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-sm font-medium">
-                        Mídias do capítulo
-                      </h2>
-
-                      <p className="mt-1 text-xs text-gray-600">
-                        Máximo de 25 arquivos. Cada arquivo pode ter até 5 MB.
-                      </p>
-                    </div>
-
-                    <span className="text-xs text-gray-500">
-                      {
-                        chapterMedia.length
-                      }
-                      /{MAX_MEDIA}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {chapterMedia.map(
-                      (media) => (
-                        <div
-                          key={
-                            media.id
-                          }
-                          className="relative overflow-hidden rounded-xl border border-white/10 bg-black/20"
-                        >
-                          <div className="aspect-video">
-                            <img
-                              src={
-                                media.url
+                            <input
+                              ref={
+                                mediaInputRef
                               }
-                              alt="Mídia do capítulo"
-                              className="h-full w-full object-cover"
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              multiple
+                              onChange={
+                                handleMediaSelect
+                              }
+                              className="hidden"
                             />
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={() =>
+                                setShowLinkBox(
+                                  (current) =>
+                                    !current
+                                )
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar link"
+                            >
+                              Link
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.preventDefault();
+                                saveSelection();
+                              }}
+                              onClick={
+                                addHorizontalRule
+                              }
+                              className="editor-toolbar-button text-xs"
+                              title="Adicionar separador"
+                            >
+                              Separador
+                            </button>
+
+                            <span className="ml-auto px-2 text-[11px] text-gray-600">
+                              {
+                                chapterMedia.length
+                              }
+                              /{MAX_MEDIA}
+                            </span>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeMedia(
-                                media.id
-                              )
-                            }
-                            disabled={
-                              savingChapter
-                            }
-                            className="absolute right-2 top-2 rounded-lg border border-white/10 bg-black/70 px-2 py-1 text-xs text-gray-300 hover:bg-red-500/80 hover:text-white disabled:opacity-50 transition"
-                          >
-                            Remover
-                          </button>
+                          {showLinkBox && (
+                            <div className="border-t border-white/10 p-3">
+                              <div className="flex flex-col gap-2 sm:flex-row">
+                                <input
+                                  ref={
+                                    linkInputRef
+                                  }
+                                  value={
+                                    linkValue
+                                  }
+                                  onChange={(
+                                    event
+                                  ) =>
+                                    setLinkValue(
+                                      event.target
+                                        .value
+                                    )
+                                  }
+                                  onKeyDown={(
+                                    event
+                                  ) => {
+                                    if (
+                                      event.key ===
+                                      'Enter'
+                                    ) {
+                                      event.preventDefault();
+                                      addLink();
+                                    }
 
-                          <div className="border-t border-white/10 px-3 py-2 text-[10px] uppercase tracking-wide text-gray-600">
-                            {media.type ===
-                            'gif'
-                              ? 'GIF'
-                              : 'IMAGEM'}
+                                    if (
+                                      event.key ===
+                                      'Escape'
+                                    ) {
+                                      event.preventDefault();
 
-                            {!media.existing &&
-                              ' · NÃO SALVA'}
-                          </div>
+                                      setShowLinkBox(
+                                        false
+                                      );
+
+                                      setLinkValue(
+                                        ''
+                                      );
+                                    }
+                                  }}
+                                  placeholder="https://exemplo.com"
+                                  className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-pink-400/40"
+                                />
+
+                                <button
+                                  type="button"
+                                  onMouseDown={(
+                                    event
+                                  ) => {
+                                    event.preventDefault();
+                                    saveSelection();
+                                  }}
+                                  onClick={
+                                    addLink
+                                  }
+                                  className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-medium hover:bg-pink-400 transition"
+                                >
+                                  Inserir link
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )
+
+                        <div
+                          ref={
+                            editorRef
+                          }
+                          contentEditable
+                          suppressContentEditableWarning
+                          onInput={
+                            handleEditorInput
+                          }
+                          onPaste={
+                            handleEditorPaste
+                          }
+                          onKeyDown={
+                            handleEditorKeyDown
+                          }
+                          onMouseUp={
+                            saveSelection
+                          }
+                          onKeyUp={
+                            saveSelection
+                          }
+                          onFocus={
+                            saveSelection
+                          }
+                          className="chapter-editor px-5 sm:px-12 lg:px-20 py-12 text-[17px] leading-8 text-gray-200"
+                          spellCheck
+                        />
+                      </>
                     )}
                   </div>
-                </section>
-              )}
 
-              <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-base font-medium">
-                      NOTAS DO AUTOR
-                    </h2>
+                  {chapterMedia.length >
+                    0 && (
+                    <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-sm font-medium">
+                            Mídias do capítulo
+                          </h2>
 
-                    <p className="mt-1 text-xs text-gray-600">
-                      Uma mensagem opcional para seus leitores no final do capítulo.
-                    </p>
-                  </div>
+                          <p className="mt-1 text-xs text-gray-600">
+                            Máximo de 25 arquivos. Cada arquivo pode ter até 5 MB.
+                          </p>
+                        </div>
 
-                  <span className="text-xs text-gray-600">
-                    {
-                      authorNotes.length
-                    }
-                    /5000
-                  </span>
-                </div>
+                        <span className="text-xs text-gray-500">
+                          {
+                            chapterMedia.length
+                          }
+                          /{MAX_MEDIA}
+                        </span>
+                      </div>
 
-                <textarea
-                  value={
-                    authorNotes
-                  }
-                  onChange={(event) =>
-                    setAuthorNotes(
-                      event.target.value
-                    )
-                  }
-                  maxLength={5000}
-                  rows={6}
-                  placeholder="Escreva uma mensagem para seus leitores..."
-                  className="mt-4 w-full resize-y rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-700 focus:border-pink-400/40"
-                />
-              </section>
+                      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {chapterMedia.map(
+                          (
+                            media
+                          ) => (
+                            <div
+                              key={
+                                media.id
+                              }
+                              className="relative overflow-hidden rounded-xl border border-white/10 bg-black/20"
+                            >
+                              <div className="aspect-video">
+                                <img
+                                  src={
+                                    media.url
+                                  }
+                                  alt="Mídia do capítulo"
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
 
-              <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <h2 className="text-base font-medium">
-                      Publicação
-                    </h2>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  removeMedia(
+                                    media.id
+                                  )
+                                }
+                                disabled={
+                                  savingChapter
+                                }
+                                className="absolute right-2 top-2 rounded-lg border border-white/10 bg-black/70 px-2 py-1 text-xs text-gray-300 hover:bg-red-500/80 hover:text-white disabled:opacity-50 transition"
+                              >
+                                Remover
+                              </button>
 
-                    <p className="mt-1 text-xs text-gray-600">
-                      Salve como rascunho, publique agora ou escolha uma data para liberar o capítulo.
-                    </p>
-                  </div>
+                              <div className="border-t border-white/10 px-3 py-2 text-[10px] uppercase tracking-wide text-gray-600">
+                                {media.type ===
+                                'gif'
+                                  ? 'GIF'
+                                  : 'IMAGEM'}
 
-                  <select
-                    value={
-                      chapterStatus
-                    }
-                    onChange={(event) => {
-                      const nextStatus =
-                        event.target
-                          .value as Chapter['publication_status'];
+                                {!media.existing &&
+                                  ' · NÃO SALVA'}
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </section>
+                  )}
 
-                      setChapterStatus(
-                        nextStatus
-                      );
+                  <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-base font-medium">
+                          NOTAS DO AUTOR
+                        </h2>
 
-                      if (
-                        nextStatus !==
-                        'scheduled'
-                      ) {
-                        setScheduledFor(
-                          ''
-                        );
-                      }
-                    }}
-                    className="rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
-                  >
-                    <option value="draft">
-                      Rascunho privado
-                    </option>
+                        <p className="mt-1 text-xs text-gray-600">
+                          Uma mensagem opcional para seus leitores no final do capítulo.
+                        </p>
+                      </div>
 
-                    <option value="published">
-                      Publicar agora
-                    </option>
+                      <span className="text-xs text-gray-600">
+                        {
+                          authorNotes.length
+                        }
+                        /5000
+                      </span>
+                    </div>
 
-                    <option value="scheduled">
-                      Agendar publicação
-                    </option>
-
-                    <option value="unpublished">
-                      Retirar do ar
-                    </option>
-                  </select>
-                </div>
-
-                {chapterStatus ===
-                  'scheduled' && (
-                  <div className="mt-5 rounded-xl border border-violet-400/20 bg-violet-500/[0.05] p-4">
-                    <label className="mb-2 block text-sm text-violet-200">
-                      Data e horário da publicação
-                    </label>
-
-                    <input
-                      type="datetime-local"
+                    <textarea
                       value={
-                        scheduledFor
+                        authorNotes
                       }
-                      onChange={
-                        handleScheduleChange
+                      onChange={(
+                        event
+                      ) =>
+                        setAuthorNotes(
+                          event.target
+                            .value
+                        )
                       }
-                      min={getLocalDateTimeInputMin()}
-                      className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-violet-400/40"
+                      maxLength={
+                        5000
+                      }
+                      rows={6}
+                      placeholder="Escreva uma mensagem para seus leitores..."
+                      className="mt-4 w-full resize-y rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-700 focus:border-pink-400/40"
                     />
+                  </section>
 
-                    <p className="mt-2 text-xs text-violet-200/50">
-                      O capítulo ficará privado até a data escolhida.
-                    </p>
-                  </div>
-                )}
+                  <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <h2 className="text-base font-medium">
+                          Publicação
+                        </h2>
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void saveChapter(
-                        'draft'
-                      )
-                    }
-                    disabled={
-                      savingChapter ||
-                      mediaUploading
-                    }
-                    className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white disabled:opacity-50 transition"
-                  >
-                    {savingChapter
-                      ? 'Salvando...'
-                      : 'Salvar rascunho'}
-                  </button>
+                        <p className="mt-1 text-xs text-gray-600">
+                          Salve como rascunho, publique agora ou escolha uma data para liberar o capítulo.
+                        </p>
+                      </div>
 
-                  <button
-                    type="submit"
-                    disabled={
-                      savingChapter ||
-                      mediaUploading
-                    }
-                    className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
-                  >
-                    {savingChapter
-                      ? 'Salvando...'
-                      : chapterStatus ===
-                          'scheduled'
-                        ? 'Agendar capítulo'
-                        : chapterStatus ===
-                            'published'
-                          ? 'Publicar capítulo'
+                      <select
+                        value={
+                          chapterStatus
+                        }
+                        onChange={(
+                          event
+                        ) => {
+                          const nextStatus =
+                            event.target
+                              .value as PublicationStatus;
+
+                          setChapterStatus(
+                            nextStatus
+                          );
+
+                          if (
+                            nextStatus !==
+                            'scheduled'
+                          ) {
+                            setScheduledFor(
+                              ''
+                            );
+                          }
+                        }}
+                        className="rounded-xl border border-white/10 bg-[#110e12] px-4 py-3 text-sm text-white outline-none focus:border-pink-400/40"
+                      >
+                        <option value="draft">
+                          Rascunho privado
+                        </option>
+
+                        <option value="published">
+                          Publicar agora
+                        </option>
+
+                        <option value="scheduled">
+                          Agendar publicação
+                        </option>
+
+                        <option value="unpublished">
+                          Retirar do ar
+                        </option>
+                      </select>
+                    </div>
+
+                    {chapterStatus ===
+                      'scheduled' && (
+                      <div className="mt-5 rounded-xl border border-violet-400/20 bg-violet-500/[0.05] p-4">
+                        <label className="mb-2 block text-sm text-violet-200">
+                          Data e horário da publicação
+                        </label>
+
+                        <input
+                          type="datetime-local"
+                          value={
+                            scheduledFor
+                          }
+                          onChange={
+                            handleScheduleChange
+                          }
+                          min={getLocalDateTimeInputMin()}
+                          className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-violet-400/40"
+                        />
+
+                        <p className="mt-2 text-xs text-violet-200/50">
+                          O capítulo ficará privado até a data escolhida.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void saveChapter(
+                            'draft'
+                          )
+                        }
+                        disabled={
+                          savingChapter ||
+                          mediaUploading
+                        }
+                        className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white disabled:opacity-50 transition"
+                      >
+                        {savingChapter
+                          ? 'Salvando...'
+                          : 'Salvar rascunho'}
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={
+                          savingChapter ||
+                          mediaUploading
+                        }
+                        className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
+                      >
+                        {savingChapter
+                          ? 'Salvando...'
                           : chapterStatus ===
-                              'unpublished'
-                            ? 'Retirar do ar'
-                            : 'Salvar capítulo'}
-                  </button>
-                </div>
-              </section>
+                              'scheduled'
+                            ? 'Agendar capítulo'
+                            : chapterStatus ===
+                                'published'
+                              ? 'Publicar capítulo'
+                              : chapterStatus ===
+                                  'unpublished'
+                                ? 'Retirar do ar'
+                                : 'Salvar capítulo'}
+                      </button>
+                    </div>
+                  </section>
 
-              <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-                <h2 className="text-base font-medium">
-                  Histórico de publicação
-                </h2>
+                  <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                    <h2 className="text-base font-medium">
+                      Histórico de publicação
+                    </h2>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                    <p className="text-[10px] uppercase tracking-wider text-gray-600">
-                      Criado em
-                    </p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                          Criado em
+                        </p>
 
-                    <p className="mt-2 text-sm text-gray-300">
-                      {formatDate(
-                        chapter.created_at
-                      )}
-                    </p>
-                  </div>
+                        <p className="mt-2 text-sm text-gray-300">
+                          {formatDate(
+                            chapter.created_at
+                          )}
+                        </p>
+                      </div>
 
-                  <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                    <p className="text-[10px] uppercase tracking-wider text-gray-600">
-                      Publicação original
-                    </p>
+                      <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                          Publicação original
+                        </p>
 
-                    <p className="mt-2 text-sm text-gray-300">
-                      {formatDate(
-                        chapter.original_published_at
-                      )}
-                    </p>
-                  </div>
+                        <p className="mt-2 text-sm text-gray-300">
+                          {formatDate(
+                            chapter.original_published_at
+                          )}
+                        </p>
+                      </div>
 
-                  <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                    <p className="text-[10px] uppercase tracking-wider text-gray-600">
-                      Republicação
-                    </p>
+                      <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                          Republicação
+                        </p>
 
-                    <p className="mt-2 text-sm text-gray-300">
-                      {formatDate(
-                        chapter.republished_at
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </section>
-            </form>
-          )}
-        </section>
+                        <p className="mt-2 text-sm text-gray-300">
+                          {formatDate(
+                            chapter.republished_at
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+                </form>
+              )}
+            </section>
+          </div>
+        )}
       </div>
-    )}
-  </div>
-</main>
-```
-
-);
+    </main>
+  );
 }
