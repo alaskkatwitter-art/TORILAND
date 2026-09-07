@@ -1,38 +1,40 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
 
-  const [mode, setMode] = useState<'login' | 'signup' | 'recover'>('signup');
+  const [mode, setMode] = useState<"login" | "signup" | "recover">(
+    "signup"
+  );
 
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [recoveryKey, setRecoveryKey] = useState('');
+  const [error, setError] = useState("");
+  const [recoveryKey, setRecoveryKey] = useState("");
 
   async function handleSignup(event: React.FormEvent) {
     event.preventDefault();
 
-    setError('');
+    setError("");
 
     if (password !== confirmPassword) {
-      setError('As senhas não coincidem.');
+      setError("As senhas não coincidem.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           username,
@@ -43,13 +45,13 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Não foi possível criar a conta.');
+        setError(data.error || "Não foi possível criar a conta.");
         return;
       }
 
       setRecoveryKey(data.recoveryKey);
     } catch {
-      setError('Não foi possível conectar ao Toriland.');
+      setError("Não foi possível conectar ao Nooklie.");
     } finally {
       setLoading(false);
     }
@@ -58,14 +60,14 @@ export default function LoginPage() {
   async function handleLogin(event: React.FormEvent) {
     event.preventDefault();
 
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           username,
@@ -76,14 +78,14 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Username ou senha incorretos.');
+        setError(data.error || "Username ou senha incorretos.");
         return;
       }
 
-      router.push('/');
+      router.push("/");
       router.refresh();
     } catch {
-      setError('Não foi possível conectar ao Toriland.');
+      setError("Não foi possível conectar ao Nooklie.");
     } finally {
       setLoading(false);
     }
@@ -92,27 +94,27 @@ export default function LoginPage() {
   async function handleRecovery(event: React.FormEvent) {
     event.preventDefault();
 
-    setError('');
+    setError("");
 
     const form = event.currentTarget as HTMLFormElement;
-const formData = new FormData(form);
+    const formData = new FormData(form);
 
-    const recoveryKeyValue = formData.get('recoveryKey');
-    const newPassword = formData.get('newPassword');
-    const confirmNewPassword = formData.get('confirmNewPassword');
+    const recoveryKeyValue = formData.get("recoveryKey");
+    const newPassword = formData.get("newPassword");
+    const confirmNewPassword = formData.get("confirmNewPassword");
 
     if (newPassword !== confirmNewPassword) {
-      setError('As senhas não coincidem.');
+      setError("As senhas não coincidem.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/recover', {
-        method: 'POST',
+      const response = await fetch("/api/auth/recover", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           username,
@@ -125,19 +127,19 @@ const formData = new FormData(form);
 
       if (!response.ok) {
         setError(
-          data.error || 'Não foi possível recuperar sua conta.'
+          data.error || "Não foi possível recuperar sua conta."
         );
         return;
       }
 
-      setPassword('');
-      setConfirmPassword('');
+      setPassword("");
+      setConfirmPassword("");
       setError(
-        'Senha alterada com sucesso. Agora você pode entrar.'
+        "Senha alterada com sucesso. Agora você pode entrar."
       );
-      setMode('login');
+      setMode("login");
     } catch {
-      setError('Não foi possível conectar ao Toriland.');
+      setError("Não foi possível conectar ao Nooklie.");
     } finally {
       setLoading(false);
     }
@@ -172,14 +174,14 @@ const formData = new FormData(form);
 
             <p className="mt-4 text-xs leading-5 text-white/35">
               Essa chave é necessária caso você esqueça sua senha.
-              O Toriland não envia essa chave por e-mail.
+              O Nooklie não envia essa chave por e-mail.
             </p>
 
             <button
-              onClick={() => router.push('/')}
+              onClick={() => router.push("/")}
               className="mt-7 w-full rounded-full bg-[#ff78b9] px-6 py-3.5 font-bold text-[#180d15] transition hover:brightness-110"
             >
-              Continuar para o Toriland
+              Continuar para o Nooklie
             </button>
           </section>
         </div>
@@ -193,43 +195,43 @@ const formData = new FormData(form);
         <section className="w-full rounded-3xl border border-white/10 bg-[#191219] p-7 shadow-2xl">
           <div className="text-center">
             <button
-              onClick={() => router.push('/')}
+              onClick={() => router.push("/")}
               className="inline-flex flex-col items-center"
             >
               <CloudLogo />
 
               <span className="mt-1 text-2xl font-black tracking-[0.18em] text-[#ff78b9]">
-                TORILAND
+                NOOKLIE
               </span>
             </button>
 
             <h1 className="mt-8 text-2xl font-black">
-              {mode === 'signup'
-                ? 'Crie sua conta'
-                : mode === 'login'
-                  ? 'Bem-vindo de volta'
-                  : 'Recupere sua conta'}
+              {mode === "signup"
+                ? "Crie sua conta"
+                : mode === "login"
+                  ? "Bem-vindo de volta"
+                  : "Recupere sua conta"}
             </h1>
 
             <p className="mt-2 text-sm text-white/40">
-              {mode === 'signup'
-                ? 'Entre no Toriland usando apenas um username e uma senha.'
-                : mode === 'login'
-                  ? 'Entre na sua conta do Toriland.'
-                  : 'Use sua chave de recuperação para criar uma nova senha.'}
+              {mode === "signup"
+                ? "Entre no Nooklie usando apenas um username e uma senha."
+                : mode === "login"
+                  ? "Entre na sua conta do Nooklie."
+                  : "Use sua chave de recuperação para criar uma nova senha."}
             </p>
           </div>
 
           <div className="mt-7 grid grid-cols-3 rounded-full bg-[#100b12] p-1">
             <button
               onClick={() => {
-                setMode('signup');
-                setError('');
+                setMode("signup");
+                setError("");
               }}
               className={`rounded-full py-2.5 text-xs font-semibold transition ${
-                mode === 'signup'
-                  ? 'bg-[#ff78b9] text-[#180d15]'
-                  : 'text-white/45'
+                mode === "signup"
+                  ? "bg-[#ff78b9] text-[#180d15]"
+                  : "text-white/45"
               }`}
             >
               Criar conta
@@ -237,13 +239,13 @@ const formData = new FormData(form);
 
             <button
               onClick={() => {
-                setMode('login');
-                setError('');
+                setMode("login");
+                setError("");
               }}
               className={`rounded-full py-2.5 text-xs font-semibold transition ${
-                mode === 'login'
-                  ? 'bg-[#ff78b9] text-[#180d15]'
-                  : 'text-white/45'
+                mode === "login"
+                  ? "bg-[#ff78b9] text-[#180d15]"
+                  : "text-white/45"
               }`}
             >
               Entrar
@@ -251,13 +253,13 @@ const formData = new FormData(form);
 
             <button
               onClick={() => {
-                setMode('recover');
-                setError('');
+                setMode("recover");
+                setError("");
               }}
               className={`rounded-full py-2.5 text-xs font-semibold transition ${
-                mode === 'recover'
-                  ? 'bg-[#ff78b9] text-[#180d15]'
-                  : 'text-white/45'
+                mode === "recover"
+                  ? "bg-[#ff78b9] text-[#180d15]"
+                  : "text-white/45"
               }`}
             >
               Recuperar
@@ -266,9 +268,9 @@ const formData = new FormData(form);
 
           <form
             onSubmit={
-              mode === 'signup'
+              mode === "signup"
                 ? handleSignup
-                : mode === 'login'
+                : mode === "login"
                   ? handleLogin
                   : handleRecovery
             }
@@ -291,14 +293,14 @@ const formData = new FormData(form);
                 className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/50"
               />
 
-              {mode === 'signup' && (
+              {mode === "signup" && (
                 <p className="mt-2 text-xs text-white/30">
                   3–30 caracteres. Use apenas letras, números e _.
                 </p>
               )}
             </div>
 
-            {mode !== 'recover' && (
+            {mode !== "recover" && (
               <div>
                 <label className="mb-2 block text-sm font-semibold">
                   Senha
@@ -312,16 +314,16 @@ const formData = new FormData(form);
                   }
                   placeholder="Sua senha"
                   autoComplete={
-                    mode === 'signup'
-                      ? 'new-password'
-                      : 'current-password'
+                    mode === "signup"
+                      ? "new-password"
+                      : "current-password"
                   }
                   minLength={8}
                   required
                   className="w-full rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3.5 text-sm outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/50"
                 />
 
-                {mode === 'signup' && (
+                {mode === "signup" && (
                   <p className="mt-2 text-xs text-white/30">
                     A senha precisa ter pelo menos 8 caracteres.
                   </p>
@@ -329,7 +331,7 @@ const formData = new FormData(form);
               </div>
             )}
 
-            {mode === 'signup' && (
+            {mode === "signup" && (
               <div>
                 <label className="mb-2 block text-sm font-semibold">
                   Confirmar senha
@@ -349,7 +351,7 @@ const formData = new FormData(form);
               </div>
             )}
 
-            {mode === 'recover' && (
+            {mode === "recover" && (
               <>
                 <div>
                   <label className="mb-2 block text-sm font-semibold">
@@ -413,18 +415,18 @@ const formData = new FormData(form);
               className="w-full rounded-full bg-[#ff78b9] px-6 py-3.5 font-bold text-[#180d15] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading
-                ? 'Aguarde...'
-                : mode === 'signup'
-                  ? 'Criar minha conta'
-                  : mode === 'login'
-                    ? 'Entrar'
-                    : 'Alterar minha senha'}
+                ? "Aguarde..."
+                : mode === "signup"
+                  ? "Criar minha conta"
+                  : mode === "login"
+                    ? "Entrar"
+                    : "Alterar minha senha"}
             </button>
           </form>
 
           <div className="mt-7 border-t border-white/5 pt-5 text-center">
             <p className="text-xs leading-5 text-white/25">
-              O Toriland não precisa do seu e-mail, nome real,
+              O Nooklie não precisa do seu e-mail, nome real,
               telefone ou qualquer outro dado pessoal para criar
               uma conta.
             </p>
@@ -443,7 +445,7 @@ function CloudLogo() {
       viewBox="0 0 180 105"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      aria-label="Logo Toriland"
+      aria-label="Logo Nooklie"
     >
       <path
         d="M45 79C26 79 14 67 14 51C14 36 25 24 40 23C45 9 58 2 73 2C89 2 102 12 106 27C111 24 117 22 124 22C143 22 158 36 158 54C158 57 158 60 157 63C168 66 174 74 174 84C174 96 164 103 151 103H45C28 103 17 94 17 83C17 81 17 80 18 78C26 79 35 79 45 79Z"
