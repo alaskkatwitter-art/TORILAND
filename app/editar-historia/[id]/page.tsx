@@ -80,11 +80,7 @@ type ChapterResponse = {
   media?: ChapterMedia[];
   scheduled?: boolean;
   published?: boolean;
-  publication_status?:
-    | 'draft'
-    | 'scheduled'
-    | 'published'
-    | 'unpublished';
+  publication_status?: Chapter['publication_status'];
   scheduled_for?: string | null;
   error?: string;
 };
@@ -1836,28 +1832,17 @@ export default function EditarHistoriaPage() {
         null;
 
       /*
-       * ========================================================
        * REDIRECIONAMENTO APÓS PUBLICAÇÃO
-       * ========================================================
        *
-       * Só redireciona quando o SERVIDOR confirma:
+       * Este é o último PUT da operação.
+       * Como chegamos aqui e response.ok === true,
+       * o servidor confirmou que o salvamento deu certo.
        *
-       * success === true
-       * publication_status === 'published'
-       * published === true
-       *
-       * Assim, clicar em "Publicar" não basta:
-       * o capítulo precisa ter sido realmente salvo
-       * como publicado no banco.
+       * Só redirecionamos quando a ação solicitada
+       * foi realmente "published".
        */
       if (
-        data.success === true &&
-        data.publication_status ===
-          'published' &&
-        data.published === true &&
-        savedChapter.publication_status ===
-          'published' &&
-        savedChapter.published === true
+        finalStatus === 'published'
       ) {
         router.push(
           `/capitulo-publicado/${savedChapter.id}`
@@ -3252,7 +3237,7 @@ export default function EditarHistoriaPage() {
                                       );
                                     }
                                   }}
-                                  placeholder="https://exemplo.com"
+                                  placeholder="[https://exemplo.com](https://exemplo.com)"
                                   className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-pink-400/40"
                                 />
 
