@@ -1832,21 +1832,18 @@ export default function EditarHistoriaPage() {
         null;
 
       /*
-       * REDIRECIONAMENTO APÓS PUBLICAÇÃO
+       * CORREÇÃO PRINCIPAL:
        *
-       * Este é o último PUT da operação.
-       * Como chegamos aqui e response.ok === true,
-       * o servidor confirmou que o salvamento deu certo.
-       *
-       * Só redirecionamos quando a ação solicitada
-       * foi realmente "published".
+       * Em vez de router.push(), usamos
+       * window.location.href para forçar
+       * uma navegação completa para a página
+       * de confirmação da publicação.
        */
       if (
         finalStatus === 'published'
       ) {
-        router.push(
-          `/capitulo-publicado/${savedChapter.id}`
-        );
+        window.location.href =
+          `/capitulo-publicado/${savedChapter.id}`;
 
         return;
       }
