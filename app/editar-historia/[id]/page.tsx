@@ -522,20 +522,14 @@ export default function EditarHistoriaPage() {
           normalizedStory.cover_url || null
         );
 
-        const requestedChapter =
-          searchParams.get('chapter');
+     const requestedChapter =
+  searchParams.get('chapter');
 
-        if (
-          requestedChapter
-        ) {
-          // Quando o capítulo foi criado como rascunho, ele pode ainda
-          // não aparecer na lista de capítulos retornada pela obra.
-          // Se a URL trouxe um ID explícito, carregamos esse capítulo
-          // diretamente pela API em vez de descartá-lo.
-          setSelectedChapterId(
-            requestedChapter
-          );
-        }
+if (requestedChapter) {
+  setSelectedChapterId(
+    requestedChapter
+  );
+}
       } catch (caughtError) {
         if (cancelled) return;
 
