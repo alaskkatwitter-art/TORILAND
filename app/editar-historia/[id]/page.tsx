@@ -353,6 +353,9 @@ export default function EditarHistoriaPage() {
   const [savingChapter, setSavingChapter] =
     useState(false);
 
+  const [creatingChapter, setCreatingChapter] =
+    useState(false);
+
   const [mediaUploading, setMediaUploading] =
     useState(false);
 
@@ -522,31 +525,24 @@ export default function EditarHistoriaPage() {
           normalizedStory.cover_url || null
         );
 
-        /*
-         * IMPORTANTE:
-         *
-         * Quando "Novo capítulo" cria um rascunho,
-         * esse capítulo pode ainda não aparecer na
-         * lista de capítulos retornada pela API da obra.
-         *
-         * Antes o código verificava se o ID estava nessa
-         * lista e, caso não estivesse, fazia:
-         *
-         * setSelectedChapterId(null)
-         *
-         * Isso fazia o editor perder o capítulo recém-criado.
-         *
-         * Agora, se a URL trouxe ?chapter=ID, usamos
-         * diretamente esse ID e o próximo useEffect
-         * carrega o capítulo pela API /api/chapters/[id].
-         */
         const requestedChapter =
           searchParams.get('chapter');
 
-        if (requestedChapter) {
+        if (
+          requestedChapter &&
+          normalizedChapters.some(
+            (item) =>
+              item.id ===
+              requestedChapter
+          )
+        ) {
           setSelectedChapterId(
             requestedChapter
           );
+        } else if (
+          requestedChapter
+        ) {
+          setSelectedChapterId(null);
         }
       } catch (caughtError) {
         if (cancelled) return;
@@ -756,6 +752,111 @@ export default function EditarHistoriaPage() {
       window.clearTimeout(timer);
     };
   }, [showLinkBox]);
+
+  async function handleCreateChapter() {
+    if (creatingChapter) return;
+
+    setCreatingChapter(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(
+        '/api/chapters/create',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            story_id: id,
+            title: 'Novo capítulo',
+            body: '<p><br></p>',
+            author_notes: '',
+            publication_status: 'draft',
+            scheduled_for: null,
+          }),
+        }
+      );
+
+      const data: ChapterResponse =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Não foi possível criar o novo capítulo.'
+        );
+      }
+
+      const newChapter = data.chapter;
+
+      if (!newChapter?.id) {
+        throw new Error(
+          'O capítulo foi criado, mas o ID não foi retornado.'
+        );
+      }
+
+      setSelectedChapterId(newChapter.id);
+      setChapter(newChapter);
+      setChapterTitle(newChapter.title || 'Novo capítulo');
+      setChapterBody(newChapter.body || '<p><br></p>');
+      setAuthorNotes(newChapter.author_notes || '');
+      setChapterStatus(
+        newChapter.publication_status || 'draft'
+      );
+      setScheduledFor('');
+      setChapterMedia([]);
+      setPreviewMode(false);
+      setShowLinkBox(false);
+      setLinkValue('');
+      savedSelectionRef.current = null;
+
+      setStory((currentStory) => {
+        if (!currentStory) return currentStory;
+
+        const exists = currentStory.chapters.some(
+          (item) => item.id === newChapter.id
+        );
+
+        if (exists) return currentStory;
+
+        const newStoryChapter: StoryChapter = {
+          id: newChapter.id,
+          chapter_number: newChapter.chapter_number,
+          title: newChapter.title || 'Novo capítulo',
+          published: newChapter.published,
+          scheduled_for: newChapter.scheduled_for || null,
+          is_scheduled: false,
+          publication_status: newChapter.publication_status || 'draft',
+        };
+
+        const updatedStory = {
+          ...currentStory,
+          chapters: [...currentStory.chapters, newStoryChapter].sort(
+            (a, b) => a.chapter_number - b.chapter_number
+          ),
+        };
+
+        storyRef.current = updatedStory;
+        return updatedStory;
+      });
+
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('chapter', newChapter.id);
+      router.replace(
+        currentUrl.pathname + '?' + currentUrl.searchParams.toString()
+      );
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Não foi possível criar o novo capítulo.'
+      );
+    } finally {
+      setCreatingChapter(false);
+    }
+  }
 
   function selectChapter(
     chapterId: string
@@ -1868,80 +1969,32 @@ export default function EditarHistoriaPage() {
           return currentStory;
         }
 
-        const chapterAlreadyExists =
-          currentStory.chapters.some(
-            (item) =>
-              item.id ===
-              savedChapter.id
-          );
-
-        let updatedChapters;
-
-        if (
-          chapterAlreadyExists
-        ) {
-          updatedChapters =
-            currentStory.chapters.map(
-              (item) => {
-                if (
-                  item.id !==
-                  savedChapter.id
-                ) {
-                  return item;
-                }
-
-                return {
-                  ...item,
-                  title:
-                    savedChapter.title,
-                  published:
-                    savedChapter.published,
-                  publication_status:
-                    savedChapter.publication_status,
-                  scheduled_for:
-                    resolvedScheduledFor,
-                  is_scheduled:
-                    savedChapter.publication_status ===
-                    'scheduled',
-                };
+        const updatedChapters =
+          currentStory.chapters.map(
+            (item) => {
+              if (
+                item.id !==
+                savedChapter.id
+              ) {
+                return item;
               }
-            );
-        } else {
-          /*
-           * O capítulo novo pode ter sido criado como
-           * rascunho e, por isso, ainda não existir na
-           * lista original da obra.
-           *
-           * Depois que ele for salvo, adicionamos o capítulo
-           * à lista local para que ele também apareça na
-           * coluna "Capítulos".
-           */
-          const newStoryChapter: StoryChapter = {
-            id: savedChapter.id,
-            chapter_number:
-              savedChapter.chapter_number,
-            title:
-              savedChapter.title,
-            published:
-              savedChapter.published,
-            scheduled_for:
-              resolvedScheduledFor,
-            is_scheduled:
-              savedChapter.publication_status ===
-              'scheduled',
-            publication_status:
-              savedChapter.publication_status,
-          };
 
-          updatedChapters = [
-            ...currentStory.chapters,
-            newStoryChapter,
-          ].sort(
-            (a, b) =>
-              a.chapter_number -
-              b.chapter_number
+              return {
+                ...item,
+                title:
+                  savedChapter.title,
+                published:
+                  savedChapter.published,
+                publication_status:
+                  savedChapter.publication_status,
+                scheduled_for:
+                  resolvedScheduledFor,
+                is_scheduled:
+                  savedChapter.publication_status ===
+                  'scheduled',
+              };
+            }
           );
-        }
 
         const updatedStory =
           {
@@ -2656,13 +2709,33 @@ export default function EditarHistoriaPage() {
                         : 'capítulos'}
                     </p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateChapter()}
+                    disabled={creatingChapter}
+                    className="shrink-0 rounded-lg bg-pink-500 px-3 py-2 text-xs font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
+                  >
+                    {creatingChapter ? 'CRIANDO...' : '+ NOVO CAPÍTULO'}
+                  </button>
                 </div>
 
                 <div className="mt-4 space-y-2">
                   {story.chapters
                     .length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-gray-600">
-                      Sua obra ainda não possui capítulos.
+                    <div className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center">
+                      <p className="text-sm text-gray-600">
+                        Sua obra ainda não possui capítulos.
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => void handleCreateChapter()}
+                        disabled={creatingChapter}
+                        className="mt-4 rounded-lg bg-pink-500 px-4 py-2 text-xs font-medium text-white hover:bg-pink-400 disabled:opacity-50 transition"
+                      >
+                        {creatingChapter ? 'CRIANDO...' : '+ CRIAR PRIMEIRO CAPÍTULO'}
+                      </button>
                     </div>
                   ) : (
                     story.chapters.map(
