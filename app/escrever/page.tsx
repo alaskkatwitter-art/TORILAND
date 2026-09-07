@@ -1,852 +1,201 @@
 "use client";
 
-import {
-  Suspense,
-  useEffect,
-  useState,
-} from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import AuthStatus from "../../components/AuthStatus";
 
-type StoryTag = {
-  id: string;
-  name: string;
-  slug: string;
-  category: string | null;
-  category_slug: string | null;
-};
-
-type Story = {
-  id: string;
-  title: string;
-  description: string | null;
-  cover_url: string | null;
-  status: string | null;
-  rating: string | null;
-  tags: StoryTag[];
-};
-
-const genres = [
-  "Romance",
-  "Fantasia",
-  "Drama",
-  "Aventura",
-  "Terror",
-  "Mistério",
-  "Ficção científica",
-  "Fanfic",
-];
-
-const ratings = ["Livre", "12+", "14+", "16+", "18+"];
-
-function EscreverForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const storyId = searchParams.get("id");
-  const isEditing = Boolean(storyId);
-
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [genre, setGenre] = useState("");
-  const [rating, setRating] = useState("Livre");
-  const [tags, setTags] = useState("");
-
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
-
-  const [loadingStory, setLoadingStory] = useState(isEditing);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!storyId) {
-      setLoadingStory(false);
-      return;
-    }
-
-    async function loadStory() {
-      try {
-        setLoadingStory(true);
-        setError("");
-
-        const response = await fetch(`/api/stories/${storyId}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.error || "Não foi possível carregar a história."
-          );
-        }
-
-        const story: Story = data.story;
-
-        setTitle(story.title || "");
-        setDescription(story.description || "");
-
-        if (story.rating) {
-          if (story.rating === "Livre") {
-            setRating("Livre");
-          } else {
-            setRating(`${story.rating}`.replace("+", "") + "+");
-          }
-        } else {
-          setRating("Livre");
-        }
-
-        const storyTags = Array.isArray(story.tags)
-          ? story.tags
-          : [];
-
-        const genreTag = storyTags.find(
-          (tag) =>
-            tag.category_slug === "genre" ||
-            tag.category === "genre" ||
-            tag.category === "Gênero" ||
-            tag.category === "genero"
-        );
-
-        if (genreTag) {
-          setGenre(genreTag.name);
-        }
-
-        const normalTags = storyTags
-          .filter(
-            (tag) =>
-              tag !== genreTag &&
-              tag.category_slug !== "genre" &&
-              tag.category !== "genre" &&
-              tag.category !== "Gênero" &&
-              tag.category !== "genero"
-          )
-          .map((tag) => tag.name);
-
-        setTags(normalTags.join(", "));
-
-        if (story.cover_url) {
-          setCoverPreview(story.cover_url);
-        }
-      } catch (err) {
-        console.error(err);
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Não foi possível carregar a história."
-        );
-      } finally {
-        setLoadingStory(false);
-      }
-    }
-
-    loadStory();
-  }, [storyId]);
-
-  function handleCoverChange(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
-    const file = event.target.files?.[0];
-
-    if (!file) return;
-
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "image/gif",
-    ];
-
-    if (!allowedTypes.includes(file.type)) {
-      setError(
-        "A capa precisa estar em JPG, PNG, WEBP ou GIF."
-      );
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setError("A capa pode ter no máximo 10 MB.");
-      return;
-    }
-
-    setError("");
-    setCoverFile(file);
-
-    const previewUrl = URL.createObjectURL(file);
-    setCoverPreview(previewUrl);
-  }
-
-  async function handleSave() {
-    if (!title.trim()) {
-      setError("Digite um título para sua história.");
-      return;
-    }
-
-    if (description.length > 5000) {
-      setError(
-        "A descrição pode ter no máximo 5000 caracteres."
-      );
-      return;
-    }
-
-    try {
-      setSaving(true);
-      setError("");
-      setSaved(false);
-
-      const formData = new FormData();
-
-      formData.append("title", title.trim());
-      formData.append("description", description.trim());
-      formData.append("status", "Em andamento");
-
-      const normalizedRating =
-        rating === "12+"
-          ? "12"
-          : rating === "14+"
-          ? "14"
-          : rating === "16+"
-          ? "16"
-          : rating === "18+"
-          ? "18"
-          : rating === "Livre"
-          ? "Livre"
-          : "";
-
-      formData.append("rating", normalizedRating);
-      formData.append("genre", genre);
-
-      const cleanedTags = tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean)
-        .join(",");
-
-      formData.append("tags", cleanedTags);
-
-      if (coverFile) {
-        formData.append("cover", coverFile);
-      }
-
-      const endpoint = isEditing
-        ? `/api/stories/${storyId}`
-        : "/api/stories/create";
-
-      const method = isEditing ? "PUT" : "POST";
-
-      const response = await fetch(endpoint, {
-        method,
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            data.message ||
-            "Não foi possível salvar a história."
-        );
-      }
-
-      setSaved(true);
-
-      const savedStoryId = data.story?.id || storyId;
-
-      if (savedStoryId) {
-        router.push(`/historia/${savedStoryId}`);
-      } else {
-        router.push("/perfil");
-      }
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Ocorreu um erro ao salvar a história."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function handleCancel() {
-    if (storyId) {
-      router.push(`/historia/${storyId}`);
-    } else {
-      router.back();
-    }
-  }
-
-  if (loadingStory) {
-    return (
-      <main
-        style={{
-          minHeight: "100vh",
-          background: "#0d0910",
-          color: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "Arial, sans-serif",
-        }}
-      >
-        <p style={{ color: "#c9bfc9" }}>
-          Carregando história...
-        </p>
-      </main>
-    );
-  }
-
+export default function EscreverPage() {
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#0d0910",
-        color: "#fff",
-        fontFamily: "Arial, sans-serif",
-        paddingBottom: "80px",
-      }}
-    >
-      <header
-        style={{
-          height: "72px",
-          borderBottom: "1px solid #241b28",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 7%",
-          background: "#100b13",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          style={{
-            border: "none",
-            background: "transparent",
-            color: "#fff",
-            fontSize: "24px",
-            fontWeight: 800,
-            cursor: "pointer",
-          }}
-        >
-          ☁ NOOKLIE
-        </button>
+    <main className="min-h-screen bg-[#100b12] text-white">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#100b12]/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center gap-6 px-5 py-4">
+          <Link
+            href="/"
+            className="flex shrink-0 items-center gap-2"
+          >
+            <CloudLogo />
 
-        <button
-          type="button"
-          onClick={handleCancel}
-          style={{
-            border: "1px solid #34283a",
-            background: "#171019",
-            color: "#d8ccd9",
-            borderRadius: "10px",
-            padding: "10px 18px",
-            cursor: "pointer",
-          }}
-        >
-          Cancelar
-        </button>
+            <span className="text-xl font-black tracking-[0.18em] text-[#ff78b9]">
+              NOOKLIE
+            </span>
+          </Link>
+
+          <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">
+            <NavLink href="/" label="Início" />
+            <NavLink href="/explorar" label="Explorar" />
+
+            <NavLink
+              href="/escrever"
+              label="Escrever"
+              active
+            />
+
+            <NavLink href="/fandoms" label="Fandoms" />
+            <NavLink href="/noticias" label="Notícias" />
+          </nav>
+
+          <div className="ml-auto">
+            <AuthStatus />
+          </div>
+        </div>
       </header>
 
-      <section
-        style={{
-          width: "min(900px, 90%)",
-          margin: "50px auto 0",
-        }}
-      >
-        <div style={{ marginBottom: "35px" }}>
-          <p
-            style={{
-              color: "#d96bd8",
-              fontSize: "13px",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "1px",
-              marginBottom: "8px",
-            }}
-          >
-            {isEditing ? "Editar obra" : "Nova história"}
-          </p>
+      <div className="mx-auto max-w-7xl px-5 py-12 md:py-20">
+        <section className="relative overflow-hidden rounded-[2rem] border border-[#ff78b9]/15 bg-gradient-to-br from-[#291522] via-[#21131e] to-[#171018] p-8 md:p-14">
+          <div className="pointer-events-none absolute -right-40 -top-40 h-[500px] w-[500px] rounded-full bg-[#ff78b9]/10 blur-[120px]" />
 
-          <h1
-            style={{
-              fontSize: "42px",
-              margin: 0,
-              lineHeight: 1.1,
-            }}
-          >
-            {isEditing
-              ? "Edite sua história"
-              : "Conte uma história"}
-          </h1>
-
-          <p
-            style={{
-              color: "#a99eaa",
-              marginTop: "12px",
-              fontSize: "16px",
-            }}
-          >
-            {isEditing
-              ? "Atualize os detalhes da sua obra."
-              : "Crie um cantinho para sua história existir."}
-          </p>
-        </div>
-
-        {error && (
-          <div
-            style={{
-              background: "#32151d",
-              border: "1px solid #713344",
-              color: "#ffb9c8",
-              padding: "14px 16px",
-              borderRadius: "10px",
-              marginBottom: "25px",
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        <div
-          style={{
-            display: "grid",
-            gap: "28px",
-          }}
-        >
-          <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "9px",
-                fontWeight: 700,
-              }}
-            >
-              Título
-            </label>
-
-            <input
-              type="text"
-              value={title}
-              maxLength={150}
-              onChange={(event) =>
-                setTitle(event.target.value)
-              }
-              placeholder="O nome da sua história"
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                background: "#151016",
-                border: "1px solid #34283a",
-                borderRadius: "10px",
-                padding: "15px",
-                color: "#fff",
-                fontSize: "16px",
-                outline: "none",
-              }}
-            />
-
-            <div
-              style={{
-                textAlign: "right",
-                color: "#746b76",
-                fontSize: "12px",
-                marginTop: "6px",
-              }}
-            >
-              {title.length}/150
-            </div>
-          </div>
-
-          <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "9px",
-                fontWeight: 700,
-              }}
-            >
-              Descrição
-            </label>
-
-            <textarea
-              value={description}
-              maxLength={5000}
-              onChange={(event) =>
-                setDescription(event.target.value)
-              }
-              placeholder="Sobre o que é sua história?"
-              rows={7}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                background: "#151016",
-                border: "1px solid #34283a",
-                borderRadius: "10px",
-                padding: "15px",
-                color: "#fff",
-                fontSize: "16px",
-                resize: "vertical",
-                outline: "none",
-                fontFamily: "inherit",
-              }}
-            />
-
-            <div
-              style={{
-                textAlign: "right",
-                color: "#746b76",
-                fontSize: "12px",
-                marginTop: "6px",
-              }}
-            >
-              {description.length}/5000
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: "20px",
-            }}
-          >
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "9px",
-                  fontWeight: 700,
-                }}
-              >
-                Gênero
-              </label>
-
-              <select
-                value={genre}
-                onChange={(event) =>
-                  setGenre(event.target.value)
-                }
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  background: "#151016",
-                  border: "1px solid #34283a",
-                  borderRadius: "10px",
-                  padding: "15px",
-                  color: "#fff",
-                  fontSize: "16px",
-                  outline: "none",
-                }}
-              >
-                <option value="">
-                  Selecione um gênero
-                </option>
-
-                {genres.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "9px",
-                  fontWeight: 700,
-                }}
-              >
-                Classificação
-              </label>
-
-              <select
-                value={rating}
-                onChange={(event) =>
-                  setRating(event.target.value)
-                }
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  background: "#151016",
-                  border: "1px solid #34283a",
-                  borderRadius: "10px",
-                  padding: "15px",
-                  color: "#fff",
-                  fontSize: "16px",
-                  outline: "none",
-                }}
-              >
-                {ratings.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "9px",
-                fontWeight: 700,
-              }}
-            >
-              Tags
-            </label>
-
-            <input
-              type="text"
-              value={tags}
-              onChange={(event) =>
-                setTags(event.target.value)
-              }
-              placeholder="ex: enemies to lovers, fantasia, slow burn"
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                background: "#151016",
-                border: "1px solid #34283a",
-                borderRadius: "10px",
-                padding: "15px",
-                color: "#fff",
-                fontSize: "16px",
-                outline: "none",
-              }}
-            />
-
-            <p
-              style={{
-                color: "#746b76",
-                fontSize: "12px",
-                marginTop: "7px",
-              }}
-            >
-              Separe as tags por vírgula.
+          <div className="relative max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#ff78b9]">
+              Área de escrita
             </p>
-          </div>
 
-          <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "9px",
-                fontWeight: 700,
-              }}
-            >
-              Capa
-            </label>
+            <h1 className="mt-4 text-4xl font-black leading-tight md:text-6xl">
+              Transforme uma ideia em uma história.
+            </h1>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit, minmax(230px, 1fr))",
-                gap: "20px",
-                alignItems: "start",
-              }}
-            >
-              <label
-                style={{
-                  minHeight: "280px",
-                  border: "1px dashed #514254",
-                  background: "#151016",
-                  borderRadius: "14px",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  padding: "25px",
-                  boxSizing: "border-box",
-                  textAlign: "center",
-                }}
+            <p className="mt-6 max-w-2xl text-base leading-7 text-white/50 md:text-lg">
+              Crie sua obra, organize capítulos, escolha seus fandoms e
+              publique suas histórias no Nooklie.
+            </p>
+
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/criar"
+                className="rounded-full bg-gradient-to-r from-[#ff68ae] to-[#ff91c4] px-7 py-3.5 text-center font-bold text-[#180d15] shadow-[0_10px_35px_rgba(255,104,174,0.15)] transition hover:-translate-y-0.5 hover:brightness-110"
               >
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  onChange={handleCoverChange}
-                  style={{ display: "none" }}
-                />
+                Criar nova história
+              </Link>
 
-                <div
-                  style={{
-                    fontSize: "42px",
-                    marginBottom: "12px",
-                  }}
-                >
-                  🖼️
-                </div>
-
-                <strong>Escolher imagem</strong>
-
-                <span
-                  style={{
-                    color: "#827784",
-                    fontSize: "13px",
-                    marginTop: "8px",
-                  }}
-                >
-                  JPG, PNG, WEBP ou GIF
-                  <br />
-                  até 10 MB
-                </span>
-              </label>
-
-              {coverPreview && (
-                <div>
-                  <div
-                    style={{
-                      width: "100%",
-                      aspectRatio: "2 / 3",
-                      maxWidth: "260px",
-                      overflow: "hidden",
-                      borderRadius: "14px",
-                      background: "#1a131c",
-                      border: "1px solid #34283a",
-                    }}
-                  >
-                    <img
-                      src={coverPreview}
-                      alt="Pré-visualização da capa"
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                    />
-                  </div>
-
-                  <p
-                    style={{
-                      color: "#827784",
-                      fontSize: "12px",
-                      marginTop: "8px",
-                    }}
-                  >
-                    Pré-visualização da capa
-                  </p>
-                </div>
-              )}
+              <Link
+                href="/"
+                className="rounded-full border border-white/10 bg-white/5 px-7 py-3.5 text-center font-bold text-white/70 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-white"
+              >
+                Voltar para o início
+              </Link>
             </div>
           </div>
+        </section>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: "12px",
-              marginTop: "15px",
-            }}
-          >
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={saving}
-              style={{
-                border: "1px solid #34283a",
-                background: "transparent",
-                color: "#d8ccd9",
-                borderRadius: "10px",
-                padding: "14px 22px",
-                cursor: saving
-                  ? "not-allowed"
-                  : "pointer",
-                opacity: saving ? 0.6 : 1,
-              }}
-            >
-              Cancelar
-            </button>
+        <section className="mt-12 grid gap-4 md:grid-cols-3">
+          <WritingCard
+            number="01"
+            title="Crie sua obra"
+            description="Comece com título, descrição, capa, classificação e informações da história."
+          />
 
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              style={{
-                border: "none",
-                background:
-                  "linear-gradient(135deg, #d95fd4, #a94dbb)",
-                color: "#fff",
-                borderRadius: "10px",
-                padding: "14px 26px",
-                fontWeight: 800,
-                cursor: saving
-                  ? "not-allowed"
-                  : "pointer",
-                opacity: saving ? 0.7 : 1,
-                boxShadow:
-                  "0 8px 25px rgba(180, 75, 190, 0.2)",
-              }}
-            >
-              {saving
-                ? "Salvando..."
-                : isEditing
-                ? "Salvar alterações"
-                : "Criar história"}
-            </button>
-          </div>
+          <WritingCard
+            number="02"
+            title="Escreva capítulos"
+            description="Use o editor do Nooklie para escrever e organizar seus capítulos."
+          />
 
-          {saved && (
-            <div
-              style={{
-                textAlign: "center",
-                color: "#9ee6b5",
-                fontSize: "14px",
-              }}
-            >
-              História salva com sucesso!
-            </div>
-          )}
+          <WritingCard
+            number="03"
+            title="Publique"
+            description="Quando estiver pronta, publique sua história para que leitores possam encontrá-la."
+          />
+        </section>
+
+        <section className="mt-12 rounded-[2rem] border border-white/10 bg-[#171018] p-8 md:p-10">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
+            Seu espaço
+          </p>
+
+          <h2 className="mt-3 text-2xl font-black">
+            Escreva do seu jeito.
+          </h2>
+
+          <p className="mt-3 max-w-2xl leading-7 text-white/40">
+            O Nooklie foi pensado para que a criação da história não fique
+            escondida atrás de uma interface complicada. Você cria a obra,
+            entra no editor e começa a escrever.
+          </p>
+        </section>
+      </div>
+
+      <footer className="border-t border-white/10 bg-[#0b080d]">
+        <div className="mx-auto max-w-7xl px-5 py-10 text-center">
+          <p className="text-sm text-white/30">
+            De escritor para escritor.
+          </p>
+
+          <p className="mt-2 text-xs text-white/15">
+            © {new Date().getFullYear()} Nooklie
+          </p>
         </div>
-      </section>
-
-      <footer
-        style={{
-          width: "min(900px, 90%)",
-          margin: "70px auto 0",
-          paddingTop: "25px",
-          borderTop: "1px solid #241b28",
-          color: "#665d68",
-          fontSize: "13px",
-          textAlign: "center",
-        }}
-      >
-        feito por escritores nooklie! para escritores
       </footer>
     </main>
   );
 }
 
-export default function EscreverPage() {
+function NavLink({
+  href,
+  label,
+  active = false,
+}: {
+  href: string;
+  label: string;
+  active?: boolean;
+}) {
   return (
-    <Suspense
-      fallback={
-        <main
-          style={{
-            minHeight: "100vh",
-            background: "#0d0910",
-            color: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "Arial, sans-serif",
-          }}
-        >
-          <p style={{ color: "#c9bfc9" }}>
-            Carregando...
-          </p>
-        </main>
-      }
+    <Link
+      href={href}
+      className={`rounded-full px-5 py-2.5 text-sm font-medium transition ${
+        active
+          ? "bg-gradient-to-r from-[#ff5fab] to-[#ff8fc5] text-[#180d15]"
+          : "text-white/60 hover:bg-[#ff78b9]/10 hover:text-[#ff9bca]"
+      }`}
     >
-      <EscreverForm />
-    </Suspense>
+      {label}
+    </Link>
+  );
+}
+
+function WritingCard({
+  number,
+  title,
+  description,
+}: {
+  number: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#171018] p-6 transition hover:border-[#ff78b9]/20 hover:bg-[#1b131a]">
+      <span className="text-sm font-bold text-[#ff78b9]">
+        {number}
+      </span>
+
+      <h2 className="mt-4 text-xl font-bold">
+        {title}
+      </h2>
+
+      <p className="mt-3 text-sm leading-6 text-white/40">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function CloudLogo() {
+  return (
+    <svg
+      width="44"
+      height="30"
+      viewBox="0 0 180 105"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="Logo Nooklie"
+    >
+      <path
+        d="M45 79C26 79 14 67 14 51C14 36 25 24 40 23C45 9 58 2 73 2C89 2 102 12 106 27C111 24 117 22 124 22C143 22 158 36 158 54C158 57 158 60 157 63C168 66 174 74 174 84C174 96 164 103 151 103H45C28 103 17 94 17 83C17 81 17 80 18 78C26 79 35 79 45 79Z"
+        fill="#FF78B9"
+      />
+
+      <path
+        d="M45 79C26 79 14 67 14 51C14 36 25 24 40 23C45 9 58 2 73 2C89 2 102 12 106 27C111 24 117 22 124 22C143 22 158 36 158 54C158 57 158 60 157 63C168 66 174 74 174 84C174 96 164 103 151 103H45C28 103 17 94 17 83C17 81 17 80 18 78C26 79 35 79 45 79Z"
+        stroke="#FF9BCB"
+        strokeWidth="3"
+      />
+    </svg>
   );
 }
