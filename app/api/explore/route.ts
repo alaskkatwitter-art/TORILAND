@@ -32,7 +32,8 @@ export async function GET(request: Request) {
      */
     const { data: users, error: usersError } = await supabase
       .from('profiles')
-.select('id, username, display_name, avatar_url, verified')      .or(`username.ilike.${search},display_name.ilike.${search}`)
+.select('id, username, display_name, avatar_url, verified')  
+      .or(`username.ilike.${search},display_name.ilike.${search}`)
       .order('username', { ascending: true })
       .limit(20);
 
@@ -94,7 +95,7 @@ export async function GET(request: Request) {
     if (authorIds.length > 0) {
       const { data: authorRows, error: authorsError } = await supabase
         .from('profiles')
-        .select('id, username, display_name, avatar_url')
+       .select('id, username, display_name, avatar_url, verified')
         .in('id', authorIds);
 
       if (authorsError) {
